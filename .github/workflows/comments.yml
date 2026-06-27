@@ -1,0 +1,54 @@
+name: Post Jira Comments
+
+# Triggered by the dashboard's "Comment" button: it commits
+# data/comment_queue.json then dispatches this workflow. The job posts each
+# queued comment to Jira (real @owner / CC mentions), writes a log, and clears
+# the queue so a batch never double-posts.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  post-comments:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post comments to Jira
+        env:
+          JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_BASE_URL:  ${{ secrets.JIRA_BASE_URL }}
+          # Needed to decrypt the encrypted CC recipients sheet (email_recipients.json.enc)
+          SITE_PASSWORD:  ${{ secrets.SITE_PASSWORD }}
+        run: python src/post_comments.py
+
+      - name: Commit log + cleared queue
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Commit only the ENCRYPTED queue (cleared). The plaintext log stays
+          # local (gitignored) so issue keys/results never hit the public repo.
+          git add data/comment_queue.json.enc 2>/dev/null || true
+          git rm --cached --ignore-unmatch data/comment_queue.json data/comment_log.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Post Jira comments $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              sleep 3
+            done
+          fi

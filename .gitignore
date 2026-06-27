@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# ── Confidential artifacts — generated only on the runner, never published ──
+# The report images + email body contain names/numbers in plaintext. They are
+# built transiently for the email step but must NOT be committed to the public
+# repo. The dashboard renders live from the encrypted blob, so it doesn't need
+# them. (See weekly.yml: these are deliberately excluded from `git add`.)
+docs/report.png
+docs/dashboard_full.png
+docs/changes_only.png
+docs/email_body.html
+data/temp/
+
+# Plaintext copies of the encrypted-at-rest data stores (we commit only *.enc).
+# NOTE: schedule.json stays PLAINTEXT (no PII; read by the lightweight decide
+# job which has no crypto lib), so it is NOT listed here.
+data/history.json
+data/hidden_people.json
+data/email_recipients.json
+data/comment_queue.json
+# Comment log holds issue keys/results — keep it local only, never published.
+data/comment_log.json
+
+# Local diagnostic dumps (never commit)
+/live*.html
+/_*.html
+
+# Cloudflare wrangler local cache (leaks account id) — never commit
+worker/.wrangler/
+.wrangler/

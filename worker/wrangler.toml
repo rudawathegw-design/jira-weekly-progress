@@ -1,0 +1,17 @@
+name = "github-proxy"
+main = "github-proxy.js"
+compatibility_date = "2024-11-01"
+
+# Public, non-secret config. Edit REPO/ALLOWED_ORIGIN to match your setup.
+[vars]
+REPO = "rudawathegw-design/jira-weekly-progress"
+ALLOWED_ORIGIN = "https://admin.fibpmo.com,https://fibpmo.com,https://www.fibpmo.com,https://rudawathegw-design.github.io"
+# Jira (non-secret). Keep these here so `wrangler deploy` never wipes them.
+# JIRA_EMAIL / JIRA_API_TOKEN stay as SECRETS (wrangler secret put …).
+JIRA_BASE_URL = "https://fibtask.atlassian.net"
+JIRA_PROJECT = "FIBTMP"
+
+# Secrets are NOT stored here. Set them once with:
+#   wrangler secret put GH_PAT
+#   wrangler secret put SITE_PASSWORD
+# (or via the Cloudflare dashboard → Worker → Settings → Variables → Encrypt)

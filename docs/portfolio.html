@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FIB · PMO Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;color:#0f172a;min-height:100vh;
+  background:radial-gradient(ellipse 90% 50% at 12% -8%,#bfdbfe66,transparent),
+  radial-gradient(ellipse 70% 60% at 95% 0%,#ddd6fe44,transparent),#f3f7fc;
+  background-attachment:fixed;padding:clamp(14px,3vw,40px)}
+.wrap{max-width:1240px;margin:0 auto}
+/* gate */
+#gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:300;
+  background:linear-gradient(160deg,#dbeafe,#ede9fe90,#f0fdf4);backdrop-filter:blur(18px)}
+.gate-card{background:#fff;border:1px solid #e2e8f0;border-radius:22px;box-shadow:0 20px 60px rgba(59,130,246,.18);
+  padding:40px 46px;width:min(400px,92vw);text-align:center}
+.gate-card h2{font-size:21px;font-weight:800;margin-bottom:4px}
+.gate-card p{color:#64748b;font-size:13px;margin-bottom:22px}
+.inp{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-size:15px;
+  padding:11px 15px;outline:none;font-family:inherit;transition:border .2s}
+.inp:focus{border-color:#3b82f6;background:#fff}
+.btn{margin-top:11px;width:100%;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
+  font-weight:700;font-size:14px;border:none;border-radius:10px;padding:12px;cursor:pointer;font-family:inherit}
+.err{color:#dc2626;font-size:12px;margin-top:9px;min-height:16px}
+/* header */
+header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:22px}
+.brand{font-size:clamp(22px,4vw,32px);font-weight:900;letter-spacing:-.03em}
+.brand span{background:linear-gradient(90deg,#0e9488,#2563eb);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:#64748b;font-size:13px;margin-top:3px}
+.refresh{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#0d9488,#0f766e);
+  color:#fff;border:none;border-radius:11px;font-weight:700;font-size:13px;padding:11px 18px;cursor:pointer;
+  font-family:inherit;box-shadow:0 3px 14px rgba(13,148,136,.3)}
+.refresh:disabled{opacity:.6;cursor:wait}
+.upd{font-size:11.5px;color:#94a3b8;font-family:'JetBrains Mono',monospace;margin-top:6px}
+/* KPI row */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.kpi{background:#fff;border:1px solid #e7eef7;border-radius:16px;padding:16px 18px;box-shadow:0 2px 10px rgba(2,8,23,.04)}
+.kpi .lab{font-size:10.5px;font-weight:800;letter-spacing:.12em;color:#94a3b8;text-transform:uppercase}
+.kpi .val{font-size:30px;font-weight:900;letter-spacing:-.02em;margin-top:6px;line-height:1}
+.kpi .vsub{font-size:11.5px;color:#64748b;margin-top:4px}
+.kpi.red .val{color:#dc2626}.kpi.green .val{color:#059669}.kpi.blue .val{color:#2563eb}
+/* grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:#fff;border:1px solid #e7eef7;border-radius:16px;padding:16px 18px;text-decoration:none;color:inherit;
+  box-shadow:0 2px 12px rgba(2,8,23,.05);transition:transform .12s,box-shadow .12s;display:block;position:relative;overflow:hidden}
+.card:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(2,8,23,.12)}
+.card .rag{position:absolute;left:0;top:0;bottom:0;width:5px}
+.rag-g{background:#10b981}.rag-a{background:#f59e0b}.rag-r{background:#ef4444}
+.pkey{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#64748b;
+  background:#f1f5f9;border-radius:6px;padding:2px 7px;display:inline-block}
+.pname{font-size:14px;font-weight:700;margin:9px 0 12px;line-height:1.3;min-height:36px}
+.bar{height:9px;border-radius:999px;background:#eef2f7;overflow:hidden;margin-bottom:6px}
+.bar i{display:block;height:100%;border-radius:999px}
+.barrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.pct{font-size:20px;font-weight:900;letter-spacing:-.02em}
+.pct s{font-size:11px;font-weight:600;color:#94a3b8;text-decoration:none;margin-left:4px}
+.mrow{display:flex;gap:8px}
+.m{flex:1;background:#f8fafc;border:1px solid #eef2f7;border-radius:9px;padding:7px 9px;text-align:center}
+.m b{display:block;font-size:16px;font-weight:800;line-height:1}
+.m span{font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.m.ov b{color:#dc2626}.m.ov{background:#fef2f7;border-color:#fecdd3}
+.loading{text-align:center;color:#94a3b8;padding:60px;font-size:14px}
+@media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+/* modals */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(6px);z-index:500;display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
+.ov.open{display:flex}
+.modal{background:#fff;border-radius:18px;width:min(980px,96vw);box-shadow:0 30px 80px rgba(2,8,23,.35);overflow:hidden;margin-bottom:6vh}
+.mhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid #eef2f7;position:sticky;top:0;background:#fff;z-index:2}
+.mhead h3{font-size:17px;font-weight:800}
+.mhead .sub{color:#94a3b8;font-size:11.5px;font-family:'JetBrains Mono',monospace;margin-top:2px}
+.mhead .x{border:1px solid #e2e8f0;background:#fff;border-radius:9px;padding:7px 13px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px}
+.mbody{padding:16px 22px 22px}
+.tsum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tsum .t{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 13px;font-size:11px;font-weight:700;color:#64748b;text-align:center}
+.tsum .t b{font-size:17px;display:block;color:#0f172a}
+.tsum .t.ov b{color:#dc2626}
+.tfilter{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:9px 13px;font-size:13px;margin-bottom:12px;outline:none;font-family:inherit}
+.trow{display:grid;grid-template-columns:84px 1fr 120px 120px 92px;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+.trow.h{font-weight:800;color:#94a3b8;font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid #eef2f7}
+.tk{font-family:'JetBrains Mono',monospace;font-size:11px;color:#2563eb;text-decoration:none;font-weight:600}
+.st{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.st-done{background:#dcfce7;color:#166534}.st-prog{background:#dbeafe;color:#1e40af}.st-wait{background:#fef9c3;color:#854d0e}.st-open{background:#f1f5f9;color:#475569}
+.due-ov{color:#dc2626;font-weight:700}
+.feed-row{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:10px 4px;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+.feed-when{font-family:'JetBrains Mono',monospace;font-size:11px;color:#94a3b8}
+.fpk{font-family:'JetBrains Mono',monospace;font-size:10px;background:#eef2f7;color:#475569;border-radius:5px;padding:1px 6px;font-weight:700}
+.farrow{color:#94a3b8;font-weight:700;margin:0 5px}
+.muted{color:#94a3b8;text-align:center;padding:40px}
+.card{cursor:pointer}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <div style="font-size:30px;margin-bottom:8px">📊</div>
+    <h2>PMO Portfolio</h2>
+    <p>Enter password to continue</p>
+    <input id="pw" class="inp" type="password" placeholder="Password" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')unlock()">
+    <button class="btn" onclick="unlock()">Unlock →</button>
+    <div class="err" id="gerr"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand">FIB · <span>PMO Portfolio</span></div>
+      <div class="sub">Live delivery health across every Jira project</div>
+    </div>
+    <div style="text-align:right">
+      <button class="refresh" style="background:linear-gradient(135deg,#6366f1,#4f46e5);box-shadow:0 3px 14px rgba(99,102,241,.3);margin-right:8px" onclick="openActivity()">🕒 Today's Activity</button>
+      <button class="refresh" id="rbtn" onclick="load()">↻ Refresh</button>
+      <div class="upd" id="upd"></div>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+  <div id="grid" class="grid"><div class="loading">Loading portfolio…</div></div>
+</div>
+</div>
+
+<!-- Project drill-down modal -->
+<div class="ov" id="dm" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="mhead">
+      <h3 id="dm-title">Project</h3>
+      <div style="display:flex;gap:8px">
+        <a id="dm-jira" class="x" target="_blank" rel="noopener" style="text-decoration:none;color:#2563eb">↗ Jira</a>
+        <button class="x" onclick="document.getElementById('dm').classList.remove('open')">Close</button>
+      </div>
+    </div>
+    <div class="mbody" id="dm-body"></div>
+  </div>
+</div>
+
+<!-- Today's activity modal -->
+<div class="ov" id="am" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="mhead">
+      <div><h3>🕒 Today's Activity</h3><div class="sub" id="am-sub"></div></div>
+      <button class="x" onclick="document.getElementById('am').classList.remove('open')">Close</button>
+    </div>
+    <div class="mbody" id="am-body"></div>
+  </div>
+</div>
+
+<script>
+const GH_PROXY = "https://github-proxy.rudaw-a-the-gw.workers.dev";
+const JIRA_BASE = "https://fibtask.atlassian.net";
+let PW = '';
+
+async function _proxy(action, extra){
+  const r = await fetch(GH_PROXY, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Proxy-Auth':PW},
+    body: JSON.stringify(Object.assign({action}, extra||{}))
+  });
+  return r;
+}
+
+async function unlock(){
+  const v = document.getElementById('pw').value;
+  const err = document.getElementById('gerr');
+  if(!v) return;
+  err.textContent = 'Checking…';
+  try{
+    PW = v;
+    const r = await _proxy('verify');
+    if(r.status !== 200){ throw new Error('bad'); }
+    err.textContent='';
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').style.display='block';
+    load();
+  }catch(e){
+    PW=''; err.textContent='Incorrect password.';
+    document.getElementById('pw').value=''; document.getElementById('pw').focus();
+  }
+}
+
+const esc = s => { const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; };
+function rag(pct, overdueRatio){
+  if(overdueRatio>=0.30 || pct<50) return 'r';
+  if(overdueRatio>=0.12 || pct<75) return 'a';
+  return 'g';
+}
+const RAGCOL = {g:'linear-gradient(90deg,#10b981,#059669)', a:'linear-gradient(90deg,#f59e0b,#d97706)', r:'linear-gradient(90deg,#ef4444,#b91c1c)'};
+
+async function load(){
+  const btn = document.getElementById('rbtn');
+  const grid = document.getElementById('grid');
+  btn.disabled = true; btn.textContent='↻ Loading…';
+  try{
+    const r = await _proxy('portfolio');
+    if(r.status!==200){ grid.innerHTML='<div class="loading" style="color:#dc2626">Failed to load ('+r.status+').</div>'; return; }
+    const d = await r.json();
+    render(d);
+    const now = new Date();
+    document.getElementById('upd').textContent = 'Updated '+now.toLocaleTimeString();
+  }catch(e){
+    grid.innerHTML='<div class="loading" style="color:#dc2626">Network error: '+esc(e.message)+'</div>';
+  }finally{
+    btn.disabled=false; btn.textContent='↻ Refresh';
+  }
+}
+
+function render(d){
+  const projs = (d.projects||[]).map(p=>{
+    const total=p.total||0, done=p.done||0, overdue=p.overdue||0;
+    const pct = total ? Math.round(100*done/total) : 0;
+    return {...p, total, done, overdue, pct, ovr: total?overdue/total:0};
+  });
+  // KPIs
+  const nP = projs.length;
+  const tot = projs.reduce((a,p)=>a+p.total,0);
+  const don = projs.reduce((a,p)=>a+p.done,0);
+  const ovd = projs.reduce((a,p)=>a+p.overdue,0);
+  const comp = tot ? Math.round(100*don/tot) : 0;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi blue"><div class="lab">Projects</div><div class="val">${nP}</div><div class="vsub">live in Jira</div></div>
+    <div class="kpi"><div class="lab">Total Tasks</div><div class="val">${tot.toLocaleString()}</div><div class="vsub">across portfolio</div></div>
+    <div class="kpi green"><div class="lab">Completed</div><div class="val">${don.toLocaleString()}</div><div class="vsub">${comp}% of all work</div></div>
+    <div class="kpi ${comp>=75?'green':comp>=60?'':'red'}"><div class="lab">Completion</div><div class="val">${comp}%</div><div class="vsub">portfolio-wide</div></div>
+    <div class="kpi red"><div class="lab">Overdue</div><div class="val">${ovd.toLocaleString()}</div><div class="vsub">past due, not done</div></div>`;
+  // sort: worst (most overdue) first
+  projs.sort((a,b)=> b.overdue - a.overdue || a.pct - b.pct);
+  _PF = projs;
+  document.getElementById('grid').innerHTML = projs.map(p=>{
+    const g = rag(p.pct, p.ovr);
+    return `<div class="card" onclick="openProject('${p.key}')" title="Click for task details">
+      <span class="rag rag-${g}"></span>
+      <span class="pkey">${esc(p.key)}</span>
+      <div class="pname">${esc(p.name)}</div>
+      <div class="barrow">
+        <div class="pct">${p.pct}%<s>done</s></div>
+        <div style="font-size:11.5px;color:#64748b">${p.done}/${p.total}</div>
+      </div>
+      <div class="bar"><i style="width:${p.pct}%;background:${RAGCOL[g]}"></i></div>
+      <div class="mrow">
+        <div class="m"><b>${p.total}</b><span>Total</span></div>
+        <div class="m"><b style="color:#059669">${p.done}</b><span>Done</span></div>
+        <div class="m ov"><b>${p.overdue}</b><span>Overdue</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Project drill-down (task details + status) ──
+let _PF = [];
+let _DM_ISSUES = [];
+function _cat(it){
+  const f=it.fields||{}; const st=((f.status&&f.status.name)||'').toLowerCase();
+  const c=((f.status&&f.status.statusCategory&&f.status.statusCategory.key)||'').toLowerCase();
+  if(c==='done'||st==='available') return 'done';
+  if(st.includes('progress')) return 'prog';
+  if(st.includes('wait')||st.includes('approv')||st.includes('review')) return 'wait';
+  return 'open';
+}
+function _overdue(it){ const f=it.fields||{}; if(_cat(it)==='done')return false; const d=f.duedate; return d && new Date(d).getTime()<Date.now(); }
+
+async function openProject(key){
+  const p = _PF.find(x=>x.key===key) || {key,name:key};
+  document.getElementById('dm-title').textContent = key+' · '+(p.name||'').replace(/^FIB \| |^First Iraqi Bank[ -]*/,'');
+  document.getElementById('dm-jira').href = JIRA_BASE+'/jira/software/c/projects/'+encodeURIComponent(key)+'/issues';
+  document.getElementById('dm-body').innerHTML = '<div class="muted">Loading tasks…</div>';
+  document.getElementById('dm').classList.add('open');
+  try{
+    const r = await _proxy('issues',{project:key});
+    if(r.status!==200){ document.getElementById('dm-body').innerHTML='<div class="muted" style="color:#dc2626">Failed to load ('+r.status+').</div>'; return; }
+    const d = await r.json();
+    _DM_ISSUES = d.issues||[];
+    _renderProject();
+  }catch(e){ document.getElementById('dm-body').innerHTML='<div class="muted" style="color:#dc2626">Network error.</div>'; }
+}
+function _renderProject(){
+  const iss=_DM_ISSUES;
+  const tot=iss.length, done=iss.filter(i=>_cat(i)==='done').length, prog=iss.filter(i=>_cat(i)==='prog').length,
+        wait=iss.filter(i=>_cat(i)==='wait').length, open=iss.filter(i=>_cat(i)==='open').length, ov=iss.filter(_overdue).length;
+  document.getElementById('dm-body').innerHTML = `
+    <div class="tsum">
+      <div class="t"><b>${tot}</b>Total</div>
+      <div class="t"><b style="color:#059669">${done}</b>Done</div>
+      <div class="t"><b style="color:#1e40af">${prog}</b>In&nbsp;Progress</div>
+      <div class="t"><b style="color:#854d0e">${wait}</b>Waiting</div>
+      <div class="t"><b>${open}</b>Open</div>
+      <div class="t ov"><b>${ov}</b>Overdue</div>
+    </div>
+    <input class="tfilter" id="dm-filter" placeholder="Filter by key, summary, owner, status…" oninput="_filterRows()">
+    <div class="trow h"><div>Key</div><div>Summary</div><div>Status</div><div>Owner</div><div>Due</div></div>
+    <div id="dm-rows"></div>`;
+  _filterRows();
+}
+function _filterRows(){
+  const q=(document.getElementById('dm-filter')?.value||'').toLowerCase().trim();
+  const base=JIRA_BASE;
+  let iss=_DM_ISSUES.slice();
+  if(q) iss=iss.filter(i=>{const f=i.fields||{};return (i.key||'').toLowerCase().includes(q)||(f.summary||'').toLowerCase().includes(q)||((f.assignee&&f.assignee.displayName)||'').toLowerCase().includes(q)||((f.status&&f.status.name)||'').toLowerCase().includes(q);});
+  iss.sort((a,b)=>(_overdue(b)?1:0)-(_overdue(a)?1:0));
+  const rows=iss.slice(0,500).map(i=>{
+    const f=i.fields||{}; const c=_cat(i); const ov=_overdue(i);
+    const owner=(f.assignee&&f.assignee.displayName)||'Unassigned';
+    return `<div class="trow">
+      <a class="tk" href="${base}/browse/${encodeURIComponent(i.key)}" target="_blank" rel="noopener">${esc(i.key)}</a>
+      <div title="${esc(f.summary)}">${esc((f.summary||'').slice(0,90))}</div>
+      <div><span class="st st-${c}">${esc((f.status&&f.status.name)||'')}</span></div>
+      <div>${esc(owner)}</div>
+      <div class="${ov?'due-ov':''}">${f.duedate?esc(f.duedate):'—'}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('dm-rows').innerHTML = rows || '<div class="muted">No tasks match.</div>';
+}
+
+// ── Today's activity across all projects ──
+function _ago(ms){const s=Math.max(0,Math.floor((Date.now()-ms)/1000));if(s<60)return s+'s';const m=Math.floor(s/60);if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';return Math.floor(h/24)+'d';}
+async function openActivity(){
+  document.getElementById('am-sub').textContent='';
+  document.getElementById('am-body').innerHTML='<div class="muted">Loading today\'s activity…</div>';
+  document.getElementById('am').classList.add('open');
+  try{
+    const r=await _proxy('activity_all',{days:1});
+    if(r.status!==200){ document.getElementById('am-body').innerHTML='<div class="muted" style="color:#dc2626">Failed to load ('+r.status+').</div>'; return; }
+    const d=await r.json();
+    const interesting=new Set(['status','duedate','assignee','priority']);
+    const ev=[];
+    (d.issues||[]).forEach(it=>{
+      const f=it.fields||{}; const owner=(f.assignee&&f.assignee.displayName)||'Unassigned';
+      const pk=(f.project&&f.project.key)||''; const summary=f.summary||'';
+      ((it.changelog&&it.changelog.histories)||[]).forEach(h=>{
+        const when=h.created; if(!when)return; const author=(h.author&&h.author.displayName)||'Unknown';
+        (h.items||[]).forEach(item=>{ const field=(item.field||'').toLowerCase(); if(!interesting.has(field))return;
+          ev.push({when,author,field,from:item.fromString||'',to:item.toString||'',key:it.key,summary,owner,pk,_t:new Date(when).getTime()}); });
+      });
+    });
+    ev.sort((a,b)=>b._t-a._t);
+    _renderActivity(ev);
+  }catch(e){ document.getElementById('am-body').innerHTML='<div class="muted" style="color:#dc2626">Network error.</div>'; }
+}
+function _renderActivity(ev){
+  const base=JIRA_BASE;
+  document.getElementById('am-sub').textContent = ev.length+' change(s) · last 24h · all projects';
+  if(!ev.length){ document.getElementById('am-body').innerHTML='<div class="muted">No changes in the last 24 hours.</div>'; return; }
+  const fmt=v=>v?esc(v.length>26?v.slice(0,24)+'…':v):'<em style="color:#cbd5e1">none</em>';
+  document.getElementById('am-body').innerHTML = ev.slice(0,300).map(e=>`
+    <div class="feed-row">
+      <div class="feed-when" title="${esc(e.when)}">${_ago(e._t)} ago</div>
+      <div>
+        <span class="fpk">${esc(e.pk)}</span>
+        <a class="tk" href="${base}/browse/${encodeURIComponent(e.key)}" target="_blank" rel="noopener">${esc(e.key)}</a>
+        <b style="text-transform:capitalize">${esc(e.field)}</b>: ${fmt(e.from)}<span class="farrow">→</span>${fmt(e.to)}
+        <div style="color:#64748b;font-size:11.5px;margin-top:2px">${esc((e.summary||'').slice(0,72))} · ${esc(e.author)} → owner ${esc(e.owner)}</div>
+      </div>
+    </div>`).join('');
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ document.getElementById('dm').classList.remove('open'); document.getElementById('am').classList.remove('open'); } });
+
+// Refresh on a relaxed cadence (count calls are cheap but ~6s; no tight loop).
+setInterval(()=>{ if(document.getElementById('app').style.display!=='none' && document.visibilityState==='visible') load(); }, 300000);
+</script>
+</body>
+</html>

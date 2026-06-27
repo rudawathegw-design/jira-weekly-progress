@@ -1,0 +1,302 @@
+name: Daily Progress Report
+
+on:
+  schedule:
+    # Every 5 min, OFFSET from the top of the hour. GitHub's scheduled
+    # events get delayed/dropped during xx:00 load spikes; running at
+    # xx:03, xx:08, xx:13, … dodges that bucket. Combined with the
+    # ±4-min tolerance in the 'decide' job, user-configured slots still
+    # match cleanly.
+    - cron: "3-59/5 * * * *"
+  repository_dispatch:
+    # External pingers (cron-job.org etc.) can POST to
+    # /repos/.../dispatches with event_type=cron_ping to force a tick
+    # when GitHub's own scheduler is sleeping. The decide job still
+    # honors data/schedule.json so off-window pings just exit cheaply.
+    types: [cron_ping]
+  workflow_dispatch:
+    inputs:
+      save_history:
+        description: "Save this run to history?"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      force_weekly:
+        description: "Tag this snapshot as the weekly (Wednesday) baseline?"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      send_email:
+        description: "Email the report when done?"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      recipients:
+        description: "Email recipients (comma-separated). Empty = use EMAIL_RECIPIENTS_DEFAULT secret."
+        required: false
+        default: ""
+        type: string
+      attachment_path:
+        description: "Path to PNG to attach (default: docs/report.png)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+# Serialize runs so the every-5-min schedule can't race on commit/push. Without
+# this, concurrent runs hit "could not apply / unmerged files" during the
+# rebase loop and can drop staged files (this is what wiped the data stores).
+concurrency:
+  group: build-report
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+      send_email: ${{ steps.check.outputs.send_email }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        name: Honor schedule.json (skip if hour/day excluded)
+        run: |
+          # Manual dispatch always runs with user inputs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "send_email=${{ github.event.inputs.send_email }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # schedule OR repository_dispatch (external pinger): consult schedule.json
+          if [ ! -f data/schedule.json ]; then
+            echo "No schedule.json — defaulting to run"
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "send_email=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          HOUR=$(date -u +%-H)
+          MIN=$(date -u +%-M)
+          DOW=$(date -u +%w)
+          OUT=$(python3 - <<PYEOF
+          import json
+          d = json.load(open("data/schedule.json"))
+          slots = d.get("slots_utc")          # "HH:MM" minute precision
+          if not slots:                       # legacy fallback
+              slots = [f"{h:02d}:00" for h in d.get("hours_utc", [])]
+          days  = d.get("active_days", [0,1,2,3,4])
+          se    = d.get("send_email", True)
+          tol   = int(d.get("tolerance_min", 4))  # GitHub cron jitter window
+          now_t = int($HOUR)*60 + int($MIN)
+          def to_min(s):
+              h,m = s.split(":")
+              return int(h)*60 + int(m)
+          hit = any(abs(now_t - to_min(s)) <= tol for s in slots)
+          if hit and int($DOW) in days:
+              print("RUN", "true" if se else "false")
+          else:
+              print("SKIP")
+          PYEOF
+          )
+          if [[ "$OUT" == RUN* ]]; then
+            SE=$(echo "$OUT" | awk '{print $2}')
+            echo "run=true" >> $GITHUB_OUTPUT
+            echo "send_email=$SE" >> $GITHUB_OUTPUT
+            echo "Scheduled run: HOUR=$HOUR DOW=$DOW → proceed (email=$SE)"
+          else
+            echo "Scheduled run: HOUR=$HOUR DOW=$DOW → skip per schedule.json"
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-report:
+    needs: decide
+    if: needs.decide.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate report
+        env:
+          JIRA_EMAIL:         ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN:     ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_BASE_URL:      ${{ secrets.JIRA_BASE_URL }}
+          JIRA_PROJECT:       ${{ secrets.JIRA_PROJECT }}
+          DEEPSEEK_API_KEY:   ${{ secrets.DEEPSEEK_API_KEY }}
+          SITE_PASSWORD_HASH: ${{ secrets.SITE_PASSWORD_HASH }}
+          SITE_PASSWORD:      ${{ secrets.SITE_PASSWORD }}
+          DELETE_PASSWORD_HASH: ${{ secrets.DELETE_PASSWORD_HASH }}
+          GH_PAT:             ${{ secrets.GH_PAT }}
+          # When set, the dashboard routes GitHub calls through this Worker and
+          # the PAT is NOT embedded in the page. Empty = unchanged (PAT embedded).
+          GH_PROXY_URL:       ${{ secrets.GH_PROXY_URL }}
+          # Tell main.py whether the workflow will actually email this run,
+          # so it only spends DeepSeek tokens when needed.
+          SEND_EMAIL: ${{ needs.decide.outputs.send_email }}
+          SAVE_HISTORY: >-
+            ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.save_history || 'false' }}
+          # Manual dispatch with save_history=true forces a save regardless of weekday
+          FORCE_SAVE_HISTORY: >-
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.save_history == 'true' && 'true' || 'false' }}
+          FORCE_WEEKLY: ${{ github.event.inputs.force_weekly || 'false' }}
+        run: python src/main.py
+
+      - name: Commit updated report
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Publish ONLY the encrypted dashboard + encrypted data stores. The
+          # report images and email body are confidential plaintext — generated
+          # on the runner for the email step but deliberately NEVER committed
+          # to the public repo (see .gitignore). The dashboard renders live
+          # from the encrypted blob, so it doesn't need them.
+          git add docs/index.html docs/admin.html 2>/dev/null || true
+          # Stage ALL data/ changes at once: the new *.enc files AND the removal
+          # of plaintext that the migration (main.py save_store) performed. Using
+          # -A couples the deletion to the .enc creation — plaintext can never be
+          # dropped unless its encrypted replacement is staged in the same commit.
+          git add -A data/ 2>/dev/null || true
+          # Report artifacts are confidential plaintext — never publish them.
+          git rm --cached --ignore-unmatch docs/report.png docs/email_body.html docs/dashboard_full.png docs/changes_only.png 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Progress report $(date -u +%Y-%m-%d)"
+            # Survive a race with concurrent pushes
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break
+              sleep 3
+            done
+          fi
+
+      # ── Playwright screenshots (full dashboard + Changes-only) ──
+      - name: Screenshot live dashboard for email
+        if: needs.decide.outputs.send_email == 'true'
+        continue-on-error: true
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          npm init -y >/dev/null
+          npm i --silent playwright
+          npx playwright install --with-deps chromium
+          cat > screenshot.js <<'EOF'
+          const { chromium } = require('playwright');
+          const path = require('path');
+          (async () => {
+            const browser = await chromium.launch();
+            const ctx = await browser.newContext({
+              viewport: { width: 1400, height: 2400 },
+              deviceScaleFactor: 2,
+            });
+            const page = await ctx.newPage();
+            await page.goto('file://' + path.resolve('docs/index.html'), { waitUntil: 'load' });
+            await page.fill('#pw-inp', process.env.SITE_PASSWORD);
+            await page.click('.btn-primary');
+            await page.waitForSelector('#app', { state: 'visible', timeout: 15000 });
+            await page.waitForTimeout(3000);  // donut + bars render
+
+            // Hide top-bar action buttons (Refresh / Export / More / Admin) + status chips
+            await page.evaluate(() => { document.body.classList.add('capturing'); });
+            await page.waitForTimeout(150);
+
+            // 1) Full dashboard screenshot (the whole .wrap)
+            const wrap = await page.locator('.wrap').first();
+            await wrap.screenshot({ path: 'docs/dashboard_full.png', omitBackground: false });
+            console.log('dashboard_full.png saved');
+
+            // 2) Changes-only screenshot (just the Changes col-block, no AI)
+            const changes = await page.locator('#tbl-ch').first();
+            const block = await changes.evaluateHandle(el => el.closest('.col-block'));
+            if (block && (await block.asElement())) {
+              await block.asElement().screenshot({ path: 'docs/changes_only.png', omitBackground: false });
+              console.log('changes_only.png saved');
+            }
+
+            await browser.close();
+          })();
+          EOF
+          node screenshot.js
+
+      # ── Email step (auto on schedule, opt-in on manual dispatch) ──
+      - name: Prepare email vars
+        id: emailvars
+        if: needs.decide.outputs.send_email == 'true'
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+          if [ -n "${{ github.event.inputs.recipients }}" ]; then
+            TO="${{ github.event.inputs.recipients }}"
+          else
+            TO="${{ secrets.EMAIL_RECIPIENTS_DEFAULT }}"
+          fi
+          echo "to=$TO" >> $GITHUB_OUTPUT
+          # Build attachments list (comma-separated; dawidd6/action-send-mail supports many)
+          # Priority:
+          #   - If user supplied a custom attachment_path → use ONLY that
+          #   - Else → attach dashboard_full + changes_only if they exist,
+          #            fall back to docs/report.png
+          ATTACH="${{ github.event.inputs.attachment_path }}"
+          if [ -z "$ATTACH" ] || [ ! -f "$ATTACH" ]; then
+            LIST=""
+            [ -f docs/dashboard_full.png ] && LIST="docs/dashboard_full.png"
+            [ -f docs/changes_only.png   ] && LIST="${LIST:+$LIST,}docs/changes_only.png"
+            if [ -z "$LIST" ] && [ -f docs/report.png ]; then
+              LIST="docs/report.png"
+            fi
+            ATTACH="$LIST"
+          fi
+          echo "attach=$ATTACH" >> $GITHUB_OUTPUT
+          # Email body (multi-line) from docs/email_body.html
+          # Use printf to guarantee a newline between content and the heredoc
+          # closing delimiter (the HTML file doesn't end with a newline).
+          if [ -f docs/email_body.html ]; then
+            {
+              printf 'body<<EMAILBODY_EOF\n'
+              cat docs/email_body.html
+              printf '\nEMAILBODY_EOF\n'
+            } >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send email with report image
+        if: ${{ needs.decide.outputs.send_email == 'true' && steps.emailvars.outputs.to != '' }}
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # SMTP provider configurable via secrets so we can swap relays
+          # (Resend, Brevo, SendGrid, Office 365, …) without code changes.
+          server_address: ${{ secrets.SMTP_HOST || 'smtp.resend.com' }}
+          server_port:    ${{ secrets.SMTP_PORT || 587 }}
+          secure: false
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: Rudaw AI | Banking Transformation & Modernization Program (BTMP) <${{ secrets.SMTP_FROM || 'onboarding@resend.dev' }}>
+          to: ${{ steps.emailvars.outputs.to }}
+          subject: "FIBTMP Progress Report — ${{ steps.emailvars.outputs.date }}"
+          html_body: ${{ steps.emailvars.outputs.body }}
+          attachments: ${{ steps.emailvars.outputs.attach }}
+          convert_markdown: false
+
+      - name: Cleanup temp email attachment
+        if: ${{ github.event.inputs.attachment_path != '' && startsWith(github.event.inputs.attachment_path, 'data/temp/') }}
+        continue-on-error: true
+        run: |
+          P="${{ github.event.inputs.attachment_path }}"
+          if [ -f "$P" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git rm -f "$P"
+            git commit -m "cleanup temp email attachment $(basename $P)"
+            git push
+          fi

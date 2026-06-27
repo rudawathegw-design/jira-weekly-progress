@@ -1,0 +1,422 @@
+/**
+ * github-proxy  —  Cloudflare Worker
+ *
+ * Holds the GitHub PAT so it never lives in the public dashboard. The dashboard
+ * sends the SITE password (the one every user already types) in the
+ * X-Proxy-Auth header; this Worker verifies it, then performs a TIGHTLY
+ * ALLOW-LISTED GitHub API call on the user's behalf using the secret PAT.
+ *
+ * Because the allow-list forbids touching workflows and source code, even a
+ * leaked site password can only do benign app actions (read data, write the
+ * encrypted data stores, trigger the two known workflows) — it can NEVER edit
+ * code/workflows to exfiltrate your Jira token.
+ *
+ * ── Secrets (set with `wrangler secret put` or in the dashboard) ──
+ *   GH_PAT         fine-grained PAT, this repo only, Contents:RW + Actions:RW
+ *   SITE_PASSWORD  must equal the dashboard's SITE_PASSWORD
+ * ── Vars (wrangler.toml [vars]) ──
+ *   REPO            e.g. "rudawathegw-design/jira-weekly-progress"
+ *   ALLOWED_ORIGIN  e.g. "https://rudawathegw-design.github.io"
+ */
+
+const GH = "https://api.github.com";
+
+function cors(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Proxy-Auth",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
+
+// Constant-time string compare (avoid timing oracle on the password).
+function safeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Identify operations that POST comments to Jira. These require an EXTRA
+// password (X-Comment-Auth) on top of the site password — so even a user who
+// knows the site password cannot post comments without the comment password.
+function isCommentOp(method, path, repo) {
+  const base = `/repos/${repo}`;
+  const p = path.split("?")[0];
+  const sub = p.slice(base.length);
+  // Dispatching the comments workflow, or writing the comment queue store.
+  if (method === "POST" && /^\/actions\/workflows\/comments\.yml\/dispatches$/.test(sub)) return true;
+  if ((method === "PUT" || method === "DELETE") &&
+      /^\/contents\/data\/comment_queue\.json\.enc$/.test(sub)) return true;
+  return false;
+}
+
+// Decide whether (method, path) is allowed for this repo. Returns true/false.
+function isAllowed(method, path, repo) {
+  const base = `/repos/${repo}`;
+  // Strip query string for matching.
+  const p = path.split("?")[0];
+  if (!p.startsWith(base + "/") && p !== base) return false;
+  const sub = p.slice(base.length); // e.g. "/contents/data/history.json.enc"
+
+  if (method === "GET") {
+    // Read-only: contents, commits, actions runs/workflows — all safe to read.
+    return /^\/(contents\/|commits\/|commits$|actions\/runs|actions\/workflows\/)/.test(sub) || sub === "";
+  }
+  if (method === "POST") {
+    // Only dispatching the two known workflows.
+    return /^\/actions\/workflows\/(weekly|comments)\.yml\/dispatches$/.test(sub);
+  }
+  if (method === "PUT" || method === "DELETE") {
+    // Writes are confined to data/ (encrypted stores, schedule, temp email
+    // images). NEVER source code or workflow files — so a leaked site password
+    // can't inject code to exfiltrate the Jira secret.
+    return /^\/contents\/data\//.test(sub);
+  }
+  return false;
+}
+
+export default {
+  async fetch(request, env) {
+    // ALLOWED_ORIGIN may be a comma-separated list (e.g. the custom domain plus
+    // the github.io fallback). Echo back the caller's origin when it's allowed.
+    const allowList = (env.ALLOWED_ORIGIN || "")
+      .split(",").map((s) => s.trim()).filter(Boolean);
+    const reqOrigin = request.headers.get("Origin");
+    const originAllowed = allowList.length === 0 ||
+      (reqOrigin && allowList.includes(reqOrigin));
+    const corsOrigin = (reqOrigin && originAllowed) ? reqOrigin : (allowList[0] || "*");
+    const baseHeaders = cors(corsOrigin);
+
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: baseHeaders });
+    }
+    if (request.method !== "POST") {
+      return new Response("Method not allowed", { status: 405, headers: baseHeaders });
+    }
+    // Reject cross-origin callers that aren't an allowed dashboard origin.
+    if (allowList.length && reqOrigin && !originAllowed) {
+      return new Response("Forbidden origin", { status: 403, headers: baseHeaders });
+    }
+
+    // ── Authenticate with the site password (dashboard) OR the admin password
+    // (admin panel). Both are accepted so the admin panel can use its own
+    // separate password without exposing the dashboard's SITE_PASSWORD. ──
+    let auth = request.headers.get("X-Proxy-Auth") || "";
+    auth = auth.replace(/^Bearer\s+/i, "").replace(/^token\s+/i, "").trim();
+    const _okSite  = env.SITE_PASSWORD  && safeEqual(auth, env.SITE_PASSWORD);
+    const _okAdmin = env.ADMIN_PASSWORD && safeEqual(auth, env.ADMIN_PASSWORD);
+    if (!_okSite && !_okAdmin) {
+      // Small delay blunts online brute-forcing.
+      await new Promise((r) => setTimeout(r, 400));
+      return new Response(JSON.stringify({ message: "Unauthorized" }), {
+        status: 401, headers: { ...baseHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const json = (s, o) => new Response(JSON.stringify(o), {
+      status: s, headers: { ...baseHeaders, "Content-Type": "application/json" },
+    });
+
+    let body;
+    try { body = await request.json(); } catch { body = {}; }
+
+    // ── Password verification (no GitHub call) ──
+    // The page gates (Admin panel + Restricted popup) send the typed password
+    // here to validate it SERVER-SIDE, so no password is hardcoded in the
+    // public page. Reaching this point means auth already passed (else 401),
+    // so we only need to report WHICH credential matched.
+    if (body.action === "verify") {
+      return json(200, { ok: true, role: _okAdmin ? "admin" : "site" });
+    }
+
+    // ── Portfolio rollup: per-project counts across ALL accessible projects ──
+    // Minimal fields, aggregated SERVER-SIDE so the response is tiny (counts
+    // only, not raw issues) — cheap on Worker CPU and bandwidth.
+    if (body.action === "portfolio") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const jhdr = { Accept: "application/json", Authorization: `Basic ${jauth}` };
+      // Accessible projects (key + name).
+      let projs = [], pstart = 0;
+      for (let i = 0; i < 10; i++) {
+        const pr = await fetch(`${baseUrl}/rest/api/3/project/search?maxResults=50&startAt=${pstart}`, { headers: jhdr });
+        if (!pr.ok) { const t = await pr.text(); return json(502, { message: "Jira API error", status: pr.status, detail: t.slice(0, 300) }); }
+        const pd = await pr.json();
+        (pd.values || []).forEach((p) => projs.push({ key: p.key, name: p.name }));
+        if (pd.isLast || !(pd.values || []).length) break;
+        pstart += 50;
+      }
+      // Exact counts via the count API (one tiny call per metric — no paging,
+      // no truncation, minimal CPU). 3 calls/project keeps us under the cap.
+      const countOf = async (jql) => {
+        try {
+          const r = await fetch(`${baseUrl}/rest/api/3/search/approximate-count`, {
+            method: "POST", headers: { ...jhdr, "Content-Type": "application/json" },
+            body: JSON.stringify({ jql }),
+          });
+          if (!r.ok) return null;
+          const d = await r.json();
+          return typeof d.count === "number" ? d.count : null;
+        } catch (e) { return null; }
+      };
+      const out = [];
+      for (const p of projs) {
+        const k = p.key;
+        const total = await countOf(`project = "${k}"`);
+        const done = await countOf(`project = "${k}" AND statusCategory = Done`);
+        const overdue = await countOf(`project = "${k}" AND statusCategory != Done AND duedate < now()`);
+        out.push({ key: k, name: p.name, total, done, overdue });
+      }
+      const grand = out.reduce((a, p) => a + (p.total || 0), 0);
+      return json(200, { projects: out, total: grand });
+    }
+
+    // ── One project's issues (drill-down task list) — minimal fields, no
+    // changelog (CPU-safe). project key required. ──
+    if (body.action === "issues") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const proj = String(body.project || "").trim().replace(/[^A-Za-z0-9_]/g, "");
+      if (!proj) return json(400, { message: "project key required" });
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const jql = `project = "${proj}" ORDER BY updated DESC`;
+      let issues = [], token = null;
+      for (let i = 0; i < 20; i++) {           // cap ~2000 (biggest project < 1000)
+        const qs = new URLSearchParams({
+          jql, maxResults: "100",
+          fields: "summary,assignee,status,duedate,issuetype,priority,updated",
+        });
+        if (token) qs.set("nextPageToken", token);
+        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
+          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+        });
+        if (!jr.ok) { const t = await jr.text(); return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) }); }
+        const d = await jr.json();
+        issues = issues.concat(d.issues || []);
+        token = d.nextPageToken;
+        if (!token || d.isLast) break;
+      }
+      return json(200, { project: proj, issues });
+    }
+
+    // ── Cross-project activity: issues changed in the last N days (all
+    // projects), WITH changelog. On-demand only; small window keeps it light. ──
+    if (body.action === "activity_all") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const days = Math.min(Math.max(parseInt(body.days) || 1, 1), 3);
+      const jql = `updated >= -${days}d ORDER BY updated DESC`;
+      let issues = [], token = null;
+      for (let i = 0; i < 4; i++) {            // cap ~200 recently-changed issues
+        const qs = new URLSearchParams({
+          jql, maxResults: "50",
+          fields: "summary,assignee,status,project,issuetype",
+          expand: "changelog",
+        });
+        if (token) qs.set("nextPageToken", token);
+        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
+          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+        });
+        if (!jr.ok) { const t = await jr.text(); return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) }); }
+        const d = await jr.json();
+        issues = issues.concat(d.issues || []);
+        token = d.nextPageToken;
+        if (!token || d.isLast) break;
+      }
+      return json(200, { issues });
+    }
+
+    // ── List Jira projects the token can access (read-only) ──
+    if (body.action === "projects") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      let values = [], start = 0;
+      for (let i = 0; i < 20; i++) {
+        const jr = await fetch(`${baseUrl}/rest/api/3/project/search?maxResults=50&startAt=${start}`, {
+          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+        });
+        if (!jr.ok) {
+          const t = await jr.text();
+          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
+        }
+        const d = await jr.json();
+        (d.values || []).forEach((p) => values.push({ key: p.key, name: p.name, type: p.projectTypeKey }));
+        if (d.isLast || !(d.values || []).length) break;
+        start += 50;
+      }
+      return json(200, { projects: values });
+    }
+
+    // ── Live Jira fetch (powers the dynamic dashboard) ──
+    // Read-only: pulls the project's issues with the Jira token (Worker secret).
+    if (body.action === "jira") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const project = String(env.JIRA_PROJECT || "").trim();
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      // Quote the project key, and when none is configured fall back to a valid
+      // all-issues query (an unquoted/empty project makes Jira reject the JQL).
+      const jql = project
+        ? `project = "${project}" ORDER BY created DESC`
+        : `ORDER BY created DESC`;
+      let issues = [], token = null;
+      for (let i = 0; i < 80; i++) {           // safety cap (8000 issues)
+        // NOTE: do NOT expand "changelog" here. With ~hundreds of issues the
+        // changelog payload is huge and blows the Worker CPU budget (Cloudflare
+        // error 1102 → 503 → "Failed to fetch" in the dashboard). The live view
+        // only needs current status/dates; the weekly Python build still pulls
+        // changelog for the Activity Log on the published page.
+        const qs = new URLSearchParams({
+          jql, maxResults: "100",
+          fields: "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated",
+        });
+        if (token) qs.set("nextPageToken", token);
+        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
+          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+        });
+        if (!jr.ok) {
+          const t = await jr.text();
+          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
+        }
+        const d = await jr.json();
+        issues = issues.concat(d.issues || []);
+        token = d.nextPageToken;
+        if (!token || d.isLast) break;
+      }
+      return json(200, { issues });
+    }
+
+    // ── Activity feed: changelog for recently-updated issues only ──
+    // Separate, ON-DEMAND action (called when the Activity Log opens), so the
+    // heavy changelog parse never runs on the every-10s live path. Kept small
+    // (recent window + low page cap) to stay within the Worker CPU budget.
+    if (body.action === "activity") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const project = String(env.JIRA_PROJECT || "").trim();
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const days = Math.min(Math.max(parseInt(body.days) || 2, 1), 7);
+      const jql = project
+        ? `project = "${project}" AND updated >= -${days}d ORDER BY updated DESC`
+        : `updated >= -${days}d ORDER BY updated DESC`;
+      let issues = [], token = null;
+      for (let i = 0; i < 2; i++) {            // cap ~100 recent issues
+        const qs = new URLSearchParams({
+          jql, maxResults: "50",
+          fields: "summary,assignee,status,duedate,issuetype,statuscategorychangedate,updated",
+          expand: "changelog",
+        });
+        if (token) qs.set("nextPageToken", token);
+        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
+          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+        });
+        if (!jr.ok) {
+          const t = await jr.text();
+          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
+        }
+        const d = await jr.json();
+        issues = issues.concat(d.issues || []);
+        token = d.nextPageToken;
+        if (!token || d.isLast) break;
+      }
+      return json(200, { issues });
+    }
+
+    // ── DeepSeek chat (powers the "Ask AI" overlay) ──
+    // Read-only relay: forwards the page's messages to DeepSeek using the
+    // DEEPSEEK_API_KEY secret. The key NEVER reaches the browser.
+    if (body.action === "deepseek") {
+      if (!env.DEEPSEEK_API_KEY) {
+        return json(501, { message: "DeepSeek not configured in Worker" });
+      }
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+      if (!messages.length) return json(400, { message: "No messages" });
+      const dr = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages,
+          temperature: 0.3,
+          max_tokens: 800,
+          stream: false,
+        }),
+      });
+      if (!dr.ok) {
+        const t = await dr.text();
+        return json(502, { message: "DeepSeek API error", status: dr.status, detail: t.slice(0, 300) });
+      }
+      const d = await dr.json();
+      const reply = (((d.choices || [])[0] || {}).message || {}).content || "";
+      return json(200, { reply });
+    }
+
+    const path = String(body.path || "");
+    const method = String(body.method || "GET").toUpperCase();
+    const ghBody = body.ghBody != null ? body.ghBody : undefined; // original request body string
+
+    if (!path.startsWith("/repos/") || !isAllowed(method, path, env.REPO)) {
+      return new Response(JSON.stringify({ message: "Operation not allowed by proxy", path, method }), {
+        status: 403, headers: { ...baseHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Comment ops need the SECOND password (server-side, can't be bypassed) ──
+    // Accepts the ADMIN_PASSWORD (so the admin password also authorizes posting
+    // comments) or a dedicated COMMENT_PASSWORD if one is configured. The
+    // password lives ONLY in Worker secrets — never in the page or repo.
+    if (isCommentOp(method, path, env.REPO)) {
+      if (!env.ADMIN_PASSWORD && !env.COMMENT_PASSWORD) {
+        return json(501, { message: "Comment posting not configured (set ADMIN_PASSWORD or COMMENT_PASSWORD secret)" });
+      }
+      let cAuth = request.headers.get("X-Comment-Auth") || "";
+      cAuth = cAuth.replace(/^Bearer\s+/i, "").replace(/^token\s+/i, "").trim();
+      const okComment =
+        (env.ADMIN_PASSWORD   && safeEqual(cAuth, env.ADMIN_PASSWORD)) ||
+        (env.COMMENT_PASSWORD && safeEqual(cAuth, env.COMMENT_PASSWORD));
+      if (!okComment) {
+        await new Promise((r) => setTimeout(r, 400)); // blunt brute-forcing
+        return json(401, { message: "Admin password required or incorrect" });
+      }
+    }
+
+    // ── Forward to GitHub with the secret PAT ──
+    const ghResp = await fetch(GH + path, {
+      method,
+      headers: {
+        "Authorization": `Bearer ${env.GH_PAT}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "jira-weekly-progress-proxy",
+      },
+      body: (method === "GET" || method === "HEAD") ? undefined : ghBody,
+    });
+
+    const text = await ghResp.text();
+    return new Response(text, {
+      status: ghResp.status,
+      headers: { ...baseHeaders, "Content-Type": ghResp.headers.get("Content-Type") || "application/json" },
+    });
+  },
+};
