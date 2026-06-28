@@ -17,16 +17,22 @@ Flow:
 Queue format (data/comment_queue.json):
 {
   "created":   "2026-06-04T10:00:00Z",
-  "template":  "@owner, what is the update on this task?\n\nCC: @cc",
+  "template":  "@owner, {action}\n\nCC: @cc",
   "cc_emails": ["someone@fib.iq"],          # optional; from the sheet
   "items": [
     {"key": "FIBTMP-12", "owner": "Jane Doe", "assignee_id": "5b10…", "type": "Sub-task"}
   ]
 }
 
-The template may contain two tokens:
-  {owner} / @owner  → mention of the issue assignee
+The template may contain these tokens:
+  {owner} / @owner  → mention of the CURRENT approval-level reviewer(s); falls
+                      back to the assignee when the issue isn't at a level
   {cc}    / @cc      → mentions of every resolved CC person
+  {action}          → state-aware phrasing: "please review and approve" at a
+                      level, "please share the latest progress update" when
+                      In Progress, etc.
+  {status}          → the issue's status name (e.g. "Revision Level 1")
+  {level}           → "Level N" when at an approval level (else empty)
 """
 
 import os
@@ -41,7 +47,7 @@ QUEUE_PATH  = os.path.join(ROOT, "data", "comment_queue.json")
 LOG_PATH    = os.path.join(ROOT, "data", "comment_log.json")
 SHEET_PATH  = os.path.join(ROOT, "data", "email_recipients.json")
 
-DEFAULT_TEMPLATE = "@owner, what is the update on this task?\n\nCC: @cc"
+DEFAULT_TEMPLATE = "@owner, {action}\n\nCC: @cc"
 
 # Approval-level routing. The issue's status (e.g. "Revision Level 1") or its
 # Approvals field tells which level is pending; @owner then mentions THAT level's
@@ -103,7 +109,9 @@ def _issue_context(base_url, headers, key):
         print(f"  issue context fetch failed for {key}: {e}", file=sys.stderr)
         return None
 
-    status = ((f.get("status") or {}).get("name")) or ""
+    st = f.get("status") or {}
+    status = st.get("name") or ""
+    category = ((st.get("statusCategory") or {}).get("key")) or ""   # new|indeterminate|done
     m = LEVEL_RE.search(status)
     if not m:                                   # fall back to the Approvals field
         appr = f.get(APPROVALS_FIELD) or []
@@ -128,8 +136,25 @@ def _issue_context(base_url, headers, key):
     a = f.get("assignee") or None
     assignee = ({"id": a["accountId"], "text": a.get("displayName") or "owner"}
                 if a and a.get("accountId") else None)
-    return {"status": status, "level": level,
+    return {"status": status, "category": category, "level": level,
             "level_owners": level_owners, "assignee": assignee}
+
+
+def _action_for(ctx):
+    """State-appropriate phrasing for the {action} token, so the same template
+    reads correctly whether the issue is at an approval level or in progress."""
+    if not ctx:
+        return "please share the latest update"
+    if ctx.get("level"):                       # at an approval/review level
+        return "please review and approve"
+    cat = ctx.get("category")
+    if cat == "indeterminate":                 # In Progress
+        return "please share the latest progress update"
+    if cat == "new":                           # To Do / Open
+        return "please pick this up and share an update"
+    if cat == "done":
+        return "please confirm this can be closed"
+    return "please share the latest update"
 
 
 # ── ADF builder ────────────────────────────────────────────────────────────
@@ -141,13 +166,16 @@ def _text_node(text):
     return {"type": "text", "text": text}
 
 
-def _build_adf(template, owner_mentions, cc_mentions, status_text="", level_text=""):
+def _build_adf(template, owner_mentions, cc_mentions, status_text="", level_text="", action_text=""):
     """Turn the template into an ADF doc, substituting @owner / {owner} (now the
     current approval-level reviewer(s)) and @cc / {cc} tokens with real mention
-    nodes, plus {status} / {level} text tokens (falling back to plain text)."""
-    # Normalise token spellings; substitute the plain-text {status}/{level}.
+    nodes, plus {status} / {level} / {action} text tokens (falling back to
+    plain text). {action} is state-aware (review vs in-progress wording)."""
+    # Normalise token spellings; substitute the plain-text {status}/{level}/{action}.
     text = template.replace("{owner}", "@owner").replace("{cc}", "@cc")
-    text = text.replace("{status}", status_text or "").replace("{level}", level_text or "")
+    text = (text.replace("{status}", status_text or "")
+                .replace("{level}", level_text or "")
+                .replace("{action}", action_text or ""))
 
     def render_inline(line):
         """Split a single line into ADF inline nodes, expanding @owner / @cc."""
@@ -254,9 +282,10 @@ def run():
                 if m:
                     owner_mentions = [m]
 
-        adf = _build_adf(template, owner_mentions, cc_mentions, status_text, level_text)
+        action_text = _action_for(ctx)
+        adf = _build_adf(template, owner_mentions, cc_mentions, status_text, level_text, action_text)
         print(f"  {key}: status={status_text!r} level={ctx['level'] if ctx else None} "
-              f"→ mention {[m['text'] for m in owner_mentions] or ['(none)']}")
+              f"action={action_text!r} → mention {[m['text'] for m in owner_mentions] or ['(none)']}")
         try:
             r = requests.post(
                 f"{base_url}/rest/api/3/issue/{key}/comment",

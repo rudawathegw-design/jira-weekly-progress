@@ -1112,7 +1112,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:#475569;text-transform:uppercase;margin-bottom:5px">
         Comment body <span style="font-weight:600;text-transform:none;letter-spacing:0;color:#94a3b8">— @owner becomes a Jira mention, @cc becomes the CC people below</span>
       </div>
-      <textarea id="cm-template" rows="3" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical">@owner, what is the update on this task?
+      <textarea id="cm-template" rows="3" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical">@owner, {action}
 
 CC: @cc</textarea>
     </div>
