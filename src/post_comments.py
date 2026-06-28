@@ -43,6 +43,13 @@ SHEET_PATH  = os.path.join(ROOT, "data", "email_recipients.json")
 
 DEFAULT_TEMPLATE = "@owner, what is the update on this task?\n\nCC: @cc"
 
+# Approval-level routing. The issue's status (e.g. "Revision Level 1") or its
+# Approvals field tells which level is pending; @owner then mentions THAT level's
+# reviewer(s) — the person who must act now — instead of the assignee.
+LEVEL_FIELDS = {1: "customfield_10784", 2: "customfield_10785"}   # Level 1/2 Reviewers
+APPROVALS_FIELD = "customfield_10092"                              # "Approvals" (e.g. "Revision Level 1")
+LEVEL_RE = re.compile(r"level\s*([0-9]+)", re.I)
+
 
 # ── auth ───────────────────────────────────────────────────────────────────
 def _headers(email, token):
@@ -77,6 +84,54 @@ def _resolve_account_id(base_url, headers, query, cache):
     return None
 
 
+# ── approval-level context (status → pending level → reviewer mentions) ──────
+def _issue_context(base_url, headers, key):
+    """Fetch an issue's status + level reviewers + assignee.
+
+    Returns {status, level, level_owners:[{id,text}], assignee:{id,text}|None}.
+    'level' is the current pending approval level (from the "Revision Level N"
+    status, or the Approvals field as a fallback). 'level_owners' are the
+    reviewers configured for that level — who should be @mentioned."""
+    fields = "status,assignee," + ",".join(LEVEL_FIELDS.values()) + "," + APPROVALS_FIELD
+    try:
+        r = requests.get(f"{base_url}/rest/api/3/issue/{key}",
+                         headers=headers, params={"fields": fields}, timeout=20)
+        if r.status_code != 200:
+            return None
+        f = r.json().get("fields", {}) or {}
+    except requests.RequestException as e:
+        print(f"  issue context fetch failed for {key}: {e}", file=sys.stderr)
+        return None
+
+    status = ((f.get("status") or {}).get("name")) or ""
+    m = LEVEL_RE.search(status)
+    if not m:                                   # fall back to the Approvals field
+        appr = f.get(APPROVALS_FIELD) or []
+        for o in (appr if isinstance(appr, list) else [appr]):
+            s = o.get("value") if isinstance(o, dict) else str(o)
+            mm = LEVEL_RE.search(s or "")
+            if mm:
+                m = mm
+                break
+    level = int(m.group(1)) if m else None
+
+    level_owners = []
+    if level in LEVEL_FIELDS:
+        val = f.get(LEVEL_FIELDS[level]) or []
+        if isinstance(val, dict):               # single-user field → list
+            val = [val]
+        for u in val:
+            if isinstance(u, dict) and u.get("accountId"):
+                level_owners.append({"id": u["accountId"],
+                                     "text": u.get("displayName") or "reviewer"})
+
+    a = f.get("assignee") or None
+    assignee = ({"id": a["accountId"], "text": a.get("displayName") or "owner"}
+                if a and a.get("accountId") else None)
+    return {"status": status, "level": level,
+            "level_owners": level_owners, "assignee": assignee}
+
+
 # ── ADF builder ────────────────────────────────────────────────────────────
 def _mention_node(account_id, text):
     return {"type": "mention", "attrs": {"id": account_id, "text": f"@{text}"}}
@@ -86,21 +141,29 @@ def _text_node(text):
     return {"type": "text", "text": text}
 
 
-def _build_adf(template, owner_mention, cc_mentions):
-    """Turn the template into an ADF doc, substituting @owner / {owner} and
-    @cc / {cc} tokens with real mention nodes (falling back to plain text)."""
-    # Normalise the two token spellings to a single sentinel we can split on.
+def _build_adf(template, owner_mentions, cc_mentions, status_text="", level_text=""):
+    """Turn the template into an ADF doc, substituting @owner / {owner} (now the
+    current approval-level reviewer(s)) and @cc / {cc} tokens with real mention
+    nodes, plus {status} / {level} text tokens (falling back to plain text)."""
+    # Normalise token spellings; substitute the plain-text {status}/{level}.
     text = template.replace("{owner}", "@owner").replace("{cc}", "@cc")
+    text = text.replace("{status}", status_text or "").replace("{level}", level_text or "")
 
     def render_inline(line):
         """Split a single line into ADF inline nodes, expanding @owner / @cc."""
         nodes = []
         for chunk in re.split(r"(@owner|@cc)", line):
             if chunk == "@owner":
-                if owner_mention and owner_mention.get("id"):
-                    nodes.append(_mention_node(owner_mention["id"], owner_mention["text"]))
+                if owner_mentions:
+                    for i, m in enumerate(owner_mentions):
+                        if i:
+                            nodes.append(_text_node(", "))
+                        if m.get("id"):
+                            nodes.append(_mention_node(m["id"], m["text"]))
+                        else:
+                            nodes.append(_text_node(f"@{m.get('text', 'owner')}"))
                 else:
-                    nodes.append(_text_node(f"@{(owner_mention or {}).get('text', 'owner')}"))
+                    nodes.append(_text_node("@owner"))
             elif chunk == "@cc":
                 if cc_mentions:
                     for i, m in enumerate(cc_mentions):
@@ -170,13 +233,30 @@ def run():
         key = (it.get("key") or "").strip()
         if not key:
             continue
-        owner_mention = None
-        if it.get("assignee_id"):
-            owner_mention = {"id": it["assignee_id"], "text": it.get("owner") or "owner"}
-        elif it.get("owner"):                   # no accountId on record → look it up
-            owner_mention = _resolve_account_id(base_url, headers, it["owner"], cache)
+        # Resolve who to @mention: the reviewer(s) of the CURRENT approval level
+        # (from the issue's "Revision Level N" status / Approvals field). Fall
+        # back to the assignee when the issue isn't in a level state.
+        ctx = _issue_context(base_url, headers, key)
+        owner_mentions = []
+        status_text = level_text = ""
+        if ctx:
+            status_text = ctx["status"]
+            level_text = f"Level {ctx['level']}" if ctx["level"] else ""
+            if ctx["level_owners"]:
+                owner_mentions = ctx["level_owners"]
+            elif ctx["assignee"]:
+                owner_mentions = [ctx["assignee"]]
+        if not owner_mentions:                  # fallback to the queued assignee
+            if it.get("assignee_id"):
+                owner_mentions = [{"id": it["assignee_id"], "text": it.get("owner") or "owner"}]
+            elif it.get("owner"):
+                m = _resolve_account_id(base_url, headers, it["owner"], cache)
+                if m:
+                    owner_mentions = [m]
 
-        adf = _build_adf(template, owner_mention, cc_mentions)
+        adf = _build_adf(template, owner_mentions, cc_mentions, status_text, level_text)
+        print(f"  {key}: status={status_text!r} level={ctx['level'] if ctx else None} "
+              f"→ mention {[m['text'] for m in owner_mentions] or ['(none)']}")
         try:
             r = requests.post(
                 f"{base_url}/rest/api/3/issue/{key}/comment",
