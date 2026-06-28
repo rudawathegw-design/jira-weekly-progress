@@ -66,8 +66,10 @@ function isAllowed(method, path, repo) {
     return /^\/(contents\/|commits\/|commits$|actions\/runs|actions\/workflows\/)/.test(sub) || sub === "";
   }
   if (method === "POST") {
-    // Only dispatching the two known workflows.
-    return /^\/actions\/workflows\/(weekly|comments)\.yml\/dispatches$/.test(sub);
+    // Dispatch the two known workflows, or cancel a workflow run (used by the
+    // dashboard's "Cancel queued batch"). Cancelling only stops a run — safe.
+    return /^\/actions\/workflows\/(weekly|comments)\.yml\/dispatches$/.test(sub)
+        || /^\/actions\/runs\/\d+\/cancel$/.test(sub);
   }
   if (method === "PUT" || method === "DELETE") {
     // Writes are confined to data/ (encrypted stores, schedule, temp email

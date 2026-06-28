@@ -47,6 +47,7 @@ QUEUE_PATH  = os.path.join(ROOT, "data", "comment_queue.json")
 LOG_PATH    = os.path.join(ROOT, "data", "comment_log.json")
 SHEET_PATH  = os.path.join(ROOT, "data", "email_recipients.json")
 POSTED_KEYS_PATH = os.path.join(ROOT, "data", "temp", "posted_keys.json")  # gitignored
+RESULT_PATH      = os.path.join(ROOT, "data", "temp", "post_result.json")   # gitignored
 
 DEFAULT_TEMPLATE = "@owner, {action}\n\nCC: @cc"
 
@@ -279,11 +280,13 @@ def run():
     queue = load_store(QUEUE_PATH, default=None)
     if not queue:
         print("No comment queue — nothing to post.")
+        _write_result(0, 0)
         return
 
     items = queue.get("items") or []
     if not items:
         print("Queue has no items — nothing to post.")
+        _write_result(0, 0)
         return
 
     template  = queue.get("template") or DEFAULT_TEMPLATE
@@ -345,6 +348,7 @@ def run():
     # run started, and any failed items stay queued for the next attempt.
     _write_posted_keys([r["key"] for r in results if r["ok"]])
     posted = sum(1 for r in results if r["ok"])
+    _write_result(len(results), posted)
     print(f"Done. {posted}/{len(results)} comment(s) posted.")
 
 
@@ -372,6 +376,17 @@ def _write_log(queue, results):
             f.write("\n")
     except OSError as e:
         print(f"Could not write comment_log.json: {e}", file=sys.stderr)
+
+
+def _write_result(attempted, posted):
+    """Record the run outcome so the workflow can fail loudly (red X) when a
+    dispatch posted nothing — an early warning instead of a silent no-op."""
+    try:
+        os.makedirs(os.path.dirname(RESULT_PATH), exist_ok=True)
+        with open(RESULT_PATH, "w", encoding="utf-8") as f:
+            json.dump({"attempted": attempted, "posted": posted}, f)
+    except OSError as e:
+        print(f"Could not write result file: {e}", file=sys.stderr)
 
 
 def _write_posted_keys(keys):

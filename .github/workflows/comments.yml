@@ -61,3 +61,21 @@ jobs:
             echo "Push rejected (queue advanced) — retrying…"; sleep 2
           done
           [ "$ok" = "1" ] || echo "WARNING: could not clear queue after retries (next run will retry)."
+
+      - name: Flag if nothing was posted
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          p = "data/temp/post_result.json"
+          if not os.path.exists(p):
+              print("::error::No result file — the post step likely crashed."); sys.exit(1)
+          r = json.load(open(p))
+          att, post = r.get("attempted", 0), r.get("posted", 0)
+          print(f"attempted={att} posted={post}")
+          if post == 0:
+              print(f"::error::No comments were posted (attempted {att}). "
+                    "Likely an empty/stale queue or Jira errors — investigate."); sys.exit(1)
+          if post < att:
+              print(f"::warning::Only {post}/{att} posted; {att - post} left in queue for retry.")
+          PY

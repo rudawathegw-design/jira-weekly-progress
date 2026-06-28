@@ -1101,7 +1101,10 @@ CC: @cc</textarea>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;align-items:center">
       <span id="cm-status" style="font-size:12px;color:#64748b;margin-right:auto"></span>
-      <button class="btn-modal ghost" onclick="closeModal('comment-modal')">Cancel</button>
+      <button class="btn-modal ghost" onclick="closeModal('comment-modal')">Close</button>
+      <button class="btn-modal ghost" id="cm-cancel-btn" onclick="cancelQueue()"
+              title="Discard queued-but-not-yet-posted comments and stop any in-progress run"
+              style="color:#b91c1c;border-color:#fecaca">Cancel queued batch</button>
       <button class="btn-modal" id="cm-post-btn" onclick="postComments()"
               style="background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border-color:transparent">
         Post <span id="cm-count">0</span> comment(s) to Jira
@@ -3698,6 +3701,36 @@ let _CM_PEOPLE = new Set();   // owners currently included (filterable)
 // An item shows / counts only if BOTH its type and its owner are included.
 function _cmVisible(i) {
   return _CM_TYPES.has(i.bucket) && _CM_PEOPLE.has(i.owner);
+}
+
+async function cancelQueue() {
+  const repo = document.querySelector('meta[name=repo]')?.content || '';
+  if (!repo)   { toast('Repo not configured.'); return; }
+  if (!GH_PAT) { toast('No token — re-enter password.'); return; }
+  if (!confirm('Cancel the queued comment batch?\n\nComments not yet posted will be discarded, and any in-progress comment run will be stopped.')) return;
+  const btn = document.getElementById('cm-cancel-btn');
+  const status = document.getElementById('cm-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Cancelling…';
+  // 1) Empty the queue (retry-safe) so nothing pending will post.
+  const cleared = await _saveEncStore('comment_queue.json', { items: [] }, 'Cancel queued comments');
+  // 2) Stop any in-progress / queued comment runs.
+  let stopped = 0;
+  try {
+    const hdrs = { 'Authorization':`Bearer ${GH_PAT}`, 'Accept':'application/vnd.github+json' };
+    for (const st of ['in_progress','queued']) {
+      const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/comments.yml/runs?status=${st}&per_page=30`, { headers: hdrs });
+      if (!r.ok) continue;
+      const d = await r.json();
+      for (const run of (d.workflow_runs || [])) {
+        const c = await fetch(`https://api.github.com/repos/${repo}/actions/runs/${run.id}/cancel`, { method:'POST', headers: hdrs });
+        if (c.ok) stopped++;
+      }
+    }
+  } catch(e) {}
+  if (btn) btn.disabled = false;
+  if (status) status.textContent = '';
+  toast(cleared ? `Queue cancelled${stopped ? ` · stopped ${stopped} run(s)` : ''}.` : 'Could not clear queue — try again.');
 }
 
 async function postComments() {
