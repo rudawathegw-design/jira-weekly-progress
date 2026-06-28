@@ -38,6 +38,7 @@ def encrypt_payload(plaintext: str, password: str) -> dict:
 _INDEX = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="repo" content="__REPO__">
@@ -6866,6 +6867,7 @@ document.addEventListener('keydown', function(e){
 _ADMIN = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin · Progress Report</title>
