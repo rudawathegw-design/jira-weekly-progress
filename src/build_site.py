@@ -2036,18 +2036,28 @@ async function _saveEncStore(name, data, message){
   const headers = {'Authorization':`Bearer ${GH_PAT}`,'Accept':'application/vnd.github+json'};
   const blob = await encryptBlob(data, pw);
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(blob) + '\n')));
-  let sha = null;
-  try {
-    const g = await fetch(`https://api.github.com/repos/${repo}/contents/data/${name}.enc`, {headers});
-    if (g.ok) sha = (await g.json()).sha;
-  } catch(e){}
-  const p = await fetch(`https://api.github.com/repos/${repo}/contents/data/${name}.enc`, {
-    method:'PUT',
-    headers:{...headers, 'Content-Type':'application/json'},
-    body: JSON.stringify({ message: message || ('Update ' + name), content, sha })
-  });
-  if (!p.ok) { const e = await p.json().catch(()=>({})); toast('Save failed: '+(e.message||p.status)); }
-  return p.ok;
+  const url = `https://api.github.com/repos/${repo}/contents/data/${name}.enc`;
+  // Retry on 409: the file's sha can move because a workflow cleared the queue
+  // between our read and write. Without this the save silently fails under churn.
+  for (let attempt=0; attempt<5; attempt++){
+    let sha = null;
+    try { const g = await fetch(url, {headers, cache:'no-store'}); if (g.ok) sha = (await g.json()).sha; } catch(e){}
+    const p = await fetch(url, {
+      method:'PUT',
+      headers:{...headers, 'Content-Type':'application/json'},
+      body: JSON.stringify({ message: message || ('Update ' + name), content, sha })
+    });
+    if (p.ok) return true;
+    const e = await p.json().catch(()=>({}));
+    if (p.status === 409 || /does not match|sha/i.test(e.message||'')) {
+      await new Promise(r => setTimeout(r, 400*(attempt+1)));   // conflict → re-read sha & retry
+      continue;
+    }
+    toast('Save failed: '+(e.message||p.status));
+    return false;
+  }
+  toast('Save failed: conflict after retries — please try again.');
+  return false;
 }
 
 // ── password gate ──────────────────────────────────────────────────────────

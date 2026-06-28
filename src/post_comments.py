@@ -46,6 +46,7 @@ ROOT        = os.path.join(os.path.dirname(__file__), "..")
 QUEUE_PATH  = os.path.join(ROOT, "data", "comment_queue.json")
 LOG_PATH    = os.path.join(ROOT, "data", "comment_log.json")
 SHEET_PATH  = os.path.join(ROOT, "data", "email_recipients.json")
+POSTED_KEYS_PATH = os.path.join(ROOT, "data", "temp", "posted_keys.json")  # gitignored
 
 DEFAULT_TEMPLATE = "@owner, {action}\n\nCC: @cc"
 
@@ -283,7 +284,6 @@ def run():
     items = queue.get("items") or []
     if not items:
         print("Queue has no items — nothing to post.")
-        _clear_queue()
         return
 
     template  = queue.get("template") or DEFAULT_TEMPLATE
@@ -340,7 +340,10 @@ def run():
             print(f"  {key}: ✗ {e}", file=sys.stderr)
 
     _write_log(queue, results)
-    _clear_queue()
+    # Record which keys posted OK. The workflow's clear step removes exactly
+    # these from the LATEST queue — so it never clobbers items queued after this
+    # run started, and any failed items stay queued for the next attempt.
+    _write_posted_keys([r["key"] for r in results if r["ok"]])
     posted = sum(1 for r in results if r["ok"])
     print(f"Done. {posted}/{len(results)} comment(s) posted.")
 
@@ -371,14 +374,17 @@ def _write_log(queue, results):
         print(f"Could not write comment_log.json: {e}", file=sys.stderr)
 
 
-def _clear_queue():
-    """Empty the queue so the same batch never double-posts. Writes an
-    encrypted empty queue and removes any legacy plaintext."""
+def _write_posted_keys(keys):
+    """Persist the keys that posted OK to a local (gitignored) file. The
+    workflow's clear step reads it after syncing to the latest queue and removes
+    exactly these items — a safe read-modify-write that never clobbers newly
+    queued work and leaves failed items for the next run."""
     try:
-        from crypto_store import save_store
-        save_store(QUEUE_PATH, {"items": []})   # → comment_queue.json.enc
-    except Exception as e:
-        print(f"Could not clear comment queue: {e}", file=sys.stderr)
+        os.makedirs(os.path.dirname(POSTED_KEYS_PATH), exist_ok=True)
+        with open(POSTED_KEYS_PATH, "w", encoding="utf-8") as f:
+            json.dump(sorted(set(keys)), f)
+    except OSError as e:
+        print(f"Could not write posted-keys file: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
