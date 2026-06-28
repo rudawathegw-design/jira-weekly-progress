@@ -2293,7 +2293,7 @@ function renderDonut() {
 // ── PMO Health Dashboard (RAG + KPIs + Escalation) ─────────────────────────
 function renderPMOPanel() {
   const wrap = document.getElementById('pmo-wrap');
-  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0);
+  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
   if (!rows.length) { wrap.innerHTML = '<div class="empty">No data.</div>'; return; }
 
   // ── RAG Classification (industry-standard PMO thresholds) ──
@@ -2908,7 +2908,7 @@ function exportDashboard(mobile) {
 }
 
 function _drawDashboardCanvas(returnCanvas) {
-  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0);
+  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
   if (!rows.length) { toast('No data to export.'); return; }
 
   // RAG
