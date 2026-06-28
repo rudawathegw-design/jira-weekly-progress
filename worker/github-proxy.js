@@ -25,7 +25,7 @@ function cors(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Proxy-Auth",
+    "Access-Control-Allow-Headers": "Content-Type, X-Proxy-Auth, X-Comment-Auth",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
