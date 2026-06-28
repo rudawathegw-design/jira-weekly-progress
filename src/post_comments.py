@@ -91,6 +91,18 @@ def _resolve_account_id(base_url, headers, query, cache):
 
 
 # ── approval-level context (status → pending level → reviewer mentions) ──────
+def _users_field(f, fid):
+    """Normalise a Jira user/multi-user custom field to [{id,text}]."""
+    val = f.get(fid) or []
+    if isinstance(val, dict):
+        val = [val]
+    out = []
+    for u in val:
+        if isinstance(u, dict) and u.get("accountId"):
+            out.append({"id": u["accountId"], "text": u.get("displayName") or "reviewer"})
+    return out
+
+
 def _issue_context(base_url, headers, key):
     """Fetch an issue's status + level reviewers + assignee.
 
@@ -123,38 +135,74 @@ def _issue_context(base_url, headers, key):
                 break
     level = int(m.group(1)) if m else None
 
-    level_owners = []
-    if level in LEVEL_FIELDS:
-        val = f.get(LEVEL_FIELDS[level]) or []
-        if isinstance(val, dict):               # single-user field → list
-            val = [val]
-        for u in val:
-            if isinstance(u, dict) and u.get("accountId"):
-                level_owners.append({"id": u["accountId"],
-                                     "text": u.get("displayName") or "reviewer"})
-
     a = f.get("assignee") or None
     assignee = ({"id": a["accountId"], "text": a.get("displayName") or "owner"}
                 if a and a.get("accountId") else None)
-    return {"status": status, "category": category, "level": level,
-            "level_owners": level_owners, "assignee": assignee}
+    return {"status": status, "status_norm": status.strip().lower(),
+            "category": category, "level": level,
+            "level_owners": {1: _users_field(f, LEVEL_FIELDS[1]),
+                             2: _users_field(f, LEVEL_FIELDS[2])},
+            "assignee": assignee}
 
 
-def _action_for(ctx):
-    """State-appropriate phrasing for the {action} token, so the same template
-    reads correctly whether the issue is at an approval level or in progress."""
+# ── PMO comment playbook: per-status professional wording + who to address ───
+# target: "assignee" (work statuses) | "level1" | "level2" | "approver".
+STATUS_PLAYBOOK = {
+    "open":
+        ("this task is still in the Open stage and has not been started. Kindly "
+         "initiate the work and confirm the planned start and target completion dates.",
+         "assignee"),
+    "in progress":
+        ("kindly provide a progress update on this task — the percentage completed, "
+         "any blockers, and the expected completion date.",
+         "assignee"),
+    "on hold":
+        ("this task is currently On Hold. Kindly confirm the reason for the hold and "
+         "the expected date to resume.",
+         "assignee"),
+    "waiting for approval":
+        ("this task is awaiting approval. Kindly review the deliverables and provide "
+         "your decision, or return it with your comments.",
+         "approver"),
+    "revision level 1":
+        ("this task is pending your Level 1 review. Kindly review and approve, or "
+         "return it with the required revisions.",
+         "level1"),
+    "revision level 2":
+        ("this task is pending your Level 2 review. Kindly review and approve, or "
+         "return it with the required revisions.",
+         "level2"),
+    "review complete":
+        ("the review for this task has been completed. Kindly proceed with the next "
+         "step to move it forward.",
+         "assignee"),
+    "done":
+        ("this task has been completed and marked as Done — thank you for your efforts.",
+         "assignee"),
+}
+DEFAULT_ACTION = "kindly share the latest update on this task."
+
+
+def _plan_comment(ctx):
+    """Decide the professional wording ({action}) and who to @mention for an
+    issue, based on its workflow status. Returns (action_text, owner_mentions,
+    level_text)."""
     if not ctx:
-        return "please share the latest update"
-    if ctx.get("level"):                       # at an approval/review level
-        return "please review and approve"
-    cat = ctx.get("category")
-    if cat == "indeterminate":                 # In Progress
-        return "please share the latest progress update"
-    if cat == "new":                           # To Do / Open
-        return "please pick this up and share an update"
-    if cat == "done":
-        return "please confirm this can be closed"
-    return "please share the latest update"
+        return DEFAULT_ACTION, [], ""
+    action, target = STATUS_PLAYBOOK.get(ctx.get("status_norm", ""), (DEFAULT_ACTION, "assignee"))
+    lo = ctx.get("level_owners") or {}
+    assignee = [ctx["assignee"]] if ctx.get("assignee") else []
+    if target == "level1":
+        owners = lo.get(1) or assignee
+    elif target == "level2":
+        owners = lo.get(2) or assignee
+    elif target == "approver":                 # pending approver: use detected level, else L1
+        lvl = ctx.get("level")
+        owners = (lo.get(lvl) if lvl in (1, 2) else None) or lo.get(1) or assignee
+    else:                                       # assignee-owned work statuses
+        owners = assignee
+    level_text = f"Level {ctx['level']}" if ctx.get("level") else ""
+    return action, owners, level_text
 
 
 # ── ADF builder ────────────────────────────────────────────────────────────
@@ -265,15 +313,8 @@ def run():
         # (from the issue's "Revision Level N" status / Approvals field). Fall
         # back to the assignee when the issue isn't in a level state.
         ctx = _issue_context(base_url, headers, key)
-        owner_mentions = []
-        status_text = level_text = ""
-        if ctx:
-            status_text = ctx["status"]
-            level_text = f"Level {ctx['level']}" if ctx["level"] else ""
-            if ctx["level_owners"]:
-                owner_mentions = ctx["level_owners"]
-            elif ctx["assignee"]:
-                owner_mentions = [ctx["assignee"]]
+        status_text = ctx["status"] if ctx else ""
+        action_text, owner_mentions, level_text = _plan_comment(ctx)
         if not owner_mentions:                  # fallback to the queued assignee
             if it.get("assignee_id"):
                 owner_mentions = [{"id": it["assignee_id"], "text": it.get("owner") or "owner"}]
@@ -282,7 +323,6 @@ def run():
                 if m:
                     owner_mentions = [m]
 
-        action_text = _action_for(ctx)
         adf = _build_adf(template, owner_mentions, cc_mentions, status_text, level_text, action_text)
         print(f"  {key}: status={status_text!r} level={ctx['level'] if ctx else None} "
               f"action={action_text!r} → mention {[m['text'] for m in owner_mentions] or ['(none)']}")
