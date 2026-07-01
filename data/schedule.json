@@ -11,5 +11,5 @@
   "weekly_day": 3,
   "send_email": false,
   "description": "Weekly snapshot on Wednesday",
-  "pinned_baseline": "2026-06-22"
+  "pinned_baseline": "latest"
 }

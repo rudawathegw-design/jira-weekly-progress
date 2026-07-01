@@ -1678,10 +1678,16 @@ const _LIVE = {
   findBaseline(history, todayStr){
     const all = history || [];
     // 1) Admin-pinned baseline wins (persists in schedule.json, survives refresh).
-    //    Matches ANY snapshot, including today's, since it's an explicit choice.
+    //    "latest" auto-follows the newest snapshot before today; a specific
+    //    date matches ANY snapshot, including today's (explicit choice).
     if (typeof _PINNED_BASELINE !== 'undefined' && _PINNED_BASELINE) {
-      const pin = all.find(s => s.date === _PINNED_BASELINE);
-      if (pin) return pin;
+      if (String(_PINNED_BASELINE).toLowerCase() === 'latest') {
+        const prior = all.filter(s => (s.date||'') < todayStr);
+        if (prior.length) return prior[prior.length-1];
+      } else {
+        const pin = all.find(s => s.date === _PINNED_BASELINE);
+        if (pin) return pin;
+      }
     }
     const prior = all.filter(s => (s.date||'') < todayStr);
     if (!prior.length) return null;
@@ -6445,12 +6451,19 @@ function populateBaselineSelector() {
       if (!isNaN(_d)) autoLabel = 'Auto · last ' + _DOW[_d.getDay()];
     }
   }
+  // Resolve the pin to a concrete date: "latest" → newest snapshot before today.
+  const _pinIsLatest = _PINNED_BASELINE && String(_PINNED_BASELINE).toLowerCase()==='latest';
+  let _pinDate = _PINNED_BASELINE;
+  if (_pinIsLatest) {
+    const prior = hist.filter(s => (s.date||'') < REPORT.date);
+    _pinDate = prior.length ? prior[prior.length-1].date : null;
+  }
   let opts = '<option value="auto"' + (current && hist.find(s=>s.date===current&&s.is_weekly) ? ' selected':'') + '>' + autoLabel + '</option>';
   candidates.forEach(s => {
     const isToday = s.date === REPORT.date;
     const label = formatDateTime(s.timestamp || s.date)
                   + (isToday ? ' (today)' : (s.is_weekly ? ' (weekly)' : ''))
-                  + (s.date===_PINNED_BASELINE ? '  *PINNED*' : '');
+                  + (s.date===_pinDate ? (_pinIsLatest ? '  *PINNED · latest*' : '  *PINNED*') : '');
     opts += `<option value="${s.date}" ${s.date===current ? 'selected':''}>${label}</option>`;
   });
   if (!candidates.length) {
@@ -6529,12 +6542,16 @@ function _baselineMenu(ev){
   const isSpecific = val && val!=='auto';
   const labelTxt = isSpecific ? sel.options[sel.selectedIndex].text : '';
   m.innerHTML='<div style="padding:6px 10px;font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:.08em">BASELINE - ADMIN</div>'
+    +'<div class="blc-item" data-act="latest" style="padding:8px 10px;border-radius:6px;cursor:pointer">Pin <b>latest snapshot</b> (auto-follows newest)</div>'
     +(isSpecific?'<div class="blc-item" data-act="pin" style="padding:8px 10px;border-radius:6px;cursor:pointer">Pin \''+esc(labelTxt)+'\' as baseline</div>'
-                :'<div style="padding:8px 10px;color:#94a3b8;font-size:12px">Select a specific snapshot first, then right-click to pin it.</div>')
+                :'<div style="padding:8px 10px;color:#94a3b8;font-size:12px">Select a specific snapshot to pin that exact date.</div>')
     +'<div class="blc-item" data-act="clear" style="padding:8px 10px;border-radius:6px;cursor:pointer">Clear pin (use Auto)</div>';
   m.querySelectorAll('.blc-item').forEach(el=>{
     el.onmouseenter=()=>el.style.background='#f1f5f9'; el.onmouseleave=()=>el.style.background='';
-    el.onclick=(e)=>{ e.stopPropagation(); m.style.display='none'; pinBaseline(el.dataset.act==='clear', isSpecific?val:null); };
+    el.onclick=(e)=>{ e.stopPropagation(); m.style.display='none';
+      const act=el.dataset.act;
+      if(act==='latest') pinBaseline(false,'latest');
+      else pinBaseline(act==='clear', isSpecific?val:null); };
   });
   m.style.left=Math.min(ev.clientX, window.innerWidth-240)+'px';
   m.style.top=Math.min(ev.clientY, window.innerHeight-130)+'px';
@@ -6560,7 +6577,7 @@ async function pinBaseline(clear, val){
     });
     if(pr.ok){
       _PINNED_BASELINE = clear?null:val;
-      toast(clear?'Pin cleared - using Auto':'Baseline pinned: '+val);
+      toast(clear?'Pin cleared - using Auto':(val==='latest'?'Pinned to latest snapshot - follows every new save':'Baseline pinned: '+val));
       if(typeof refreshLive==='function' && GH_PROXY) refreshLive(); else if(REPORT) populateBaselineSelector();
     } else { const j=await pr.json(); toast('Save failed: '+(j.message||pr.status)); }
   }catch(e){ toast('Network error: '+e.message); }

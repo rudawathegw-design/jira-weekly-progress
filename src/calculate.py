@@ -8,6 +8,7 @@ Produces per-person stats matching the Excel layout:
 """
 
 import os
+import sys
 import json
 from datetime import datetime, timezone, timedelta
 
@@ -237,7 +238,8 @@ def _parse_prev(v):
 
 
 def _pinned_baseline_date():
-    """Admin-pinned baseline date (YYYY-MM-DD) from data/schedule.json, or None."""
+    """Admin-pinned baseline from data/schedule.json: a YYYY-MM-DD date,
+    the string "latest" (auto-follow the newest snapshot), or None."""
     try:
         with open(SCHEDULE_PATH, encoding="utf-8") as f:
             return (json.load(f).get("pinned_baseline") or None)
@@ -247,16 +249,23 @@ def _pinned_baseline_date():
 
 def _find_baseline(history, today_str):
     """Find baseline snapshot for week-over-week comparison.
-    Priority: admin-pinned date > most recent prior snapshot on the configured
-    weekly day > most recent prior weekly-tagged snapshot > most recent prior.
-    Never returns today's own snapshot.
+    Priority: admin-pinned ("latest" or a specific date) > most recent prior
+    snapshot on the configured weekly day > most recent prior weekly-tagged
+    snapshot > most recent prior. Never returns today's own snapshot
+    (except an explicit date pin, which is an admin's deliberate choice).
     """
-    # Admin-pinned baseline wins — any snapshot, including today's.
     pinned = _pinned_baseline_date()
     if pinned:
-        hit = next((s for s in history if s.get("date") == pinned), None)
-        if hit:
-            return hit
+        if str(pinned).strip().lower() == "latest":
+            # Auto-advancing pin: newest snapshot strictly before today, so a
+            # freshly saved snapshot never compares against itself.
+            prior = [s for s in history if s.get("date", "") < today_str]
+            if prior:
+                return prior[-1]
+        else:
+            hit = next((s for s in history if s.get("date") == pinned), None)
+            if hit:
+                return hit
     prior = [s for s in history if s.get("date", "") < today_str]
     if not prior:
         return None
@@ -397,6 +406,14 @@ def build_report(issues, save_history=True, hidden_people=None):
         # Keep sorted by date
         history.sort(key=lambda s: s.get("date", ""))
         save_history_data(history)
+        # Plaintext marker (date only, no PII) so the workflow's decide job can
+        # detect a missed weekly slot and catch up later the same day.
+        try:
+            marker = os.path.join(os.path.dirname(HISTORY_PATH), "last_snapshot_date.txt")
+            with open(marker, "w", encoding="utf-8") as f:
+                f.write(today + "\n")
+        except OSError as e:
+            print(f"Could not write snapshot marker (non-fatal): {e}", file=sys.stderr)
         report["history"] = history
 
     return report

@@ -167,7 +167,22 @@ h1 span{color:#2563eb}
           <input type="time" id="sched-time" value="14:55" style="border:1.5px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:14px;padding:8px 11px;outline:none;color:#0f172a;width:100%;font-family:'JetBrains Mono',monospace">
         </div>
       </div>
-      <div class="hint" style="margin-bottom:14px">The snapshot saved on this <b>day &amp; time</b> becomes the <b>weekly baseline</b> that week-over-week changes compare against. GitHub captures it automatically — no need to open the site.</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="flex:1;min-width:180px">
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:8px">PINNED BASELINE</label>
+          <select id="sched-pin-mode" onchange="document.getElementById('sched-pin-date').style.display=this.value==='date'?'':'none'"
+                  style="border:1.5px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:14px;padding:8px 11px;outline:none;color:#0f172a;width:100%">
+            <option value="latest">Latest snapshot (auto-follows every new save)</option>
+            <option value="date">Specific date…</option>
+            <option value="none">No pin (Auto · weekly day)</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:150px">
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:8px">&nbsp;</label>
+          <input type="date" id="sched-pin-date" style="display:none;border:1.5px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:14px;padding:8px 11px;outline:none;color:#0f172a;width:100%;font-family:'JetBrains Mono',monospace">
+        </div>
+      </div>
+      <div class="hint" style="margin-bottom:14px">The snapshot saved on this <b>day &amp; time</b> becomes the <b>weekly baseline</b> that week-over-week changes compare against. GitHub captures it automatically — no need to open the site. The <b>pinned baseline</b> is what the dashboard's delta compares against: <b>Latest snapshot</b> moves forward automatically each week; pin a <b>specific date</b> to freeze it.</div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <button class="tok-save-btn" onclick="saveSchedule()">Save</button>
         <span id="auth-status" style="font-size:11.5px;color:#64748b"></span>
@@ -299,6 +314,9 @@ function _baghdadTimeToUtcSlot(t){
 
 // Preserve the existing capture time across saves (UI no longer edits it).
 let _SCHED_SLOTS = ['11:55'];
+// Full schedule.json as last fetched — saves MERGE into this so keys the UI
+// doesn't edit (tolerance_min, future fields) are never silently dropped.
+let _SCHED_CFG = {};
 
 async function loadSchedule(){
   const editor = document.getElementById('sched-editor');
@@ -317,9 +335,17 @@ async function loadSchedule(){
     let slots = cfg.slots_utc;
     if (!slots || !slots.length) slots = (cfg.hours_utc||[]).map(h => `${String(h).padStart(2,'0')}:00`);
     _SCHED_SLOTS = (slots && slots.length) ? slots : ['11:55'];
+    _SCHED_CFG = cfg || {};
     const wd = (cfg.weekly_day===undefined||cfg.weekly_day===null) ? 3 : cfg.weekly_day;
     document.getElementById('sched-weekly-day').value=String(wd);
     document.getElementById('sched-time').value = _utcSlotToBaghdadTime(_SCHED_SLOTS[0] || '11:55');
+    // Pinned baseline → UI
+    const pin = cfg.pinned_baseline || '';
+    const pinMode = document.getElementById('sched-pin-mode');
+    const pinDate = document.getElementById('sched-pin-date');
+    if (!pin) { pinMode.value='none'; pinDate.style.display='none'; }
+    else if (String(pin).toLowerCase()==='latest') { pinMode.value='latest'; pinDate.style.display='none'; }
+    else { pinMode.value='date'; pinDate.value=pin; pinDate.style.display=''; }
     loading.style.display='none';
     editor.style.display='';
   }catch(e){
@@ -335,14 +361,22 @@ async function saveSchedule(){
   const baghdadTime=document.getElementById('sched-time').value || '14:55';
   const slotUtc=_baghdadTimeToUtcSlot(baghdadTime);
   // The weekly snapshot runs ONLY on the baseline day, at the chosen time; no email.
-  const cfg={
+  // MERGE into the fetched config so unrelated keys (e.g. tolerance_min,
+  // pinned_baseline set from the dashboard) survive a schedule save.
+  const cfg = Object.assign({}, _SCHED_CFG, {
     slots_utc:  [slotUtc],
     hours_utc:  [parseInt(slotUtc.split(':')[0])],
     active_days: [weeklyDay],
     weekly_day: weeklyDay,
     send_email: false,
     description: `Weekly snapshot on ${DAYS_LABEL[weeklyDay]} at ${baghdadTime} Baghdad`,
-  };
+  });
+  // Pinned baseline from the UI
+  const pinMode = document.getElementById('sched-pin-mode').value;
+  const pinDate = document.getElementById('sched-pin-date').value;
+  if (pinMode==='latest') cfg.pinned_baseline='latest';
+  else if (pinMode==='date' && pinDate) cfg.pinned_baseline=pinDate;
+  else delete cfg.pinned_baseline;
   const msg=document.getElementById('sched-msg');
   msg.innerHTML='<span style="color:#64748b">Saving…</span>';
   const content=btoa(unescape(encodeURIComponent(JSON.stringify(cfg, null, 2)+'\n')));

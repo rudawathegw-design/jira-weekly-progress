@@ -61,6 +61,7 @@ jobs:
     outputs:
       run: ${{ steps.check.outputs.run }}
       send_email: ${{ steps.check.outputs.send_email }}
+      save: ${{ steps.check.outputs.save }}
     steps:
       - uses: actions/checkout@v4
       - id: check
@@ -70,6 +71,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "run=true" >> $GITHUB_OUTPUT
             echo "send_email=${{ github.event.inputs.send_email }}" >> $GITHUB_OUTPUT
+            echo "save=${{ github.event.inputs.save_history }}" >> $GITHUB_OUTPUT
             exit 0
           fi
           # schedule OR repository_dispatch (external pinger): consult schedule.json
@@ -77,13 +79,15 @@ jobs:
             echo "No schedule.json — defaulting to run"
             echo "run=true" >> $GITHUB_OUTPUT
             echo "send_email=true" >> $GITHUB_OUTPUT
+            echo "save=true" >> $GITHUB_OUTPUT
             exit 0
           fi
           HOUR=$(date -u +%-H)
           MIN=$(date -u +%-M)
           DOW=$(date -u +%w)
+          TODAY=$(date -u +%F)
           OUT=$(python3 - <<PYEOF
-          import json
+          import json, os
           d = json.load(open("data/schedule.json"))
           slots = d.get("slots_utc")          # "HH:MM" minute precision
           if not slots:                       # legacy fallback
@@ -96,17 +100,36 @@ jobs:
               h,m = s.split(":")
               return int(h)*60 + int(m)
           hit = any(abs(now_t - to_min(s)) <= tol for s in slots)
-          if hit and int($DOW) in days:
-              print("RUN", "true" if se else "false")
+          on_day = int($DOW) in days
+          # ── Missed-slot catch-up ─────────────────────────────────────
+          # GitHub cron ticks are often delayed past the ±tol window, which
+          # used to silently skip the WHOLE weekly snapshot. If we're on the
+          # active day, PAST the slot, and data/last_snapshot_date.txt shows
+          # no snapshot was saved today, run+save on this later tick instead.
+          catchup = False
+          if on_day and not hit and slots:
+              try:
+                  marker = open("data/last_snapshot_date.txt").read().strip()
+              except OSError:
+                  marker = ""
+              if marker != "$TODAY" and now_t > min(to_min(s) for s in slots) + tol:
+                  catchup = True
+          if on_day and (hit or catchup):
+              print("RUN", "true" if se else "false", "catchup" if catchup else "slot")
           else:
               print("SKIP")
           PYEOF
           )
           if [[ "$OUT" == RUN* ]]; then
             SE=$(echo "$OUT" | awk '{print $2}')
+            WHY=$(echo "$OUT" | awk '{print $3}')
             echo "run=true" >> $GITHUB_OUTPUT
             echo "send_email=$SE" >> $GITHUB_OUTPUT
-            echo "Scheduled run: HOUR=$HOUR DOW=$DOW → proceed (email=$SE)"
+            # Any scheduled/pinged run that matches the configured day saves
+            # the snapshot — regardless of whether GitHub's own cron or an
+            # external pinger delivered the tick.
+            echo "save=true" >> $GITHUB_OUTPUT
+            echo "Scheduled run: HOUR=$HOUR DOW=$DOW → proceed (email=$SE, reason=$WHY)"
           else
             echo "Scheduled run: HOUR=$HOUR DOW=$DOW → skip per schedule.json"
             echo "run=false" >> $GITHUB_OUTPUT
@@ -145,8 +168,9 @@ jobs:
           # Tell main.py whether the workflow will actually email this run,
           # so it only spends DeepSeek tokens when needed.
           SEND_EMAIL: ${{ needs.decide.outputs.send_email }}
-          SAVE_HISTORY: >-
-            ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.save_history || 'false' }}
+          # decide computes this for ALL trigger types: manual dispatch input,
+          # slot hit, missed-slot catch-up, and external cron_ping alike.
+          SAVE_HISTORY: ${{ needs.decide.outputs.save || 'false' }}
           # Manual dispatch with save_history=true forces a save regardless of weekday
           FORCE_SAVE_HISTORY: >-
             ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.save_history == 'true' && 'true' || 'false' }}
