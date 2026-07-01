@@ -6839,11 +6839,30 @@ document.addEventListener('keydown', function(e){
       radial-gradient(ellipse at 82% 28%,#e7dcff,transparent 55%),
       radial-gradient(ellipse at 50% 105%,#ffe7d1,transparent 55%),#f7f7fb !important;
     background-attachment:fixed !important}
-  html.theme-dark body{background:#0b1220 !important}
-  html.theme-dark #app{filter:invert(1) hue-rotate(180deg)}
+  /* ── Dark mode (Claude-style: warm charcoal, soft contrast) ──────────
+     The palette is inverted with hue preserved, then softened + warmed so
+     surfaces land near Claude's #262624/#30302e charcoals instead of harsh
+     blue-blacks. Media (img/canvas/video) re-inverts to stay true-color;
+     the residual brightness/sepia leaves it slightly dimmed+warm, which is
+     what you want in dark mode anyway. */
+  html.theme-dark{color-scheme:dark}
+  html.theme-dark body{background:#262624 !important;background-image:none !important}
+  html.theme-dark #app{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9) sepia(.12)}
   html.theme-dark #app img,html.theme-dark #app canvas,html.theme-dark #app video,
   html.theme-dark #app .no-invert{filter:invert(1) hue-rotate(180deg)}
   html.theme-dark .theme-pop{filter:invert(1) hue-rotate(180deg)}
+  /* Chrome that lives OUTSIDE #app gets real dark styles (no filter) */
+  html.theme-dark #pw-overlay{background:
+    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(87,80,70,.45),transparent 60%),
+    linear-gradient(180deg,#1f1e1d,#262624)}
+  html.theme-dark .pw-card{background:#30302e;border-color:#3e3d39;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+  html.theme-dark .pw-card h2{color:#f5f4ee}
+  html.theme-dark .pw-card p{color:#b8b5ad}
+  html.theme-dark .pw-card .inp{background:#262624;border-color:#4a4844;color:#f5f4ee}
+  html.theme-dark .fab{border-color:rgba(255,255,255,.18);
+    box-shadow:0 8px 24px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.16)}
+  html.theme-dark .fab-label{background:rgba(48,48,46,.72);color:#f5f4ee;border-color:rgba(255,255,255,.14)}
+  html.theme-dark .fab-label::after{border-top-color:rgba(48,48,46,.72)}
   .fab-stack{position:fixed;right:18px;bottom:168px;z-index:650;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
   /* Frosted-glass FABs: translucent tinted fill + backdrop blur + light rim */
   .fab{width:44px;height:44px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
@@ -6856,6 +6875,10 @@ document.addEventListener('keydown', function(e){
     box-shadow:0 12px 28px rgba(2,8,23,.2),inset 0 1px 0 rgba(255,255,255,.65)}
   .fab.theme{color:#6d28d9;background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(109,40,217,.18))}
   .fab.theme:hover{background:linear-gradient(135deg,rgba(139,92,246,.44),rgba(109,40,217,.28))}
+  .fab.moon{color:#475569;background:linear-gradient(135deg,rgba(148,163,184,.32),rgba(71,85,105,.2))}
+  .fab.moon:hover{background:linear-gradient(135deg,rgba(148,163,184,.46),rgba(71,85,105,.3))}
+  html.theme-dark .fab.moon{color:#d97757;background:linear-gradient(135deg,rgba(217,119,87,.32),rgba(150,70,45,.22))}
+  html.theme-dark .fab.moon:hover{background:linear-gradient(135deg,rgba(217,119,87,.46),rgba(150,70,45,.32))}
   .fab.laser{color:#b91c1c;background:linear-gradient(135deg,rgba(239,68,68,.3),rgba(185,28,28,.18))}
   .fab.laser:hover{background:linear-gradient(135deg,rgba(239,68,68,.44),rgba(185,28,28,.28))}
   .fab.laser.active{box-shadow:0 0 0 3px rgba(239,68,68,.3),0 0 16px 3px rgba(239,68,68,.45),
@@ -6894,6 +6917,9 @@ document.addEventListener('keydown', function(e){
 </style>
 
 <div class="fab-stack">
+  <button class="fab moon" id="dark-fab" onclick="toggleDarkMode()" title="Dark mode" aria-label="Toggle dark mode">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+  </button>
   <div class="fab-label" id="laser-label" aria-hidden="true">Laser</div>
   <button class="fab laser" id="laser-fab" onclick="toggleLaser()" title="Laser pointer — toggle (L)" aria-label="Toggle laser pointer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
@@ -6923,8 +6949,23 @@ document.addEventListener('keydown', function(e){
   }
   window.fibScrollTop    = () => window.scrollTo({top:0, behavior:'smooth'});
   window.fibScrollBottom = () => window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
-  document.documentElement.classList.remove('theme-dark');
-  try { localStorage.removeItem('fibTheme'); localStorage.removeItem('fibBg'); } catch(e){}
+  // ── Dark mode toggle (Claude-style theme, persisted per device) ──
+  const MOON_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>';
+  const SUN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>';
+  function syncDarkFab(on){
+    const b = document.getElementById('dark-fab'); if (!b) return;
+    b.innerHTML = on ? SUN_SVG : MOON_SVG;
+    b.title = on ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+  window.toggleDarkMode = function(){
+    const on = document.documentElement.classList.toggle('theme-dark');
+    try { localStorage.setItem('fibTheme', on ? 'dark' : 'light'); } catch(e){}
+    syncDarkFab(on);
+  };
+  let dark = false;
+  try { dark = localStorage.getItem('fibTheme') === 'dark'; } catch(e){}
+  if (dark) document.documentElement.classList.add('theme-dark');
+  syncDarkFab(dark);
   window.addEventListener('load', () => setTimeout(typeBrand, 400));
 })();
 </script>
