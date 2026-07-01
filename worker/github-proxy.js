@@ -81,6 +81,30 @@ function isAllowed(method, path, repo) {
 }
 
 export default {
+  // ── Backup cron pinger ────────────────────────────────────────────────
+  // GitHub's own scheduler is unreliable and the external pinger
+  // (cron-job.org) is a single point of failure. This Cloudflare cron
+  // trigger (wrangler.toml [triggers]) fires repository_dispatch
+  // event_type=cron_ping every 5 minutes as a redundant tick source. The
+  // repo's `decide` job stays the single source of truth for whether a
+  // tick actually runs/saves, so overlapping pingers are harmless.
+  async scheduled(event, env, ctx) {
+    const r = await fetch(`${GH}/repos/${env.REPO}/dispatches`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.GH_PAT}`,
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "github-proxy-cron-pinger",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ event_type: "cron_ping" }),
+    });
+    // 204 = dispatched. Log failures so they show in the Worker's dashboard.
+    if (r.status !== 204) {
+      console.error(`cron_ping dispatch failed: ${r.status} ${await r.text()}`);
+    }
+  },
+
   async fetch(request, env) {
     // ALLOWED_ORIGIN may be a comma-separated list (e.g. the custom domain plus
     // the github.io fallback). Echo back the caller's origin when it's allowed.
