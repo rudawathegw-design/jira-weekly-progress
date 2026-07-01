@@ -6845,24 +6845,35 @@ document.addEventListener('keydown', function(e){
   html.theme-dark #app .no-invert{filter:invert(1) hue-rotate(180deg)}
   html.theme-dark .theme-pop{filter:invert(1) hue-rotate(180deg)}
   .fab-stack{position:fixed;right:18px;bottom:168px;z-index:650;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
-  .fab{width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;display:grid;place-items:center;
-    color:#fff;box-shadow:0 6px 18px rgba(2,8,23,.28);transition:transform .15s;background:linear-gradient(135deg,#0ea5e9,#0369a1)}
-  .fab:hover{transform:translateY(-2px)}
-  .fab.theme{background:linear-gradient(135deg,#8b5cf6,#6d28d9)}
-  .fab.laser{background:linear-gradient(135deg,#ef4444,#b91c1c)}
-  .fab.laser.active{box-shadow:0 0 0 3px rgba(239,68,68,.35),0 0 16px 3px rgba(239,68,68,.5),0 6px 18px rgba(2,8,23,.28)}
+  /* Frosted-glass FABs: translucent tinted fill + backdrop blur + light rim */
+  .fab{width:44px;height:44px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
+    color:#0369a1;background:linear-gradient(135deg,rgba(14,165,233,.28),rgba(3,105,161,.18));
+    border:1px solid rgba(255,255,255,.55);
+    backdrop-filter:blur(14px) saturate(1.7);-webkit-backdrop-filter:blur(14px) saturate(1.7);
+    box-shadow:0 8px 24px rgba(2,8,23,.16),inset 0 1px 0 rgba(255,255,255,.55),inset 0 -6px 12px rgba(255,255,255,.14);
+    transition:transform .15s,background .2s,box-shadow .2s}
+  .fab:hover{transform:translateY(-2px);background:linear-gradient(135deg,rgba(14,165,233,.42),rgba(3,105,161,.28));
+    box-shadow:0 12px 28px rgba(2,8,23,.2),inset 0 1px 0 rgba(255,255,255,.65)}
+  .fab.theme{color:#6d28d9;background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(109,40,217,.18))}
+  .fab.theme:hover{background:linear-gradient(135deg,rgba(139,92,246,.44),rgba(109,40,217,.28))}
+  .fab.laser{color:#b91c1c;background:linear-gradient(135deg,rgba(239,68,68,.3),rgba(185,28,28,.18))}
+  .fab.laser:hover{background:linear-gradient(135deg,rgba(239,68,68,.44),rgba(185,28,28,.28))}
+  .fab.laser.active{box-shadow:0 0 0 3px rgba(239,68,68,.3),0 0 16px 3px rgba(239,68,68,.45),
+    0 8px 24px rgba(2,8,23,.16),inset 0 1px 0 rgba(255,255,255,.55)}
   .fab.laser.active svg{animation:laserFabSpin 6s linear infinite}
   @keyframes laserFabSpin{to{transform:rotate(360deg)}}
-  .fab-label{align-self:flex-end;background:#fff;color:#b91c1c;
+  .fab-label{align-self:flex-end;background:rgba(255,255,255,.55);color:#b91c1c;
     font:800 11px/1 'Inter',system-ui,sans-serif;padding:5px 11px;border-radius:11px;
-    border:1px solid #fee2e2;box-shadow:0 5px 14px rgba(185,28,28,.18);
+    border:1px solid rgba(255,255,255,.65);
+    backdrop-filter:blur(12px) saturate(1.6);-webkit-backdrop-filter:blur(12px) saturate(1.6);
+    box-shadow:0 5px 14px rgba(185,28,28,.14),inset 0 1px 0 rgba(255,255,255,.6);
     position:relative;pointer-events:none;letter-spacing:.02em;white-space:nowrap;margin-bottom:-2px;
     opacity:0;transform:translateY(4px);transition:opacity .18s,transform .18s}
   .fab-label::after{content:"";position:absolute;right:17px;bottom:-5px;
-    border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #fff;transition:border-top-color .18s}
+    border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid rgba(255,255,255,.8);transition:border-top-color .18s}
   .fab-stack:hover .fab-label{opacity:1;transform:none}
-  body.laser-on .fab-label{opacity:1;transform:none;background:#b91c1c;color:#fff;border-color:#b91c1c}
-  body.laser-on .fab-label::after{border-top-color:#b91c1c}
+  body.laser-on .fab-label{opacity:1;transform:none;background:rgba(185,28,28,.78);color:#fff;border-color:rgba(255,255,255,.35)}
+  body.laser-on .fab-label::after{border-top-color:rgba(185,28,28,.78)}
   .fab svg{width:20px;height:20px}
   .theme-pop{position:fixed;right:18px;bottom:80px;z-index:601;background:#fff;border:1px solid #e2e8f0;
     border-radius:14px;box-shadow:0 16px 40px rgba(2,8,23,.22);padding:14px;width:240px;display:none}
