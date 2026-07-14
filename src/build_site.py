@@ -5782,6 +5782,18 @@ function _epicStatusFill(status){
   return 'E7E6E6';
 }
 
+// Issue type → fill colour, same soft palette family as the status cells so
+// the whole sheet reads as one consistent colour system.
+function _epicTypeFill(type){
+  const t = (type||'').toLowerCase();
+  if (t.includes('epic'))    return 'D9C2EE'; // purple
+  if (t.includes('story'))   return 'C6EFCE'; // green
+  if (t.includes('bug'))     return 'F4B7B7'; // red
+  if (t.includes('sub'))     return 'FFE699'; // amber
+  if (t.includes('task'))    return 'BDD7EE'; // blue
+  return 'E7E6E6'; // grey fallback
+}
+
 async function exportEpicExcel(){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   toast(`Pulling ${EPIC_KEY} from Jira…`);
@@ -5796,54 +5808,66 @@ async function exportEpicExcel(){
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const dateLabel = now.toISOString().slice(0,10);
 
-    // Owner-lookup map so subtasks can show who owns their parent task too.
+    // Owner-lookup map (kept for future use; each row now just shows its own assignee).
     const ownerByKey = {};
     issues.forEach(i => { ownerByKey[i.key] = (i.fields.assignee && i.fields.assignee.displayName) || 'Unassigned'; });
+
+    const base = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
 
     const rows = issues.map(issue=>{
       const f = issue.fields||{};
       const key = issue.key;
       const owner = ownerByKey[key];
-      const title = `${key} — ${(f.summary||'').slice(0,200)}`;
+      const summary = (f.summary||'').slice(0,200);
       const type = ((f.issuetype||{}).name)||'';
-      const is_subtask = !!((f.issuetype||{}).subtask);
-      const parentKey = (f.parent||{}).key || '';
-      const parent_owner = (is_subtask && parentKey && ownerByKey[parentKey]) ? ownerByKey[parentKey] : '';
       const today_status = ((f.status||{}).name)||'Unknown';
       const yStatus = _statusAsOf(issue, startOfToday);
       const yesterday_status = yStatus === null ? 'New today' : yStatus;
       const changed = yStatus !== null && yStatus !== today_status;
-      return { key, owner, title, type, parent_owner, yesterday_status, today_status, changed };
+      const link = `${base}/browse/${encodeURIComponent(key)}`;
+      return { key, owner, summary, type, yesterday_status, today_status, changed, link };
     });
 
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     s.onload = () => {
       try {
-        const header = ['Owner','Task','Type','Parent Task Owner','Yesterday Status','Today Status','Changed?'];
+        // Columns: Key and Summary are separate (no more "KEY — summary" mash-up),
+        // Owner is just the task's own assignee (Parent Task Owner column removed),
+        // Type keeps its own colour family, and Link is the last column.
+        const header = ['Key','Summary','Owner','Type','Yesterday Status','Today Status','Changed?','Link'];
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
-        const aoa = [header, ...rows.map(r=>[r.owner, r.title, r.type, r.parent_owner, r.yesterday_status, r.today_status, r.changed?'Yes':'No'])];
+        const aoa = [header, ...rows.map(r=>[r.key, r.summary, r.owner, r.type, r.yesterday_status, r.today_status, r.changed?'Yes':'No', r.link])];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = [{wch:22},{wch:60},{wch:12},{wch:22},{wch:18},{wch:18},{wch:10}];
+        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12},{wch:18},{wch:18},{wch:10},{wch:38}];
         ws['!freeze'] = {xSplit:0, ySplit:1};
-        ws['!autofilter'] = {ref:`A1:G${rows.length+1}`};
+        ws['!autofilter'] = {ref:`A1:H${rows.length+1}`};
         for (let c=0;c<header.length;c++){
           const addr = XLSX.utils.encode_cell({r:0,c});
           if (ws[addr]) ws[addr].s = headStyle;
         }
+        const plainCols = [0,1,2]; // Key, Summary, Owner — banded, no special colour
         rows.forEach((r,i)=>{
           const rr = i+1;
           const bandFill = i%2===0 ? 'FFFFFF' : 'F2F6FA';
-          for (let c=0;c<4;c++){
+          const border = {bottom:{style:'thin',color:{rgb:'DCE3EA'}}};
+          plainCols.forEach(c=>{
             const addr = XLSX.utils.encode_cell({r:rr,c});
-            if (ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:c===1}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
-          }
+            if (ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:c===1}, border };
+          });
+          const typeAddr = XLSX.utils.encode_cell({r:rr,c:3});
+          if (ws[typeAddr]) ws[typeAddr].s = { fill:{fgColor:{rgb:_epicTypeFill(r.type)}}, alignment:{horizontal:'center',vertical:'center'}, border };
           const yAddr = XLSX.utils.encode_cell({r:rr,c:4});
-          if (ws[yAddr]) ws[yAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.yesterday_status)}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
+          if (ws[yAddr]) ws[yAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.yesterday_status)}}, alignment:{horizontal:'center',vertical:'center'}, border };
           const tAddr = XLSX.utils.encode_cell({r:rr,c:5});
-          if (ws[tAddr]) ws[tAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.today_status)}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
+          if (ws[tAddr]) ws[tAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.today_status)}}, alignment:{horizontal:'center',vertical:'center'}, border };
           const chAddr = XLSX.utils.encode_cell({r:rr,c:6});
-          if (ws[chAddr]) ws[chAddr].s = { font:{bold:r.changed,color:{rgb:r.changed?'C00000':'666666'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
+          if (ws[chAddr]) ws[chAddr].s = { font:{bold:r.changed,color:{rgb:r.changed?'C00000':'666666'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+          const linkAddr = XLSX.utils.encode_cell({r:rr,c:7});
+          if (ws[linkAddr]){
+            ws[linkAddr].s = { font:{color:{rgb:'1155CC'},underline:true}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
+            ws[linkAddr].l = { Target: r.link, Tooltip: 'Open in Jira' };
+          }
         });
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, EPIC_KEY);
