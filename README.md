@@ -107,6 +107,31 @@ No extra secrets are needed â€” `comments.yml` reuses `JIRA_EMAIL`,
 
 ---
 
+## Exporting one epic's daily status (Excel)
+
+The **More → Export Epic Excel** button on the dashboard downloads a coloured
+`.xlsx` for epic **FIBTMP-489**: every task and subtask under it, one row
+each, with columns **Name** (assignee), **Task**, **Type**, **Yesterday
+Status**, **Today Status**, and **Changed?**. It's meant for a quick daily
+send-up to management.
+
+- Pulls live from Jira through the Worker's `epic_issues` action (needs
+  `GH_PROXY` / the Worker deployed — see `worker/SETUP.md`).
+- Jira has no "yesterday status" field, so the button remembers each issue's
+  status in `data/epic_snapshot.json` (plain JSON, committed back through the
+  same Worker) and rolls it forward one day at a time. First export for an
+  issue shows "—" for Yesterday; from the second day on it shows the real
+  comparison, and status cells that changed are flagged in the **Changed?**
+  column.
+- To export a different epic, edit `EPIC_KEY` near the top of the
+  `exportEpicExcel()` function in `docs/index.html` (and `src/build_site.py`,
+  so a future weekly rebuild doesn't revert it).
+- **After pulling this change, redeploy the Cloudflare Worker** (`wrangler
+  deploy` from `worker/`) — the button won't work until the Worker knows the
+  new `epic_issues` action.
+
+---
+
 ## Running locally (optional, to test)
 
 ```bash
