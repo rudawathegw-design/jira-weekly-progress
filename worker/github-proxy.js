@@ -341,12 +341,16 @@ export default {
       const epicKey = String(body.epicKey || "FIBTMP-489").trim();
       const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
       const jhdr = { Accept: "application/json", Authorization: `Basic ${jauth}` };
-      const fields = "summary,assignee,status,issuetype,parent,duedate";
+      const fields = "summary,assignee,status,issuetype,parent,duedate,created";
+      // expand=changelog is what lets the dashboard compute "yesterday's
+      // status" by CHECKING Jira's own status-change history instead of us
+      // saving a snapshot file anywhere. Safe here (unlike the whole-project
+      // "jira" action above) because an epic's issue count is small.
 
       async function runJql(jql) {
         let out = [], token = null;
         for (let i = 0; i < 20; i++) {          // safety cap (~2000 issues)
-          const qs = new URLSearchParams({ jql, maxResults: "100", fields });
+          const qs = new URLSearchParams({ jql, maxResults: "100", fields, expand: "changelog" });
           if (token) qs.set("nextPageToken", token);
           const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, { headers: jhdr });
           if (!jr.ok) {
