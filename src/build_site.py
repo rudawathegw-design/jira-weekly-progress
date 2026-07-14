@@ -1346,7 +1346,7 @@ CC: @cc</textarea>
           </button>
           <button class="menu-item" onclick="exportEpicExcel();closeMoreMenu()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="15" x2="16" y2="15"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
-            <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · Name, task, yesterday/today status</div></div>
+            <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · Owner, task, yesterday vs today status</div></div>
           </button>
 
           <div class="menu-section-label">Presentation</div>
@@ -5712,14 +5712,14 @@ function exportExcel() {
   document.head.appendChild(s);
 }
 
-// ── export Epic daily status report (Name / Task / Yesterday / Today) ──────
+// ── export Epic daily status report (Owner / Task / Yesterday / Today) ─────
 // Pulls every task + subtask under one epic straight from Jira (via the
-// Worker's read-only `epic_issues` action) and writes a coloured .xlsx with
-// each person's task, its status yesterday, and its status today — meant for
-// a quick daily send-up to management. "Yesterday" isn't a Jira field, so we
-// remember each issue's status in data/epic_snapshot.json (via the same
-// GitHub-proxy path everything else on this page uses) and roll it forward
-// one day at a time.
+// Worker's read-only `epic_issues` action, which also returns each issue's
+// changelog) and writes a coloured .xlsx for a daily send-up to management.
+// "Yesterday's status" is CHECKED, not saved: we ask Jira's own status-change
+// history what the status was at the start of today, so nothing needs to be
+// written back to the repo and every export is a fresh, independent
+// snapshot — compare it any day, no state to keep in sync.
 const EPIC_KEY = 'FIBTMP-489';
 
 async function fetchEpicIssues(){
@@ -5739,38 +5739,37 @@ async function fetchEpicIssues(){
   return j.issues || [];
 }
 
-async function _loadEpicSnapshot(){
-  const repo = document.querySelector('meta[name=repo]')?.content||'';
-  if (!repo) return {sha:null, data:{}};
-  try {
-    const url = `https://api.github.com/repos/${repo}/contents/data/epic_snapshot.json`;
-    const r = await window.fetch(url, {cache:'no-store'});
-    if (r.status === 404) return {sha:null, data:{}};
-    if (!r.ok) throw new Error('Read failed HTTP '+r.status);
-    const meta = await r.json();
-    const text = decodeURIComponent(escape(atob((meta.content||'').replace(/\n/g,''))));
-    return {sha: meta.sha, data: JSON.parse(text || '{}')};
-  } catch(e){
-    console.error('[epic-snapshot-load]', e);
-    return {sha:null, data:{}};
+// Walks an issue's changelog for "status" field changes and returns the
+// status that was in effect at cutoffMs. Returns null if the issue didn't
+// exist yet at that time.
+function _statusAsOf(issue, cutoffMs){
+  const f = issue.fields||{};
+  const created = f.created ? new Date(f.created).getTime() : null;
+  if (created && created > cutoffMs) return null; // wasn't created yet
+  const histories = ((issue.changelog||{}).histories) || [];
+  const events = [];
+  for (const h of histories){
+    const when = h.created ? new Date(h.created).getTime() : null;
+    if (when === null || isNaN(when)) continue;
+    for (const it of (h.items||[])){
+      if ((it.field||'').toLowerCase() === 'status'){
+        events.push({when, from: it.fromString||'', to: it.toString||''});
+      }
+    }
   }
-}
-async function _saveEpicSnapshot(sha, data){
-  const repo = document.querySelector('meta[name=repo]')?.content||'';
-  if (!repo) return;
-  try {
-    const url = `https://api.github.com/repos/${repo}/contents/data/epic_snapshot.json`;
-    const body = {
-      message: `Update ${EPIC_KEY} daily status snapshot`,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2) + '\n'))),
-    };
-    if (sha) body.sha = sha;
-    const r = await window.fetch(url, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    if (!r.ok) throw new Error('Write failed HTTP '+r.status+' — '+(await r.text()).slice(0,150));
-  } catch(e){
-    console.error('[epic-snapshot-save]', e);
-    toast('⚠ Downloaded, but could not save today\'s status for tomorrow\'s comparison: '+e.message);
+  events.sort((a,b)=>a.when-b.when);
+  let status = null;
+  for (const e of events){
+    if (e.when <= cutoffMs) status = e.to;
+    else break;
   }
+  if (status === null){
+    // No status change on/before cutoff — either it never changed at all
+    // (use the pre-first-change value if we have one, else today's status),
+    // or every change happened after cutoff (use the very first "from").
+    status = events.length ? events[0].from : (((f.status)||{}).name || 'Unknown');
+  }
+  return status;
 }
 
 // Status → fill colour, reused for both status cells.
@@ -5787,46 +5786,47 @@ async function exportEpicExcel(){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   toast(`Pulling ${EPIC_KEY} from Jira…`);
   try {
-    const [issues, snap] = await Promise.all([fetchEpicIssues(), _loadEpicSnapshot()]);
+    const issues = await fetchEpicIssues();
     if (!issues.length){ toast(`No tasks/subtasks found under ${EPIC_KEY}.`); return; }
 
-    const today = new Date().toISOString().slice(0,10);
-    const prevData = snap.data || {};
-    const nextData = {};
+    // "Yesterday" = status as it stood at the start of today (local time),
+    // i.e. before anything that happened today. Re-checked from Jira's own
+    // history every time — no saved state to get out of sync.
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dateLabel = now.toISOString().slice(0,10);
+
+    // Owner-lookup map so subtasks can show who owns their parent task too.
+    const ownerByKey = {};
+    issues.forEach(i => { ownerByKey[i.key] = (i.fields.assignee && i.fields.assignee.displayName) || 'Unassigned'; });
+
     const rows = issues.map(issue=>{
       const f = issue.fields||{};
       const key = issue.key;
-      const name = (f.assignee && f.assignee.displayName) || 'Unassigned';
+      const owner = ownerByKey[key];
       const title = `${key} — ${(f.summary||'').slice(0,200)}`;
       const type = ((f.issuetype||{}).name)||'';
+      const is_subtask = !!((f.issuetype||{}).subtask);
+      const parentKey = (f.parent||{}).key || '';
+      const parent_owner = (is_subtask && parentKey && ownerByKey[parentKey]) ? ownerByKey[parentKey] : '';
       const today_status = ((f.status||{}).name)||'Unknown';
-      const prevEntry = prevData[key];
-      let yesterday_status;
-      if (!prevEntry) yesterday_status = '—';
-      else if (prevEntry.date === today) yesterday_status = prevEntry.previous || '—';
-      else yesterday_status = prevEntry.current;
-      nextData[key] = {
-        date: today,
-        current: today_status,
-        previous: (prevEntry && prevEntry.date === today) ? prevEntry.previous : (prevEntry ? prevEntry.current : null),
-      };
-      return { key, name, title, type, yesterday_status, today_status,
-        changed: yesterday_status !== '—' && yesterday_status !== today_status };
+      const yStatus = _statusAsOf(issue, startOfToday);
+      const yesterday_status = yStatus === null ? 'New today' : yStatus;
+      const changed = yStatus !== null && yStatus !== today_status;
+      return { key, owner, title, type, parent_owner, yesterday_status, today_status, changed };
     });
-
-    await _saveEpicSnapshot(snap.sha, nextData);
 
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     s.onload = () => {
       try {
-        const header = ['Name','Task','Type','Yesterday Status','Today Status','Changed?'];
+        const header = ['Owner','Task','Type','Parent Task Owner','Yesterday Status','Today Status','Changed?'];
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
-        const aoa = [header, ...rows.map(r=>[r.name, r.title, r.type, r.yesterday_status, r.today_status, r.changed?'Yes':'No'])];
+        const aoa = [header, ...rows.map(r=>[r.owner, r.title, r.type, r.parent_owner, r.yesterday_status, r.today_status, r.changed?'Yes':'No'])];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = [{wch:22},{wch:60},{wch:12},{wch:20},{wch:20},{wch:10}];
+        ws['!cols'] = [{wch:22},{wch:60},{wch:12},{wch:22},{wch:18},{wch:18},{wch:10}];
         ws['!freeze'] = {xSplit:0, ySplit:1};
-        ws['!autofilter'] = {ref:`A1:F${rows.length+1}`};
+        ws['!autofilter'] = {ref:`A1:G${rows.length+1}`};
         for (let c=0;c<header.length;c++){
           const addr = XLSX.utils.encode_cell({r:0,c});
           if (ws[addr]) ws[addr].s = headStyle;
@@ -5834,20 +5834,20 @@ async function exportEpicExcel(){
         rows.forEach((r,i)=>{
           const rr = i+1;
           const bandFill = i%2===0 ? 'FFFFFF' : 'F2F6FA';
-          for (let c=0;c<3;c++){
+          for (let c=0;c<4;c++){
             const addr = XLSX.utils.encode_cell({r:rr,c});
             if (ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:c===1}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
           }
-          const yAddr = XLSX.utils.encode_cell({r:rr,c:3});
+          const yAddr = XLSX.utils.encode_cell({r:rr,c:4});
           if (ws[yAddr]) ws[yAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.yesterday_status)}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
-          const tAddr = XLSX.utils.encode_cell({r:rr,c:4});
+          const tAddr = XLSX.utils.encode_cell({r:rr,c:5});
           if (ws[tAddr]) ws[tAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.today_status)}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
-          const chAddr = XLSX.utils.encode_cell({r:rr,c:5});
+          const chAddr = XLSX.utils.encode_cell({r:rr,c:6});
           if (ws[chAddr]) ws[chAddr].s = { font:{bold:r.changed,color:{rgb:r.changed?'C00000':'666666'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'thin',color:{rgb:'DCE3EA'}}} };
         });
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, EPIC_KEY);
-        XLSX.writeFile(wb, `${EPIC_KEY}-daily-status-${today}.xlsx`);
+        XLSX.writeFile(wb, `${EPIC_KEY}-daily-status-${dateLabel}.xlsx`);
         toast('✓ Epic Excel downloaded.');
       } catch(e){
         console.error('[export-epic]', e);
