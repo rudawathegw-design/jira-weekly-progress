@@ -328,6 +328,66 @@ export default {
       return json(200, { issues });
     }
 
+    // ── Epic export: all direct children of an epic + their subtasks ──
+    // Powers the "Export Epic Excel" button. Two JQL passes: (1) the epic's
+    // direct children (tries the modern "parent" link first, falls back to
+    // classic "Epic Link" if that returns nothing), then (2) any subtasks of
+    // those children. Read-only, same Jira secret as the other actions.
+    if (body.action === "epic_issues") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const epicKey = String(body.epicKey || "FIBTMP-489").trim();
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const jhdr = { Accept: "application/json", Authorization: `Basic ${jauth}` };
+      const fields = "summary,assignee,status,issuetype,parent,duedate";
+
+      async function runJql(jql) {
+        let out = [], token = null;
+        for (let i = 0; i < 20; i++) {          // safety cap (~2000 issues)
+          const qs = new URLSearchParams({ jql, maxResults: "100", fields });
+          if (token) qs.set("nextPageToken", token);
+          const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, { headers: jhdr });
+          if (!jr.ok) {
+            const t = await jr.text();
+            return { error: true, status: jr.status, detail: t.slice(0, 300) };
+          }
+          const d = await jr.json();
+          out = out.concat(d.issues || []);
+          token = d.nextPageToken;
+          if (!token || d.isLast) break;
+        }
+        return { issues: out };
+      }
+
+      let direct = await runJql(`parent = "${epicKey}"`);
+      if (direct.error) {
+        return json(502, { message: "Jira API error", status: direct.status, detail: direct.detail });
+      }
+      if (!direct.issues.length) {
+        const alt = await runJql(`"Epic Link" = "${epicKey}"`);
+        if (!alt.error) direct = alt;
+      }
+
+      const directKeys = direct.issues.map((i) => i.key);
+      let subtasks = [];
+      if (directKeys.length) {
+        const quoted = directKeys.map((k) => `"${k}"`).join(",");
+        const sub = await runJql(`parent in (${quoted})`);
+        if (!sub.error) subtasks = sub.issues;
+      }
+
+      const seen = new Set();
+      const all = [];
+      for (const i of [...direct.issues, ...subtasks]) {
+        if (seen.has(i.key)) continue;
+        seen.add(i.key);
+        all.push(i);
+      }
+      return json(200, { epicKey, issues: all });
+    }
+
     // ── Activity feed: changelog for recently-updated issues only ──
     // Separate, ON-DEMAND action (called when the Activity Log opens), so the
     // heavy changelog parse never runs on the every-10s live path. Kept small
