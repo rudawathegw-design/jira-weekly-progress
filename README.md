@@ -111,18 +111,22 @@ No extra secrets are needed â€” `comments.yml` reuses `JIRA_EMAIL`,
 
 The **More → Export Epic Excel** button on the dashboard downloads a coloured
 `.xlsx` for epic **FIBTMP-489**: every task and subtask under it, one row
-each, with columns **Name** (assignee), **Task**, **Type**, **Yesterday
-Status**, **Today Status**, and **Changed?**. It's meant for a quick daily
-send-up to management.
+each, with columns **Owner**, **Task**, **Type**, **Parent Task Owner**
+(shown on subtask rows, in case a subtask's assignee differs from the main
+task's), **Yesterday Status**, **Today Status**, and **Changed?**. It's meant
+for a quick daily send-up to management.
 
 - Pulls live from Jira through the Worker's `epic_issues` action (needs
-  `GH_PROXY` / the Worker deployed — see `worker/SETUP.md`).
-- Jira has no "yesterday status" field, so the button remembers each issue's
-  status in `data/epic_snapshot.json` (plain JSON, committed back through the
-  same Worker) and rolls it forward one day at a time. First export for an
-  issue shows "—" for Yesterday; from the second day on it shows the real
-  comparison, and status cells that changed are flagged in the **Changed?**
-  column.
+  `GH_PROXY` / the Worker deployed — see `worker/SETUP.md`), including each
+  issue's changelog.
+- "Yesterday's status" isn't a Jira field, so nothing is saved anywhere: each
+  export **checks** Jira's own status-change history for what the status was
+  at the start of today, and compares it to the live status right now. Every
+  export is independent — no snapshot file, nothing to fall out of sync,
+  works the same whether you download it once a day or ten times.
+- Status cells are colour-coded (green = done, blue = in progress, amber =
+  waiting/review, red = blocked); rows whose status changed since the start
+  of today are flagged in the **Changed?** column.
 - To export a different epic, edit `EPIC_KEY` near the top of the
   `exportEpicExcel()` function in `docs/index.html` (and `src/build_site.py`,
   so a future weekly rebuild doesn't revert it).
