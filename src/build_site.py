@@ -964,6 +964,25 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   </div>
 </div>
 
+<!-- ═══════════════ Epic Excel Modal (choose start date) ════════════════════ -->
+<div class="modal-overlay hidden" id="epic-excel-modal" onclick="if(event.target===this)closeModal('epic-excel-modal')">
+  <div class="modal" style="max-width:420px">
+    <h3>📊 Export Epic Excel</h3>
+    <div class="modal-section">
+      <div class="modal-section-label">From date</div>
+      <input type="date" id="epic-excel-start" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:14px">
+      <div class="persist-note" style="margin-top:8px">
+        One status column per day, from this date through <b id="epic-excel-today-label"></b>
+        (today's column is always live). Remembers your last pick for next time.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal ghost" onclick="closeModal('epic-excel-modal')">Cancel</button>
+      <button class="btn-modal blue" onclick="confirmEpicExcelExport()">Download</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ Compare Excel Modal ════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="compare-modal">
   <div class="modal">
@@ -1344,9 +1363,9 @@ CC: @cc</textarea>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <div class="menu-item-text"><div>Export Excel</div><div class="menu-item-sub">Multi-sheet .xlsx download</div></div>
           </button>
-          <button class="menu-item" onclick="exportEpicExcel();closeMoreMenu()">
+          <button class="menu-item" onclick="openEpicExcelModal();closeMoreMenu()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="15" x2="16" y2="15"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
-            <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · Owner, task, yesterday vs today status</div></div>
+            <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · pick a start date, one column per day to today</div></div>
           </button>
 
           <div class="menu-section-label">Presentation</div>
@@ -5712,15 +5731,23 @@ function exportExcel() {
   document.head.appendChild(s);
 }
 
-// ── export Epic daily status report (Owner / Task / Yesterday / Today) ─────
+// ── export Epic daily status report (one column per day, side by side) ────
 // Pulls every task + subtask under one epic straight from Jira (via the
 // Worker's read-only `epic_issues` action, which also returns each issue's
-// changelog) and writes a coloured .xlsx for a daily send-up to management.
-// "Yesterday's status" is CHECKED, not saved: we ask Jira's own status-change
-// history what the status was at the start of today, so nothing needs to be
-// written back to the repo and every export is a fresh, independent
-// snapshot — compare it any day, no state to keep in sync.
+// changelog) and writes a coloured .xlsx for management, with every day from
+// a chosen start date through today laid out as its own column — so a
+// stalled task (same status repeated day after day) is visible at a glance
+// across the row, next to who owns it.
+// Every day's status is CHECKED, not saved: we ask Jira's own status-change
+// history what the status was at the end of each day, so nothing needs to
+// be written back to the repo. Today's column is always the *live* status
+// at the moment of download — export it once or ten times a day, it's
+// always current. The start date is picked in the "Export Epic Excel" modal
+// (openEpicExcelModal / confirmEpicExcelExport below); EPIC_HISTORY_START is
+// just the fallback default shown the first time, before anyone has picked
+// their own date (which is then remembered in localStorage).
 const EPIC_KEY = 'FIBTMP-489';
+const EPIC_HISTORY_START = '2026-07-13'; // yyyy-mm-dd, default start shown in the modal
 
 async function fetchEpicIssues(){
   if (!GH_PROXY) throw new Error('No Worker proxy configured (meta gh-proxy).');
@@ -5794,18 +5821,94 @@ function _epicTypeFill(type){
   return 'E7E6E6'; // grey fallback
 }
 
-async function exportEpicExcel(){
+// Builds the list of local-midnight Date objects from startStr (yyyy-mm-dd,
+// falls back to EPIC_HISTORY_START) through today (inclusive). Today is
+// always the last entry. If startStr is after today, just today is used.
+function _epicDayList(startStr){
+  const [sy,sm,sd] = (startStr || EPIC_HISTORY_START).split('-').map(Number);
+  const start = new Date(sy, (sm||1)-1, sd||1);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = [];
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate()+1)){
+    days.push(new Date(d));
+  }
+  if (!days.length) days.push(today); // guard: start date in the future
+  return days;
+}
+
+// Per-day status for one issue across the whole day list. Every day except
+// the last (today) is looked up from the changelog as of the *end* of that
+// day (i.e. just before the next day starts). Today is always the issue's
+// live current status. null = issue didn't exist yet on that day.
+function _dailyStatuses(issue, days){
+  const out = [];
+  for (let i=0;i<days.length;i++){
+    if (i === days.length-1){
+      out.push(((issue.fields.status||{}).name) || 'Unknown');
+    } else {
+      out.push(_statusAsOf(issue, days[i+1].getTime()));
+    }
+  }
+  return out;
+}
+
+// How many days in a row (counting back from today) the status hasn't
+// moved — the number a manager actually cares about: a high count next to
+// an owner's name means that task has been sitting untouched.
+function _idleStreak(daily){
+  const last = daily[daily.length-1];
+  let streak = 0;
+  for (let i=daily.length-1;i>=0;i--){
+    if (daily[i] === last) streak++; else break;
+  }
+  return streak;
+}
+
+// Idle-streak → fill colour: green while fresh, amber once it's worth a
+// look, red once it's clearly stalled.
+function _idleFill(days){
+  if (days >= 5) return 'F4B7B7';
+  if (days >= 3) return 'FFE699';
+  return 'C6EFCE';
+}
+
+// Opens the "choose start date" modal. Defaults to whatever was picked last
+// time (remembered in localStorage), or EPIC_HISTORY_START the first time.
+function openEpicExcelModal(){
+  const inp = document.getElementById('epic-excel-start');
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  let saved = null;
+  try { saved = localStorage.getItem('epicExcelStart'); } catch(e){}
+  inp.value = (saved && saved <= todayStr) ? saved : EPIC_HISTORY_START;
+  inp.max = todayStr;
+  const lbl = document.getElementById('epic-excel-today-label');
+  if (lbl) lbl.textContent = now.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ' (today)';
+  openModal('epic-excel-modal');
+}
+
+// Reads the chosen date out of the modal, remembers it for next time, and
+// kicks off the actual export.
+function confirmEpicExcelExport(){
+  const inp = document.getElementById('epic-excel-start');
+  const val = inp && inp.value;
+  if (!val){ toast('Pick a start date first.'); return; }
+  try { localStorage.setItem('epicExcelStart', val); } catch(e){}
+  closeModal('epic-excel-modal');
+  exportEpicExcel(val);
+}
+
+async function exportEpicExcel(historyStart){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   toast(`Pulling ${EPIC_KEY} from Jira…`);
   try {
     const issues = await fetchEpicIssues();
     if (!issues.length){ toast(`No tasks/subtasks found under ${EPIC_KEY}.`); return; }
 
-    // "Yesterday" = status as it stood at the start of today (local time),
-    // i.e. before anything that happened today. Re-checked from Jira's own
-    // history every time — no saved state to get out of sync.
+    const startLabel = historyStart || EPIC_HISTORY_START;
+    const days = _epicDayList(startLabel); // startLabel … today, today last
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const dateLabel = now.toISOString().slice(0,10);
 
     // Owner-lookup map (kept for future use; each row now just shows its own assignee).
@@ -5820,28 +5923,39 @@ async function exportEpicExcel(){
       const owner = ownerByKey[key];
       const summary = (f.summary||'').slice(0,200);
       const type = ((f.issuetype||{}).name)||'';
-      const today_status = ((f.status||{}).name)||'Unknown';
-      const yStatus = _statusAsOf(issue, startOfToday);
-      const yesterday_status = yStatus === null ? 'New today' : yStatus;
-      const changed = yStatus !== null && yStatus !== today_status;
+      const daily = _dailyStatuses(issue, days); // one entry per day, null = not created yet
+      const idle = _idleStreak(daily);
       const link = `${base}/browse/${encodeURIComponent(key)}`;
-      return { key, owner, summary, type, yesterday_status, today_status, changed, link };
+      return { key, owner, summary, type, daily, idle, link };
     });
 
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     s.onload = () => {
       try {
-        // Columns: Key and Summary are separate (no more "KEY — summary" mash-up),
-        // Owner is just the task's own assignee (Parent Task Owner column removed),
-        // Type keeps its own colour family, and Link is the last column.
-        const header = ['Key','Summary','Owner','Type','Yesterday Status','Today Status','Changed?','Link'];
+        // Columns: Key/Summary/Owner/Type, then one status column per day
+        // (side by side, so a frozen status jumps out across the row),
+        // then Idle Days (how long the status has sat unchanged), then Link.
+        const dayLabels = days.map((d,i)=>{
+          const label = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+          return i === days.length-1 ? `${label} (Today)` : label;
+        });
+        const header = ['Key','Summary','Owner','Type', ...dayLabels, 'Idle Days','Link'];
+        const idleCol = 4 + days.length;
+        const linkCol = idleCol + 1;
+        const lastColLetter = XLSX.utils.encode_col(linkCol);
+
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
-        const aoa = [header, ...rows.map(r=>[r.key, r.summary, r.owner, r.type, r.yesterday_status, r.today_status, r.changed?'Yes':'No', r.link])];
+        const aoa = [header, ...rows.map(r=>[
+          r.key, r.summary, r.owner, r.type,
+          ...r.daily.map(st => st===null ? '—' : st),
+          r.idle,
+          r.link
+        ])];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12},{wch:18},{wch:18},{wch:10},{wch:38}];
-        ws['!freeze'] = {xSplit:0, ySplit:1};
-        ws['!autofilter'] = {ref:`A1:H${rows.length+1}`};
+        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:12})), {wch:11},{wch:38}];
+        ws['!freeze'] = {xSplit:4, ySplit:1}; // Key/Summary/Owner/Type stay put while scrolling through days
+        ws['!autofilter'] = {ref:`A1:${lastColLetter}${rows.length+1}`};
         for (let c=0;c<header.length;c++){
           const addr = XLSX.utils.encode_cell({r:0,c});
           if (ws[addr]) ws[addr].s = headStyle;
@@ -5857,13 +5971,19 @@ async function exportEpicExcel(){
           });
           const typeAddr = XLSX.utils.encode_cell({r:rr,c:3});
           if (ws[typeAddr]) ws[typeAddr].s = { fill:{fgColor:{rgb:_epicTypeFill(r.type)}}, alignment:{horizontal:'center',vertical:'center'}, border };
-          const yAddr = XLSX.utils.encode_cell({r:rr,c:4});
-          if (ws[yAddr]) ws[yAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.yesterday_status)}}, alignment:{horizontal:'center',vertical:'center'}, border };
-          const tAddr = XLSX.utils.encode_cell({r:rr,c:5});
-          if (ws[tAddr]) ws[tAddr].s = { fill:{fgColor:{rgb:_epicStatusFill(r.today_status)}}, alignment:{horizontal:'center',vertical:'center'}, border };
-          const chAddr = XLSX.utils.encode_cell({r:rr,c:6});
-          if (ws[chAddr]) ws[chAddr].s = { font:{bold:r.changed,color:{rgb:r.changed?'C00000':'666666'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
-          const linkAddr = XLSX.utils.encode_cell({r:rr,c:7});
+          r.daily.forEach((st,di)=>{
+            const c = 4+di;
+            const addr = XLSX.utils.encode_cell({r:rr,c});
+            if (!ws[addr]) return;
+            if (st === null){
+              ws[addr].s = { fill:{fgColor:{rgb:'F2F2F2'}}, font:{color:{rgb:'AAAAAA'},italic:true}, alignment:{horizontal:'center',vertical:'center'}, border };
+            } else {
+              ws[addr].s = { fill:{fgColor:{rgb:_epicStatusFill(st)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+            }
+          });
+          const idleAddr = XLSX.utils.encode_cell({r:rr,c:idleCol});
+          if (ws[idleAddr]) ws[idleAddr].s = { font:{bold:r.idle>=3,color:{rgb:r.idle>=5?'C00000':'333333'}}, fill:{fgColor:{rgb:_idleFill(r.idle)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+          const linkAddr = XLSX.utils.encode_cell({r:rr,c:linkCol});
           if (ws[linkAddr]){
             ws[linkAddr].s = { font:{color:{rgb:'1155CC'},underline:true}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
             ws[linkAddr].l = { Target: r.link, Tooltip: 'Open in Jira' };
@@ -5871,7 +5991,7 @@ async function exportEpicExcel(){
         });
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, EPIC_KEY);
-        XLSX.writeFile(wb, `${EPIC_KEY}-daily-status-${dateLabel}.xlsx`);
+        XLSX.writeFile(wb, `${EPIC_KEY}-daily-status-${startLabel}_to_${dateLabel}.xlsx`);
         toast('✓ Epic Excel downloaded.');
       } catch(e){
         console.error('[export-epic]', e);
