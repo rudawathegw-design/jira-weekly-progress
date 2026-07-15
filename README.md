@@ -125,7 +125,14 @@ who isn't actually moving their tasks.
   remembered (per browser) for next time.
 - **Every day is its own column**, laid out left to right, so a manager can
   scan a row and immediately see an owner sitting on the same status for
-  days at a time.
+  days at a time. Day columns wrap long status text onto 1-2 lines inside
+  the cell (rather than overflowing into the next day's column), so
+  something like "Revision Level 1" stays readable and doesn't bleed into
+  the neighbouring day.
+- **Row 1 is a "Generated" banner** merged across the whole sheet — it
+  spells out the epic, the date range, and the exact date/time the file was
+  pulled, so anyone opening it (or a forwarded copy) can tell at a glance
+  how fresh it is, on top of the "(Today)" tag on the last day column.
 - **Today's column is always live** — fetched fresh at the moment of
   download, so exporting once a day or ten times a day always shows the
   current state.
