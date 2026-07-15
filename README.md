@@ -109,27 +109,46 @@ No extra secrets are needed â€” `comments.yml` reuses `JIRA_EMAIL`,
 
 ## Exporting one epic's daily status (Excel)
 
-The **More → Export Epic Excel** button on the dashboard downloads a coloured
-`.xlsx` for epic **FIBTMP-489**: every task and subtask under it, one row
-each, with columns **Owner**, **Task**, **Type**, **Parent Task Owner**
-(shown on subtask rows, in case a subtask's assignee differs from the main
-task's), **Yesterday Status**, **Today Status**, and **Changed?**. It's meant
-for a quick daily send-up to management.
+The **More → Export Epic Excel** button opens a small dialog asking **which
+date to start from** (defaults to `EPIC_HISTORY_START`, or whatever you
+picked last time — it's remembered in your browser). Confirming downloads a
+coloured `.xlsx` for epic **FIBTMP-489**: every task and subtask under it,
+one row each, with columns **Key**, **Summary**, **Owner** (the task's own
+assignee), **Type**, then **one status column per day** from your chosen
+start date through today (side by side, so a status frozen across many days
+jumps out in the row), then **Idle Days** and **Link** (a clickable Jira
+link, last column). It's meant for a quick send-up to management showing
+who isn't actually moving their tasks.
 
+- **Pick the start date each time** in the "Export Epic Excel" dialog —
+  no code edits needed for a different range. Your last choice is
+  remembered (per browser) for next time.
+- **Every day is its own column**, laid out left to right, so a manager can
+  scan a row and immediately see an owner sitting on the same status for
+  days at a time.
+- **Today's column is always live** — fetched fresh at the moment of
+  download, so exporting once a day or ten times a day always shows the
+  current state.
+- **Idle Days** counts how many days in a row (ending today) the status
+  hasn't changed — coloured green (fresh), amber (3+ days), or red (5+
+  days, clearly stalled).
 - Pulls live from Jira through the Worker's `epic_issues` action (needs
   `GH_PROXY` / the Worker deployed — see `worker/SETUP.md`), including each
   issue's changelog.
-- "Yesterday's status" isn't a Jira field, so nothing is saved anywhere: each
-  export **checks** Jira's own status-change history for what the status was
-  at the start of today, and compares it to the live status right now. Every
-  export is independent — no snapshot file, nothing to fall out of sync,
-  works the same whether you download it once a day or ten times.
+- Every earlier day's status **isn't a Jira field, so nothing is saved
+  anywhere**: each export checks Jira's own status-change history for what
+  the status was at the end of that day. Every export is independent — no
+  snapshot file, nothing to fall out of sync.
 - Status cells are colour-coded (green = done, blue = in progress, amber =
-  waiting/review, red = blocked); rows whose status changed since the start
-  of today are flagged in the **Changed?** column.
-- To export a different epic, edit `EPIC_KEY` near the top of the
+  waiting/review, red = blocked), and the **Type** column uses the same
+  colour family (green = Story, blue = Task, amber = Sub-task, red = Bug,
+  purple = Epic) so the sheet reads as one consistent colour system. Cells
+  for days before an issue existed show a grey dash (—).
+- `EPIC_HISTORY_START` (format `yyyy-mm-dd`), near the top of the
   `exportEpicExcel()` function in `docs/index.html` (and `src/build_site.py`,
-  so a future weekly rebuild doesn't revert it).
+  so a future weekly rebuild doesn't revert it), only sets the *default*
+  shown the first time someone opens the dialog — not a hard limit.
+- To export a different epic, edit `EPIC_KEY` the same way, in both files.
 - **After pulling this change, redeploy the Cloudflare Worker** (`wrangler
   deploy` from `worker/`) — the button won't work until the Worker knows the
   new `epic_issues` action.
