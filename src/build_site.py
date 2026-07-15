@@ -5945,24 +5945,45 @@ async function exportEpicExcel(historyStart){
         const linkCol = idleCol + 1;
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
+        // Row 0 is a plain title/generated-on banner (merged across every
+        // column); row 1 is the real header; data starts at row 2. This is
+        // the "when was this pulled" note — today's column always says
+        // "(Today)" too, but this spells out the exact generation time so
+        // it's obvious the file is fresh even printed out or forwarded.
+        const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        const titleText = `Epic ${EPIC_KEY}  ·  ${startLabel} → ${dateLabel} (Today)  ·  Generated ${generatedAt}`;
+        const HEADER_ROW = 1, DATA_START = 2;
+
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
-        const aoa = [header, ...rows.map(r=>[
-          r.key, r.summary, r.owner, r.type,
-          ...r.daily.map(st => st===null ? '—' : st),
-          r.idle,
-          r.link
-        ])];
+        const titleStyle = { font:{bold:true,color:{rgb:'1F4E78'},sz:11}, alignment:{horizontal:'left',vertical:'center'} };
+        const aoa = [
+          [titleText],
+          header,
+          ...rows.map(r=>[
+            r.key, r.summary, r.owner, r.type,
+            ...r.daily.map(st => st===null ? '—' : st),
+            r.idle,
+            r.link
+          ])
+        ];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:12})), {wch:11},{wch:38}];
-        ws['!freeze'] = {xSplit:4, ySplit:1}; // Key/Summary/Owner/Type stay put while scrolling through days
-        ws['!autofilter'] = {ref:`A1:${lastColLetter}${rows.length+1}`};
+        // Day columns are wider now and wrap, so a long status (e.g.
+        // "Revision Level 1") stays inside its own cell on 1-2 lines
+        // instead of overflowing across the neighbouring day columns.
+        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:16})), {wch:11},{wch:38}];
+        ws['!rows'] = [{hpx:20}, {hpx:34}, ...rows.map(()=>({hpx:32}))];
+        ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:linkCol} }];
+        ws['!freeze'] = {xSplit:4, ySplit:DATA_START}; // Key/Summary/Owner/Type stay put; title+header stay put too
+        ws['!autofilter'] = {ref:`A${HEADER_ROW+1}:${lastColLetter}${rows.length+DATA_START}`};
+        const titleAddr = XLSX.utils.encode_cell({r:0,c:0});
+        if (ws[titleAddr]) ws[titleAddr].s = titleStyle;
         for (let c=0;c<header.length;c++){
-          const addr = XLSX.utils.encode_cell({r:0,c});
+          const addr = XLSX.utils.encode_cell({r:HEADER_ROW,c});
           if (ws[addr]) ws[addr].s = headStyle;
         }
         const plainCols = [0,1,2]; // Key, Summary, Owner — banded, no special colour
         rows.forEach((r,i)=>{
-          const rr = i+1;
+          const rr = i+DATA_START;
           const bandFill = i%2===0 ? 'FFFFFF' : 'F2F6FA';
           const border = {bottom:{style:'thin',color:{rgb:'DCE3EA'}}};
           plainCols.forEach(c=>{
@@ -5970,15 +5991,15 @@ async function exportEpicExcel(historyStart){
             if (ws[addr]) ws[addr].s = { fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:c===1}, border };
           });
           const typeAddr = XLSX.utils.encode_cell({r:rr,c:3});
-          if (ws[typeAddr]) ws[typeAddr].s = { fill:{fgColor:{rgb:_epicTypeFill(r.type)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+          if (ws[typeAddr]) ws[typeAddr].s = { fill:{fgColor:{rgb:_epicTypeFill(r.type)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
           r.daily.forEach((st,di)=>{
             const c = 4+di;
             const addr = XLSX.utils.encode_cell({r:rr,c});
             if (!ws[addr]) return;
             if (st === null){
-              ws[addr].s = { fill:{fgColor:{rgb:'F2F2F2'}}, font:{color:{rgb:'AAAAAA'},italic:true}, alignment:{horizontal:'center',vertical:'center'}, border };
+              ws[addr].s = { font:{sz:10,color:{rgb:'AAAAAA'},italic:true}, fill:{fgColor:{rgb:'F2F2F2'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
             } else {
-              ws[addr].s = { fill:{fgColor:{rgb:_epicStatusFill(st)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+              ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(st)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
             }
           });
           const idleAddr = XLSX.utils.encode_cell({r:rr,c:idleCol});
