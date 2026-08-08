@@ -1372,6 +1372,10 @@ CC: @cc</textarea>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="15" x2="16" y2="15"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
             <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · pick a start date, one column per day to today</div></div>
           </button>
+          <button class="menu-item" onclick="exportExecutivePPTX();closeMoreMenu()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+            <div class="menu-item-text"><div>Executive Summary (PPTX)</div><div class="menu-item-sub">RAG status, KPIs, risks &amp; escalations — one deck, ready to present</div></div>
+          </button>
 
           <div class="menu-section-label">Presentation</div>
           <button class="menu-item" id="laser-menu-item" onclick="toggleLaser();closeMoreMenu()">
@@ -5875,6 +5879,217 @@ function exportExcel() {
   };
   s.onerror=()=>toast('Failed to load XLSX library.');
   document.head.appendChild(s);
+}
+
+// ── Executive Summary (PPTX) ────────────────────────────────────────────
+// A ready-to-present deck for steering committee / leadership: RAG status,
+// KPIs, the escalation watchlist and top risks — all pulled from the exact
+// same numbers already computed for the on-screen PMO panel (renderPMOPanel),
+// so the deck never disagrees with what's on the dashboard.
+function _computePMOSummary() {
+  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
+  const rag = {green:[], amber:[], red:[]};
+  rows.forEach(r => {
+    const pct = r.this_week || 0;
+    const ov  = r.overdue || 0;
+    const d   = r.delta;
+    if (pct >= 80 && ov <= 1) rag.green.push(r);
+    else if (pct < 50 || ov >= 4 || (d === 0 && pct < 50)) rag.red.push(r);
+    else rag.amber.push(r);
+  });
+  const gTotal = rows.reduce((s,r)=>s+(r.total||0),0);
+  const gDone  = rows.reduce((s,r)=>s+(r.completed||0),0);
+  const gIP    = rows.reduce((s,r)=>s+(r.in_progress||0),0);
+  const gWFA   = rows.reduce((s,r)=>s+(r.waiting_for_approval||0),0);
+  const gOv    = rows.reduce((s,r)=>s+(r.overdue||0),0);
+  const completion  = gTotal ? +(gDone/gTotal*100).toFixed(1) : 0;
+  const overdueRate = gTotal ? +(gOv/gTotal*100).toFixed(1) : 0;
+  const wipRatio     = gTotal ? +(gIP/gTotal*100).toFixed(1) : 0;
+
+  const watchlist = rows.slice().map(r => {
+    const reasons = [];
+    const pct = r.this_week||0, ov = r.overdue||0, d = r.delta;
+    if (ov >= 4) reasons.push(`${ov} overdue`);
+    else if (ov >= 2) reasons.push(`${ov} overdue`);
+    if (pct < 30) reasons.push(`only ${pct}%`);
+    else if (pct < 50) reasons.push(`${pct}%`);
+    if (d !== null && d !== undefined && d < -5) reasons.push(`${d}% WoW`);
+    if (pct === 0 && (r.total||0) > 2) reasons.push('no progress');
+    const score = ov*15 + Math.max(0,50-pct) + (d<0?Math.abs(d)*2:0);
+    return {...r, _reasons: reasons, _score: score};
+  }).filter(r => r._reasons.length > 0).sort((a,b) => b._score - a._score).slice(0, 5);
+
+  // "Wins" — best movers this week, for a positive close to the deck.
+  const wins = rows.slice()
+    .filter(r => (r.this_week||0) >= 80 || (r.delta||0) >= 10)
+    .sort((a,b) => (b.this_week||0) - (a.this_week||0))
+    .slice(0, 5);
+
+  return { rag, gTotal, gDone, gIP, gWFA, gOv, completion, overdueRate, wipRatio, watchlist, wins, total: rows.length };
+}
+
+async function exportExecutivePPTX() {
+  if (!REPORT) return;
+  toast('Building executive summary…');
+
+  const loadPptxGen = () => new Promise((resolve, reject) => {
+    if (window.PptxGenJS) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgenjs.bundle.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load PPTX library.'));
+    document.head.appendChild(s);
+  });
+
+  try {
+    await loadPptxGen();
+
+    const S = _computePMOSummary();
+    const projectName = (REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'PMO';
+    const reportDate = REPORT.date || '';
+    const now = new Date();
+    const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const risks = (ANALYSIS && ANALYSIS.risks || []).filter(r=>r&&r.name).slice(0,5);
+    const summaryText = (ANALYSIS && ANALYSIS.summary || '').trim();
+
+    const NAVY='1F4E78', RED='DC2626', DARKRED='991B1B', GREEN='059669', AMBER='D97706', SLATE='475569', LIGHT='F2F6FA';
+    const pptx = new PptxGenJS();
+    pptx.defineLayout({ name:'WIDE', width:13.33, height:7.5 });
+    pptx.layout = 'WIDE';
+
+    const addFooter = (slide, label) => {
+      slide.addText(`${projectName} · ${reportDate}  ·  ${label}`, { x:0.4, y:7.1, w:8, h:0.3, fontSize:9, color:'94A3B8', fontFace:'Arial' });
+      slide.addText(`Generated ${generatedAt}`, { x:9.5, y:7.1, w:3.4, h:0.3, fontSize:9, color:'94A3B8', align:'right', fontFace:'Arial' });
+    };
+
+    // ── Slide 1: Title ──────────────────────────────────────────────────
+    let slide = pptx.addSlide();
+    slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
+    slide.addShape('rect', { x:0, y:4.7, w:13.33, h:0.06, fill:{color:RED} });
+    slide.addText('Executive Summary', { x:0.8, y:2.7, w:11.7, h:1.0, fontSize:44, bold:true, color:'FFFFFF', fontFace:'Arial' });
+    slide.addText(`${projectName} Weekly Progress Report`, { x:0.8, y:3.65, w:11.7, h:0.6, fontSize:20, color:'CBD5E1', fontFace:'Arial' });
+    slide.addText(`${reportDate}  ·  Generated ${generatedAt}`, { x:0.8, y:5.0, w:11.7, h:0.4, fontSize:13, color:'94A3B8', fontFace:'Arial' });
+
+    // ── Slide 2: RAG Status + KPIs ──────────────────────────────────────
+    slide = pptx.addSlide();
+    slide.addText('🚦 RAG Status & Key Metrics', { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:NAVY, fontFace:'Arial' });
+
+    const ragTotal = S.total || 1;
+    const gW = S.rag.green.length/ragTotal, aW = S.rag.amber.length/ragTotal, rW = S.rag.red.length/ragTotal;
+    let barX = 0.5, barY = 1.25, barW = 12.3, barH = 0.55;
+    const segs = [
+      {n:S.rag.green.length, w:gW, color:GREEN, label:'Healthy'},
+      {n:S.rag.amber.length, w:aW, color:AMBER, label:'Watch'},
+      {n:S.rag.red.length,   w:rW, color:RED,   label:'At Risk'},
+    ];
+    segs.forEach(sg => {
+      if (sg.n <= 0) return;
+      const w = barW*sg.w;
+      slide.addShape('rect', { x:barX, y:barY, w, h:barH, fill:{color:sg.color} });
+      if (w > 0.9) slide.addText(`${sg.n}`, { x:barX, y:barY, w, h:barH, fontSize:18, bold:true, color:'FFFFFF', align:'center', valign:'middle', fontFace:'Arial' });
+      barX += w;
+    });
+    slide.addText(
+      [
+        { text:`● Healthy: ${S.rag.green.length} (≥80% complete, ≤1 overdue)   `, options:{color:GREEN, bold:true} },
+        { text:`● Watch: ${S.rag.amber.length}   `, options:{color:AMBER, bold:true} },
+        { text:`● At Risk: ${S.rag.red.length} (<50% complete or 4+ overdue)`, options:{color:RED, bold:true} },
+      ], { x:0.5, y:1.95, w:12.3, h:0.4, fontSize:12, fontFace:'Arial' }
+    );
+
+    const kpis = [
+      { label:'Completion', value:`${S.completion}%`, sub:`${S.gDone} / ${S.gTotal} tasks`, good: S.completion>=80, warn: S.completion>=50 },
+      { label:'Overdue Rate', value:`${S.overdueRate}%`, sub:`${S.gOv} of ${S.gTotal} past due`, good: S.overdueRate<=5, warn: S.overdueRate<=15 },
+      { label:'WIP Ratio', value:`${S.wipRatio}%`, sub:`${S.gIP} in progress`, good: S.wipRatio<=20, warn: S.wipRatio<=35 },
+      { label:'Approval Queue', value:`${S.gWFA}`, sub:'waiting for sign-off', good: S.gWFA<=3, warn: S.gWFA<=8 },
+    ];
+    const kpiW = 2.95, kpiGap = 0.2, kpiX0 = 0.5, kpiY = 2.7, kpiH = 1.5;
+    kpis.forEach((k,i) => {
+      const x = kpiX0 + i*(kpiW+kpiGap);
+      const color = k.good ? GREEN : k.warn ? AMBER : RED;
+      slide.addShape('roundRect', { x, y:kpiY, w:kpiW, h:kpiH, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
+      slide.addShape('rect', { x, y:kpiY, w:0.08, h:kpiH, fill:{color} });
+      slide.addText(k.label.toUpperCase(), { x:x+0.2, y:kpiY+0.15, w:kpiW-0.3, h:0.3, fontSize:10, bold:true, color:SLATE, fontFace:'Arial' });
+      slide.addText(k.value, { x:x+0.2, y:kpiY+0.45, w:kpiW-0.3, h:0.6, fontSize:30, bold:true, color, fontFace:'Arial' });
+      slide.addText(k.sub, { x:x+0.2, y:kpiY+1.08, w:kpiW-0.3, h:0.3, fontSize:10, color:SLATE, fontFace:'Arial' });
+    });
+    addFooter(slide, 'RAG Status & KPIs');
+
+    // ── Slide 3: Escalation Watchlist ───────────────────────────────────
+    slide = pptx.addSlide();
+    slide.addText('⚠ Escalation Watchlist — PM Action Required', { x:0.5, y:0.35, w:12, h:0.6, fontSize:24, bold:true, color:DARKRED, fontFace:'Arial' });
+    if (S.watchlist.length) {
+      const rows = [[
+        {text:'#', options:{bold:true,color:'FFFFFF',fill:{color:RED},align:'center'}},
+        {text:'Owner', options:{bold:true,color:'FFFFFF',fill:{color:RED}}},
+        {text:'Completion', options:{bold:true,color:'FFFFFF',fill:{color:RED},align:'center'}},
+        {text:'Reasons', options:{bold:true,color:'FFFFFF',fill:{color:RED}}},
+      ]];
+      S.watchlist.forEach((r,i) => {
+        rows.push([
+          {text:String(i+1), options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
+          {text:r.owner, options:{bold:true, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+          {text:`${r.this_week}% (${r.completed}/${r.total})`, options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
+          {text:r._reasons.join(' · '), options:{color:DARKRED, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+        ]);
+      });
+      slide.addTable(rows, { x:0.5, y:1.2, w:12.3, colW:[0.7,3.2,2.4,6.0], fontSize:12, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.5}, autoPage:false, rowH:0.5 });
+    } else {
+      slide.addText('✓ No escalations — all members operating within tolerance.', { x:0.5, y:1.3, w:12, h:0.5, fontSize:16, color:GREEN, bold:true, fontFace:'Arial' });
+    }
+    addFooter(slide, 'Escalation Watchlist');
+
+    // ── Slide 4: Top Risks (from this week's AI analysis, if any) ──────
+    if (risks.length) {
+      slide = pptx.addSlide();
+      slide.addText('🔎 Key Risks This Week', { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:NAVY, fontFace:'Arial' });
+      let ry = 1.25;
+      risks.forEach(r => {
+        const h = 1.05;
+        slide.addShape('roundRect', { x:0.5, y:ry, w:12.3, h, rectRadius:0.06, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
+        slide.addShape('rect', { x:0.5, y:ry, w:0.08, h, fill:{color:AMBER} });
+        slide.addText(r.name||'', { x:0.75, y:ry+0.08, w:11.8, h:0.35, fontSize:15, bold:true, color:NAVY, fontFace:'Arial' });
+        slide.addText(r.note||'', { x:0.75, y:ry+0.42, w:11.8, h:0.3, fontSize:11.5, color:SLATE, fontFace:'Arial' });
+        if (r.tip) slide.addText(`💡 ${r.tip}`, { x:0.75, y:ry+0.72, w:11.8, h:0.28, fontSize:10.5, italic:true, color:'92640C', fontFace:'Arial' });
+        ry += h + 0.15;
+      });
+      addFooter(slide, 'Key Risks');
+    }
+
+    // ── Slide 5: Wins & Next Steps ──────────────────────────────────────
+    slide = pptx.addSlide();
+    slide.addText("✓ This Week's Wins & Next Steps", { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:GREEN, fontFace:'Arial' });
+    if (S.wins.length) {
+      const winsRows = [[
+        {text:'Owner', options:{bold:true,color:'FFFFFF',fill:{color:GREEN}}},
+        {text:'Completion', options:{bold:true,color:'FFFFFF',fill:{color:GREEN},align:'center'}},
+        {text:'Change (WoW)', options:{bold:true,color:'FFFFFF',fill:{color:GREEN},align:'center'}},
+      ]];
+      S.wins.forEach((r,i) => {
+        const d = r.delta;
+        winsRows.push([
+          {text:r.owner, options:{bold:true, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+          {text:`${r.this_week}%`, options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
+          {text: d===null||d===undefined?'NEW':(d>=0?'+':'')+d+'%', options:{align:'center', color: d>=0?GREEN:RED, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+        ]);
+      });
+      slide.addTable(winsRows, { x:0.5, y:1.2, w:6.0, colW:[2.6,1.8,1.6], fontSize:12, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.5}, autoPage:false, rowH:0.5 });
+    } else {
+      slide.addText('No standout movers this week.', { x:0.5, y:1.3, w:6, h:0.4, fontSize:13, color:SLATE, fontFace:'Arial' });
+    }
+    if (summaryText) {
+      slide.addText('AI Summary', { x:6.9, y:1.2, w:5.9, h:0.35, fontSize:13, bold:true, color:NAVY, fontFace:'Arial' });
+      slide.addShape('roundRect', { x:6.9, y:1.55, w:5.9, h:4.8, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
+      slide.addText(summaryText, { x:7.1, y:1.7, w:5.5, h:4.5, fontSize:12, color:'0F172A', valign:'top', fontFace:'Arial' });
+    }
+    addFooter(slide, "Wins & Next Steps");
+
+    await pptx.writeFile({ fileName: `executive-summary-${reportDate || 'report'}.pptx` });
+    toast('✓ Executive Summary downloaded.');
+  } catch (e) {
+    console.error('[export-executive-pptx]', e);
+    toast('Export failed: '+e.message);
+  }
 }
 
 // ── export Epic daily status report (one column per day, side by side) ────
