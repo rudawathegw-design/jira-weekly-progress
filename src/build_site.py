@@ -376,6 +376,17 @@ body.capturing .topbar-right{display:none !important}
 .esc-chip.amber{background:#fef3c7;color:#92400e}
 .esc-chip.blue{background:#dbeafe;color:#1e40af}
 
+/* Small transparent "show all / collapse" toggle under the watchlist */
+.esc-toggle-btn{
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  width:100%;margin-top:8px;padding:6px 10px;
+  background:transparent;border:1px dashed #cbd5e1;border-radius:6px;
+  color:#64748b;font-size:11.5px;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease;
+}
+.esc-toggle-btn:hover{background:#f8fafc;border-color:#94a3b8;color:#334155}
+.esc-toggle-btn svg{flex-shrink:0}
+
 @media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.analytics-grid{grid-template-columns:1fr}}
 
@@ -2329,6 +2340,13 @@ function renderDonut() {
 }
 
 // ── PMO Health Dashboard (RAG + KPIs + Escalation) ─────────────────────────
+// Persisted across re-renders (live refresh, snapshot switches, etc.) so the
+// watchlist doesn't silently collapse back to top-5 every time fresh data comes in.
+let _pmoWatchlistExpanded = false;
+function _togglePmoWatchlist() {
+  _pmoWatchlistExpanded = !_pmoWatchlistExpanded;
+  renderPMOPanel();
+}
 function renderPMOPanel() {
   const wrap = document.getElementById('pmo-wrap');
   const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
@@ -2374,7 +2392,7 @@ function renderPMOPanel() {
   const wfaClass  = gWFA <= 3 ? 'kpi-good' : gWFA <= 8 ? 'kpi-warn' : 'kpi-bad';
 
   // ── Escalation watchlist (PMO action items) ──
-  const watchlist = rows.slice().map(r => {
+  const watchlistFull = rows.slice().map(r => {
     const reasons = [];
     const pct = r.this_week||0;
     const ov = r.overdue||0;
@@ -2388,8 +2406,9 @@ function renderPMOPanel() {
     const score = ov*15 + Math.max(0,50-pct) + (d<0?Math.abs(d)*2:0);
     return {...r, _reasons: reasons, _score: score};
   }).filter(r => r._reasons.length > 0)
-    .sort((a,b) => b._score - a._score)
-    .slice(0, 5);
+    .sort((a,b) => b._score - a._score);
+  const watchlist = _pmoWatchlistExpanded ? watchlistFull : watchlistFull.slice(0, 5);
+  const hiddenCount = watchlistFull.length - watchlist.length;
 
   // ── Render ──
   wrap.innerHTML = `
@@ -2451,6 +2470,12 @@ function renderPMOPanel() {
           </div>`;
         }).join('')}
       </div>
+      ${watchlistFull.length > 5 ? `
+      <button type="button" class="esc-toggle-btn" onclick="_togglePmoWatchlist()">
+        ${_pmoWatchlistExpanded
+          ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg> Collapse to top 5`
+          : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg> Show all ${watchlistFull.length} (+${hiddenCount} more)`}
+      </button>` : ''}
     </div>` : `
     <div class="pmo-section">
       <div class="pmo-section-title">✓ No Escalations</div>
