@@ -1084,6 +1084,11 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="15" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 18"/></svg>
         Copy as image
       </button>
+      <button class="col-hdr-btn" onclick="exportOverdueExcel()" title="Download a colour-coded Excel file, grouped by owner"
+              style="background:linear-gradient(135deg,#1d6f42,#14532d);color:#fff;border-color:transparent">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 13 6 6M15 13l-6 6"/></svg>
+        Download Excel
+      </button>
       <button class="col-hdr-btn" onclick="exportOverduePNG(false)" title="Download JPG to Windows/PC">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         PC
@@ -4127,6 +4132,147 @@ async function exportOverduePNG(mobile) {
     mobile ? await _shareCanvasMobile(cv, fn) : await _shareOrDownloadCanvas(cv, fn, `✓ Saved ${fn}`);
   } catch (e) {
     console.error('[export-overdue]', e);
+    toast('Export failed: '+e.message);
+  }
+}
+
+// ── Overdue tasks → colour-coded Excel (grouped by owner, worst first) ─────
+// Raw integer days-overdue (unlike _overdueDaysAgo's human string) so the
+// Excel column can be coloured on a scale and still sorted/filtered as a number.
+function _overdueDaysNum(due) {
+  if (!due) return null;
+  const d = new Date(String(due).length <= 10 ? due + 'T00:00:00Z' : due);
+  if (isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
+function _overdueDaysFill(days) {
+  if (days === null)  return 'E7E6E6'; // unknown due date — grey
+  if (days >= 30)      return 'F4B7B7'; // long overdue — deep red
+  if (days >= 7)       return 'FFCFCF'; // overdue a while — red
+  return 'FFE699';                      // just tipped over — amber
+}
+
+async function exportOverdueExcel() {
+  if (!REPORT) return;
+  const hide = (hiddenPeople && hiddenPeople.size) ? hiddenPeople : null;
+  const items = _collectOverdue(hide);
+  if (!items.length) { toast('No overdue tasks to export. 🎉'); return; }
+
+  toast('Generating Excel…');
+  const base = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
+  const projectName = (REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'PMO';
+  const reportDate = REPORT.date || '';
+
+  // Same grouping/order as the on-screen modal and the Outlook copy: bucket
+  // by owner, worst (earliest) due date first, so the Excel reads the same
+  // as everything else in this feature.
+  const groups = {};
+  items.forEach(i => { (groups[i.owner] = groups[i.owner] || []).push(i); });
+  const owners = Object.keys(groups).sort((a,b) => {
+    const aDue = groups[a][0]?.due || '';
+    const bDue = groups[b][0]?.due || '';
+    return aDue < bDue ? -1 : 1;
+  });
+  const accents = ['DC2626','EA580C','D97706','0891B2','7C3AED','DB2777','0F766E','4F46E5'];
+  const ownerAccent = {};
+  owners.forEach((o,i) => ownerAccent[o] = accents[i % accents.length]);
+
+  const loadXlsxStyle = () => new Promise((resolve, reject) => {
+    if (window.XLSX && XLSX.utils && XLSX.writeFile) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load styled XLSX library.'));
+    document.head.appendChild(s);
+  });
+
+  try {
+    await loadXlsxStyle();
+
+    const header = ['#','Key','Summary','Owner','Status','Due Date','Days Overdue','Link'];
+    let n = 0;
+    const rows = [];
+    owners.forEach(owner => {
+      groups[owner].forEach(i => {
+        n++;
+        rows.push({
+          n, key: i.key, summary: i.summary || '(no summary)', owner,
+          status: i.status || '', due: i.due ? String(i.due).slice(0,10) : '—',
+          days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
+        });
+      });
+    });
+
+    const now = new Date();
+    const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const titleText = `⚠ Overdue Tasks — ${projectName}  ·  ${reportDate}  ·  ${items.length} task(s) across ${owners.length} owner(s)  ·  Generated ${generatedAt}`;
+    const HEADER_ROW = 1, DATA_START = 2;
+    const lastCol = header.length - 1;
+    const lastColLetter = XLSX.utils.encode_col(lastCol);
+
+    const aoa = [
+      [titleText],
+      header,
+      ...rows.map(r => [r.n, r.key, r.summary, r.owner, r.status, r.due, r.days===null?'—':r.days, r.link])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:20},{wch:12},{wch:13},{wch:40}];
+    ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:24}))];
+    ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:lastCol} }];
+    ws['!freeze'] = {xSplit:0, ySplit:DATA_START};
+    ws['!autofilter'] = {ref:`A${HEADER_ROW+1}:${lastColLetter}${rows.length+DATA_START}`};
+
+    const titleAddr = XLSX.utils.encode_cell({r:0,c:0});
+    if (ws[titleAddr]) ws[titleAddr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'991B1B'}}, alignment:{horizontal:'left',vertical:'center'} };
+
+    const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'DC2626'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'7F1D1D'}}} };
+    for (let c=0;c<header.length;c++){
+      const addr = XLSX.utils.encode_cell({r:HEADER_ROW,c});
+      if (ws[addr]) ws[addr].s = headStyle;
+    }
+
+    rows.forEach((r,i) => {
+      const rr = i + DATA_START;
+      const bandFill = i % 2 === 0 ? 'FFFFFF' : 'FEF2F2';
+      const border = {bottom:{style:'thin',color:{rgb:'FCA5A5'}}};
+
+      let addr = XLSX.utils.encode_cell({r:rr,c:0});
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'7F1D1D'},sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:1}); // Key — clickable
+      if (ws[addr]) {
+        ws[addr].s = { font:{bold:true,color:{rgb:'1155CC'},underline:true,sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
+        ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
+      }
+
+      addr = XLSX.utils.encode_cell({r:rr,c:2}); // Summary
+      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Owner badge
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10}, fill:{fgColor:{rgb:ownerAccent[r.owner]}}, alignment:{horizontal:'center',vertical:'center'}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:4}); // Status
+      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.status)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Due date
+      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'7F1D1D'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Days overdue
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:(r.days!==null && r.days>=30)?'C00000':'7F1D1D'},sz:10}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Link
+      if (ws[addr]) {
+        ws[addr].s = { font:{color:{rgb:'1155CC'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
+        ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
+      }
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Overdue');
+    XLSX.writeFile(wb, `overdue-${reportDate || 'report'}.xlsx`);
+    toast('✓ Overdue Excel downloaded.');
+  } catch (e) {
+    console.error('[export-overdue-excel]', e);
     toast('Export failed: '+e.message);
   }
 }
