@@ -6019,6 +6019,15 @@ function _idleFill(days){
   return 'C6EFCE';
 }
 
+// A long idle streak only means "stalled, go check on it" for tasks that
+// are still open. If the task is Done/Closed/Resolved, that same streak is
+// actually good news — it's just been sitting finished — so it should read
+// as "Completed", not get flagged red like a stuck task.
+function _isDoneStatus(status){
+  const s = (status||'').toLowerCase();
+  return s.includes('done') || s.includes('closed') || s.includes('resolved') || s === 'available';
+}
+
 // Opens the "choose start date" modal. Defaults to whatever was picked last
 // time (remembered in localStorage), or EPIC_HISTORY_START the first time.
 function openEpicExcelModal(){
@@ -6071,8 +6080,9 @@ async function exportEpicExcel(historyStart){
       const type = ((f.issuetype||{}).name)||'';
       const daily = _dailyStatuses(issue, days); // one entry per day, null = not created yet
       const idle = _idleStreak(daily);
+      const lastStatus = daily[daily.length-1];
       const link = `${base}/browse/${encodeURIComponent(key)}`;
-      return { key, owner, summary, type, daily, idle, link };
+      return { key, owner, summary, type, daily, idle, lastStatus, link };
     });
 
     const s = document.createElement('script');
@@ -6086,7 +6096,7 @@ async function exportEpicExcel(historyStart){
           const label = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
           return i === days.length-1 ? `${label} (Today)` : label;
         });
-        const header = ['Key','Summary','Owner','Type', ...dayLabels, 'Idle Days','Link'];
+        const header = ['Key','Summary','Owner','Type', ...dayLabels, 'Idle / Completed','Link'];
         const idleCol = 4 + days.length;
         const linkCol = idleCol + 1;
         const lastColLetter = XLSX.utils.encode_col(linkCol);
@@ -6108,7 +6118,7 @@ async function exportEpicExcel(historyStart){
           ...rows.map(r=>[
             r.key, r.summary, r.owner, r.type,
             ...r.daily.map(st => st===null ? '—' : st),
-            r.idle,
+            _isDoneStatus(r.lastStatus) ? `Completed (${r.idle}d)` : r.idle,
             r.link
           ])
         ];
@@ -6116,7 +6126,7 @@ async function exportEpicExcel(historyStart){
         // Day columns are wider now and wrap, so a long status (e.g.
         // "Revision Level 1") stays inside its own cell on 1-2 lines
         // instead of overflowing across the neighbouring day columns.
-        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:16})), {wch:11},{wch:38}];
+        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:16})), {wch:16},{wch:38}];
         ws['!rows'] = [{hpx:20}, {hpx:34}, ...rows.map(()=>({hpx:32}))];
         ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:linkCol} }];
         ws['!freeze'] = {xSplit:4, ySplit:DATA_START}; // Key/Summary/Owner/Type stay put; title+header stay put too
@@ -6149,7 +6159,15 @@ async function exportEpicExcel(historyStart){
             }
           });
           const idleAddr = XLSX.utils.encode_cell({r:rr,c:idleCol});
-          if (ws[idleAddr]) ws[idleAddr].s = { font:{bold:r.idle>=3,color:{rgb:r.idle>=5?'C00000':'333333'}}, fill:{fgColor:{rgb:_idleFill(r.idle)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+          if (ws[idleAddr]) {
+            if (_isDoneStatus(r.lastStatus)) {
+              // Finished work sitting still isn't a problem — frame it as a
+              // positive outcome, not a stalled-task warning.
+              ws[idleAddr].s = { font:{bold:true,color:{rgb:'2E7D32'}}, fill:{fgColor:{rgb:'C6EFCE'}}, alignment:{horizontal:'center',vertical:'center'}, border };
+            } else {
+              ws[idleAddr].s = { font:{bold:r.idle>=3,color:{rgb:r.idle>=5?'C00000':'333333'}}, fill:{fgColor:{rgb:_idleFill(r.idle)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+            }
+          }
           const linkAddr = XLSX.utils.encode_cell({r:rr,c:linkCol});
           if (ws[linkAddr]){
             ws[linkAddr].s = { font:{color:{rgb:'1155CC'},underline:true}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
