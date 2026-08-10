@@ -1568,8 +1568,6 @@ CC: @cc</textarea>
 </div>
 </div>
 
-
-
 <div id="toast"></div>
 
 <script>
@@ -6568,8 +6566,23 @@ async function exportEpicExcel(historyStart){
     // ── helper: append the responsible person's name beside the status ────────
     function getStatusWithOwner(issue, rawStatus){
       const f    = (issue && issue.fields) || {};
-      const l1   = (_fieldNames(f.customfield_10784)[0]) || '';
-      const l2   = (_fieldNames(f.customfield_10785)[0]) || '';
+      let l1   = (_fieldNames(f.customfield_10784)[0]) || '';
+      let l2   = (_fieldNames(f.customfield_10785)[0]) || '';
+      
+      const approvals = f.customfield_10092 || [];
+      if (Array.isArray(approvals)) {
+        approvals.forEach(stage => {
+          const sname = (stage.name || '').toLowerCase();
+          (stage.approvers || []).forEach(a => {
+            const u = a.approver;
+            const n = u && (u.displayName || u.name);
+            if (!n) return;
+            if (sname.includes('level 2') && !l2) l2 = n;
+            else if (sname.includes('level 1') && !l1) l1 = n;
+          });
+        });
+      }
+
       const asgn = (f.assignee && (f.assignee.displayName || f.assignee.name)) || '';
       return _statusLabel(rawStatus, l1, l2, asgn);
     }
