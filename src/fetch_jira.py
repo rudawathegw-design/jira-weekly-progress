@@ -27,7 +27,7 @@ def fetch_all_issues(base_url, email, token, jql):
             "jql": jql,
             "maxResults": 100,
             # duedate added for overdue calculation; priority for richer AI analysis
-            "fields": "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated",
+            "fields": "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated,customfield_10784,customfield_10785",
             # expand=changelog returns the last 100 changelog entries per
             # issue (author + field + from/to + timestamp). Powers the
             # 'Activity Log' modal — who changed what, when.

@@ -129,6 +129,19 @@ def issue_link_record(issue) -> dict:
     status_from = last_status_event["from"] if last_status_event else None
     assignee = f.get("assignee") or {}
     issuetype = f.get("issuetype") or {}
+
+    def _first_display_name(field_val):
+        """Extract the first displayName from a Jira user custom field (array or single obj)."""
+        if not field_val:
+            return ""
+        arr = field_val if isinstance(field_val, list) else [field_val]
+        for u in arr:
+            if isinstance(u, dict):
+                n = u.get("displayName") or u.get("name") or ""
+                if n:
+                    return n
+        return ""
+
     return {
         "key":         issue.get("key", ""),
         "summary":     (f.get("summary") or "")[:200],
@@ -148,6 +161,10 @@ def issue_link_record(issue) -> dict:
         # Assignee email IF Jira exposes it (most users hide it → empty). Powers
         # the Team Directory; blanks are filled manually there.
         "assignee_email": assignee.get("emailAddress") or "",
+        # Reviewer names for status-aware display in Excel exports.
+        # customfield_10784 = Level 1 Reviewers, customfield_10785 = Level 2 Reviewers
+        "rev1": _first_display_name(f.get("customfield_10784")),
+        "rev2": _first_display_name(f.get("customfield_10785")),
     }
 
 
