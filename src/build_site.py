@@ -363,7 +363,7 @@ body.capturing .topbar-right{display:none !important}
 
 /* Escalation watchlist */
 .esc-list{display:flex;flex-direction:column;gap:5px}
-.esc-row{background:#fff;border:1px solid #e2e8f0;border-left:3px solid #dc2626;
+.esc-row{background:#fff;border:1px solid #e2e8f0;border-left:3px solid #ea7c2b;
   border-radius:6px;padding:7px 11px;display:flex;align-items:center;gap:10px;
   font-size:12.5px}
 .esc-row.amber{border-left-color:#d97706}
@@ -372,7 +372,7 @@ body.capturing .topbar-right{display:none !important}
 .esc-name{font-weight:700;color:#0f172a;flex-shrink:0}
 .esc-reasons{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
 .esc-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;
-  background:#fee2e2;color:#991b1b}
+  background:#fff3e0;color:#b45309}
 .esc-chip.amber{background:#fef3c7;color:#92400e}
 .esc-chip.blue{background:#dbeafe;color:#1e40af}
 
@@ -386,8 +386,6 @@ body.capturing .topbar-right{display:none !important}
 }
 .esc-toggle-btn:hover{background:#f8fafc;border-color:#94a3b8;color:#334155}
 .esc-toggle-btn svg{flex-shrink:0}
-
-@media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.analytics-grid{grid-template-columns:1fr}}
 
 /* ── AI section ──────────────────────────────────────────────── */
@@ -1097,7 +1095,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       </button>
       <button class="col-hdr-btn" onclick="exportOverdueExcel()" title="Download a colour-coded Excel file, grouped by owner"
               style="background:linear-gradient(135deg,#1d6f42,#14532d);color:#fff;border-color:transparent">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 13 6 6M15 13l-6 6"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="white" opacity="0.9"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="#1D6F42"/><rect x="15" y="7" width="4" height="1.5" fill="#1D6F42" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="#1D6F42" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="#1D6F42" rx="0.3"/></svg>
         Download Excel
       </button>
       <button class="col-hdr-btn" onclick="exportOverduePNG(false)" title="Download JPG to Windows/PC">
@@ -1376,15 +1374,15 @@ CC: @cc</textarea>
 
           <div class="menu-section-label">Data</div>
           <button class="menu-item" onclick="exportExcel();closeMoreMenu()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
             <div class="menu-item-text"><div>Export Excel</div><div class="menu-item-sub">Multi-sheet .xlsx download</div></div>
           </button>
           <button class="menu-item" onclick="openEpicExcelModal();closeMoreMenu()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.2" fill="currentColor" stroke="none"/><line x1="12" y1="15" x2="16" y2="15"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
             <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · pick a start date, one column per day to today</div></div>
           </button>
           <button class="menu-item" onclick="exportExecutivePPTX();closeMoreMenu()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#C43E1C"/><rect x="5" y="6" width="9" height="1.5" fill="white" rx="0.4"/><rect x="5" y="9.5" width="7" height="1.5" fill="white" rx="0.4"/><rect x="5" y="13" width="6" height="1.5" fill="white" rx="0.4"/><circle cx="17" cy="16" r="4" fill="white" opacity="0.15"/><path d="M14.5 14.5l5 3-5 3V14.5z" fill="white"/></svg>
             <div class="menu-item-text"><div>Executive Summary (PPTX)</div><div class="menu-item-sub">RAG status, KPIs, risks &amp; escalations — one deck, ready to present</div></div>
           </button>
 
@@ -2392,6 +2390,8 @@ function renderPMOPanel() {
   const wfaClass  = gWFA <= 3 ? 'kpi-good' : gWFA <= 8 ? 'kpi-warn' : 'kpi-bad';
 
   // ── Escalation watchlist (PMO action items) ──
+  // All rows with at least 1 overdue — these always appear in the watchlist.
+  // Rows with NO overdue but with other concerns (low %, negative WoW) also appear.
   const watchlistFull = rows.slice().map(r => {
     const reasons = [];
     const pct = r.this_week||0;
@@ -2399,6 +2399,7 @@ function renderPMOPanel() {
     const d = r.delta;
     if (ov >= 4) reasons.push({txt:`${ov} overdue`, cls:'esc-chip'});
     else if (ov >= 2) reasons.push({txt:`${ov} overdue`, cls:'esc-chip amber'});
+    else if (ov === 1) reasons.push({txt:`1 overdue`, cls:'esc-chip amber'});
     if (pct < 30) reasons.push({txt:`only ${pct}%`, cls:'esc-chip'});
     else if (pct < 50) reasons.push({txt:`${pct}%`, cls:'esc-chip amber'});
     if (d !== null && d !== undefined && d < -5) reasons.push({txt:`${d}% WoW`, cls:'esc-chip'});
@@ -5907,10 +5908,9 @@ function exportExcel() {
 }
 
 // ── Executive Summary (PPTX) ────────────────────────────────────────────
-// A ready-to-present deck for steering committee / leadership: RAG status,
-// KPIs, the escalation watchlist and top risks — all pulled from the exact
-// same numbers already computed for the on-screen PMO panel (renderPMOPanel),
-// so the deck never disagrees with what's on the dashboard.
+// A ready-to-present 8-slide deck for steering committee / leadership.
+// Data pulled from the same computed values as the on-screen PMO panel
+// so the deck always matches what's on the dashboard.
 function _computePMOSummary() {
   const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
   const rag = {green:[], amber:[], red:[]};
@@ -5931,26 +5931,31 @@ function _computePMOSummary() {
   const overdueRate = gTotal ? +(gOv/gTotal*100).toFixed(1) : 0;
   const wipRatio     = gTotal ? +(gIP/gTotal*100).toFixed(1) : 0;
 
-  const watchlist = rows.slice().map(r => {
+  const watchlistFull = rows.slice().map(r => {
     const reasons = [];
     const pct = r.this_week||0, ov = r.overdue||0, d = r.delta;
     if (ov >= 4) reasons.push(`${ov} overdue`);
     else if (ov >= 2) reasons.push(`${ov} overdue`);
+    else if (ov === 1) reasons.push(`1 overdue`);
     if (pct < 30) reasons.push(`only ${pct}%`);
     else if (pct < 50) reasons.push(`${pct}%`);
     if (d !== null && d !== undefined && d < -5) reasons.push(`${d}% WoW`);
     if (pct === 0 && (r.total||0) > 2) reasons.push('no progress');
     const score = ov*15 + Math.max(0,50-pct) + (d<0?Math.abs(d)*2:0);
     return {...r, _reasons: reasons, _score: score};
-  }).filter(r => r._reasons.length > 0).sort((a,b) => b._score - a._score).slice(0, 5);
+  }).filter(r => r._reasons.length > 0)
+    .sort((a,b) => b._score - a._score);
 
-  // "Wins" — best movers this week, for a positive close to the deck.
   const wins = rows.slice()
     .filter(r => (r.this_week||0) >= 80 || (r.delta||0) >= 10)
     .sort((a,b) => (b.this_week||0) - (a.this_week||0))
-    .slice(0, 5);
+    .slice(0, 8);
 
-  return { rag, gTotal, gDone, gIP, gWFA, gOv, completion, overdueRate, wipRatio, watchlist, wins, total: rows.length };
+  // Per-owner breakdown sorted best → worst for the team slide
+  const teamRows = rows.slice().sort((a,b) => (b.this_week||0) - (a.this_week||0));
+
+  return { rag, gTotal, gDone, gIP, gWFA, gOv, completion, overdueRate, wipRatio,
+           watchlist: watchlistFull, wins, teamRows, total: rows.length };
 }
 
 async function exportExecutivePPTX() {
@@ -5974,140 +5979,330 @@ async function exportExecutivePPTX() {
     const reportDate = REPORT.date || '';
     const now = new Date();
     const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    const risks = (ANALYSIS && ANALYSIS.risks || []).filter(r=>r&&r.name).slice(0,5);
+    const risks = (ANALYSIS && ANALYSIS.risks || []).filter(r=>r&&r.name).slice(0,6);
     const summaryText = (ANALYSIS && ANALYSIS.summary || '').trim();
 
-    const NAVY='1F4E78', RED='DC2626', DARKRED='991B1B', GREEN='059669', AMBER='D97706', SLATE='475569', LIGHT='F2F6FA';
+    // ── Colour palette ──
+    const NAVY   = '0F2554';
+    const NAVY2  = '1F4E78';
+    const ACCENT = '2563EB';
+    const GREEN  = '16A34A';
+    const AMBER  = 'D97706';
+    const ORANGE = 'EA580C';
+    const RED    = 'DC2626';
+    const TEAL   = '0891B2';
+    const PURPLE = '7C3AED';
+    const SLATE  = '475569';
+    const MUTED  = '94A3B8';
+    const LIGHT  = 'F1F5F9';
+    const WHITE  = 'FFFFFF';
+    const DARKGRAY = '1E293B';
+
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name:'WIDE', width:13.33, height:7.5 });
     pptx.layout = 'WIDE';
+    pptx.author  = 'PMO Dashboard';
+    pptx.subject = `${projectName} Executive Summary`;
+    pptx.title   = `${projectName} Executive Summary – ${reportDate}`;
 
-    const addFooter = (slide, label) => {
-      slide.addText(`${projectName} · ${reportDate}  ·  ${label}`, { x:0.4, y:7.1, w:8, h:0.3, fontSize:9, color:'94A3B8', fontFace:'Arial' });
-      slide.addText(`Generated ${generatedAt}`, { x:9.5, y:7.1, w:3.4, h:0.3, fontSize:9, color:'94A3B8', align:'right', fontFace:'Arial' });
+    // ── Helpers ────────────────────────────────────────────────────────────
+    const addHeader = (slide, title, subtitle, accentColor) => {
+      // Left stripe
+      slide.addShape('rect', { x:0, y:0, w:0.22, h:7.5, fill:{color:accentColor||ACCENT} });
+      // Top bar
+      slide.addShape('rect', { x:0.22, y:0, w:13.11, h:0.9, fill:{color:NAVY} });
+      slide.addText(title, { x:0.45, y:0.1, w:10, h:0.72, fontSize:22, bold:true, color:WHITE, fontFace:'Arial', valign:'middle' });
+      if (subtitle) slide.addText(subtitle, { x:0.45, y:0.1, w:10, h:0.72, fontSize:11, color:'B0C4DE', fontFace:'Arial', valign:'bottom' });
+      // Slide label top-right
+      slide.addText(`${projectName}  ·  ${reportDate}`, { x:10, y:0.12, w:3.1, h:0.66, fontSize:9, color:MUTED, align:'right', fontFace:'Arial', valign:'middle' });
     };
 
-    // ── Slide 1: Title ──────────────────────────────────────────────────
+    const addFooter = (slide, pageLabel, total) => {
+      slide.addShape('rect', { x:0.22, y:7.22, w:13.11, h:0.03, fill:{color:ACCENT} });
+      slide.addText(`Generated ${generatedAt}`, { x:0.4, y:7.26, w:7, h:0.22, fontSize:8, color:MUTED, fontFace:'Arial' });
+      if (pageLabel) slide.addText(pageLabel, { x:7.3, y:7.26, w:3, h:0.22, fontSize:8, color:MUTED, align:'center', fontFace:'Arial' });
+      if (total) slide.addText(`Page ${pageLabel} of ${total}`, { x:10.5, y:7.26, w:2.6, h:0.22, fontSize:8, color:MUTED, align:'right', fontFace:'Arial' });
+    };
+
+    // KPI card helper
+    const addKpiCard = (slide, x, y, w, h, label, value, sub, statusColor, icon) => {
+      slide.addShape('roundRect', { x, y, w, h, rectRadius:0.07, fill:{color:WHITE}, line:{color:'DCE3EA', width:0.8} });
+      slide.addShape('rect',      { x, y, w:0.07, h, fill:{color:statusColor} });
+      slide.addShape('rect',      { x, y, w, h:0.07, fill:{color:statusColor} });
+      if (icon) slide.addText(icon, { x:x+w-0.55, y:y+0.1, w:0.45, h:0.45, fontSize:18, fontFace:'Arial', align:'center' });
+      slide.addText(label.toUpperCase(), { x:x+0.18, y:y+0.12, w:w-0.25, h:0.27, fontSize:9, bold:true, color:SLATE, fontFace:'Arial' });
+      slide.addText(value, { x:x+0.18, y:y+0.38, w:w-0.25, h:0.7, fontSize:28, bold:true, color:statusColor, fontFace:'Arial', valign:'middle' });
+      slide.addText(sub, { x:x+0.18, y:y+h-0.32, w:w-0.25, h:0.25, fontSize:9.5, color:SLATE, fontFace:'Arial' });
+    };
+
+    // ── SLIDE 1: Title / Cover ──────────────────────────────────────────
     let slide = pptx.addSlide();
+    // Full bleed background gradient effect using two overlapping shapes
     slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
-    slide.addShape('rect', { x:0, y:4.7, w:13.33, h:0.06, fill:{color:RED} });
-    slide.addText('Executive Summary', { x:0.8, y:2.7, w:11.7, h:1.0, fontSize:44, bold:true, color:'FFFFFF', fontFace:'Arial' });
-    slide.addText(`${projectName} Weekly Progress Report`, { x:0.8, y:3.65, w:11.7, h:0.6, fontSize:20, color:'CBD5E1', fontFace:'Arial' });
-    slide.addText(`${reportDate}  ·  Generated ${generatedAt}`, { x:0.8, y:5.0, w:11.7, h:0.4, fontSize:13, color:'94A3B8', fontFace:'Arial' });
+    slide.addShape('rect', { x:0, y:0, w:6.5,   h:7.5, fill:{color:NAVY2} });
+    // Decorative accent circles
+    slide.addShape('ellipse', { x:9.5, y:-1.5, w:5, h:5, fill:{color:ACCENT}, line:{color:ACCENT,width:0}, transparency:75 });
+    slide.addShape('ellipse', { x:10.5, y:3.5, w:4, h:4, fill:{color:TEAL}, line:{color:TEAL,width:0}, transparency:80 });
+    // Left accent bar
+    slide.addShape('rect', { x:0, y:0, w:0.35, h:7.5, fill:{color:ACCENT} });
+    // Brand line
+    slide.addShape('rect', { x:0.35, y:3.5, w:5.5, h:0.04, fill:{color:ACCENT} });
+    // Titles
+    slide.addText(projectName, { x:0.6, y:1.2, w:7, h:0.7, fontSize:36, bold:true, color:'B0C4DE', fontFace:'Arial' });
+    slide.addText('Executive Summary', { x:0.6, y:1.85, w:10, h:1.1, fontSize:48, bold:true, color:WHITE, fontFace:'Arial' });
+    slide.addText('Weekly Progress Report', { x:0.6, y:2.95, w:8, h:0.55, fontSize:19, color:'93C5FD', fontFace:'Arial' });
+    slide.addText(reportDate, { x:0.6, y:4.1, w:5, h:0.45, fontSize:15, color:MUTED, fontFace:'Arial' });
+    // Stats summary box
+    slide.addShape('roundRect', { x:7.8, y:1.8, w:5.0, h:4.0, rectRadius:0.12, fill:{color:'FFFFFF'}, line:{color:'DCE3EA',width:0}, transparency:10 });
+    slide.addText('AT A GLANCE', { x:8.1, y:2.05, w:4.4, h:0.35, fontSize:11, bold:true, color:ACCENT, fontFace:'Arial' });
+    const quickStats = [
+      { lbl:'Team Members',   val:`${S.total}` },
+      { lbl:'Total Tasks',    val:`${S.gTotal}` },
+      { lbl:'Completed',      val:`${S.gDone}` },
+      { lbl:'Completion',     val:`${S.completion}%` },
+      { lbl:'Overdue Tasks',  val:`${S.gOv}` },
+    ];
+    quickStats.forEach((qs,i) => {
+      slide.addText(qs.lbl, { x:8.1, y:2.5+i*0.54, w:2.5, h:0.4, fontSize:11, color:MUTED, fontFace:'Arial', valign:'middle' });
+      slide.addText(qs.val, { x:10.6, y:2.5+i*0.54, w:2, h:0.4, fontSize:14, bold:true, color:DARKGRAY, fontFace:'Arial', align:'right', valign:'middle' });
+      if (i<quickStats.length-1) slide.addShape('rect', { x:8.1, y:2.88+i*0.54, w:4.5, h:0.01, fill:{color:'E2E8F0'} });
+    });
+    slide.addText(`Generated ${generatedAt}`, { x:0.6, y:6.9, w:9, h:0.28, fontSize:9, color:MUTED, fontFace:'Arial' });
 
-    // ── Slide 2: RAG Status + KPIs ──────────────────────────────────────
+    // ── SLIDE 2: RAG Status Overview ────────────────────────────────────
     slide = pptx.addSlide();
-    slide.addText('🚦 RAG Status & Key Metrics', { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:NAVY, fontFace:'Arial' });
-
+    addHeader(slide, 'Project Health Overview', 'RAG classification of all team members', GREEN);
     const ragTotal = S.total || 1;
-    const gW = S.rag.green.length/ragTotal, aW = S.rag.amber.length/ragTotal, rW = S.rag.red.length/ragTotal;
-    let barX = 0.5, barY = 1.25, barW = 12.3, barH = 0.55;
+    // Horizontal stacked bar
+    let barX = 0.5, barY = 1.15, barW = 12.3, barH = 0.65;
     const segs = [
-      {n:S.rag.green.length, w:gW, color:GREEN, label:'Healthy'},
-      {n:S.rag.amber.length, w:aW, color:AMBER, label:'Watch'},
-      {n:S.rag.red.length,   w:rW, color:RED,   label:'At Risk'},
+      {n:S.rag.green.length, color:GREEN, label:'On Track'},
+      {n:S.rag.amber.length, color:AMBER, label:'Needs Attention'},
+      {n:S.rag.red.length,   color:RED,   label:'At Risk'},
     ];
     segs.forEach(sg => {
       if (sg.n <= 0) return;
-      const w = barW*sg.w;
+      const w = barW*(sg.n/ragTotal);
       slide.addShape('rect', { x:barX, y:barY, w, h:barH, fill:{color:sg.color} });
-      if (w > 0.9) slide.addText(`${sg.n}`, { x:barX, y:barY, w, h:barH, fontSize:18, bold:true, color:'FFFFFF', align:'center', valign:'middle', fontFace:'Arial' });
+      if (w > 1.0) slide.addText(`${sg.n}`, { x:barX, y:barY, w, h:barH, fontSize:20, bold:true, color:WHITE, align:'center', valign:'middle', fontFace:'Arial' });
       barX += w;
     });
-    slide.addText(
-      [
-        { text:`● Healthy: ${S.rag.green.length} (≥80% complete, ≤1 overdue)   `, options:{color:GREEN, bold:true} },
-        { text:`● Watch: ${S.rag.amber.length}   `, options:{color:AMBER, bold:true} },
-        { text:`● At Risk: ${S.rag.red.length} (<50% complete or 4+ overdue)`, options:{color:RED, bold:true} },
-      ], { x:0.5, y:1.95, w:12.3, h:0.4, fontSize:12, fontFace:'Arial' }
-    );
+    // Legend
+    slide.addText([
+      {text:'● On Track ', options:{color:GREEN,bold:true}}, {text:`${S.rag.green.length} members  `, options:{color:SLATE}},
+      {text:'● Needs Attention ', options:{color:AMBER,bold:true}}, {text:`${S.rag.amber.length} members  `, options:{color:SLATE}},
+      {text:'● At Risk ', options:{color:RED,bold:true}}, {text:`${S.rag.red.length} members`, options:{color:SLATE}},
+    ], { x:0.5, y:1.88, w:12.3, h:0.3, fontSize:11, fontFace:'Arial' });
 
-    const kpis = [
-      { label:'Completion', value:`${S.completion}%`, sub:`${S.gDone} / ${S.gTotal} tasks`, good: S.completion>=80, warn: S.completion>=50 },
-      { label:'Overdue Rate', value:`${S.overdueRate}%`, sub:`${S.gOv} of ${S.gTotal} past due`, good: S.overdueRate<=5, warn: S.overdueRate<=15 },
-      { label:'WIP Ratio', value:`${S.wipRatio}%`, sub:`${S.gIP} in progress`, good: S.wipRatio<=20, warn: S.wipRatio<=35 },
-      { label:'Approval Queue', value:`${S.gWFA}`, sub:'waiting for sign-off', good: S.gWFA<=3, warn: S.gWFA<=8 },
+    // 3 RAG category cards
+    const ragCards = [
+      {title:'✅  On Track', color:GREEN,  members:S.rag.green, desc:'≥80% complete, ≤1 overdue'},
+      {title:'⚠️  Watch',    color:AMBER,  members:S.rag.amber, desc:'50–79% or low pace'},
+      {title:'🔴  At Risk',  color:RED,    members:S.rag.red,   desc:'<50% complete or 4+ overdue'},
     ];
-    const kpiW = 2.95, kpiGap = 0.2, kpiX0 = 0.5, kpiY = 2.7, kpiH = 1.5;
-    kpis.forEach((k,i) => {
-      const x = kpiX0 + i*(kpiW+kpiGap);
-      const color = k.good ? GREEN : k.warn ? AMBER : RED;
-      slide.addShape('roundRect', { x, y:kpiY, w:kpiW, h:kpiH, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
-      slide.addShape('rect', { x, y:kpiY, w:0.08, h:kpiH, fill:{color} });
-      slide.addText(k.label.toUpperCase(), { x:x+0.2, y:kpiY+0.15, w:kpiW-0.3, h:0.3, fontSize:10, bold:true, color:SLATE, fontFace:'Arial' });
-      slide.addText(k.value, { x:x+0.2, y:kpiY+0.45, w:kpiW-0.3, h:0.6, fontSize:30, bold:true, color, fontFace:'Arial' });
-      slide.addText(k.sub, { x:x+0.2, y:kpiY+1.08, w:kpiW-0.3, h:0.3, fontSize:10, color:SLATE, fontFace:'Arial' });
+    ragCards.forEach((card, ci) => {
+      const cx = 0.5 + ci*4.28, cy = 2.3, cw = 4.1, ch = 4.6;
+      slide.addShape('roundRect', { x:cx, y:cy, w:cw, h:ch, rectRadius:0.09, fill:{color:LIGHT}, line:{color:'DCE3EA',width:0.7} });
+      slide.addShape('rect', { x:cx, y:cy, w:cw, h:0.52, fill:{color:card.color}, rectRadius:0.09 });
+      slide.addText(card.title, { x:cx+0.15, y:cy+0.06, w:cw-0.2, h:0.4, fontSize:13, bold:true, color:WHITE, fontFace:'Arial' });
+      slide.addText(card.desc, { x:cx+0.15, y:cy+0.56, w:cw-0.2, h:0.25, fontSize:9, color:SLATE, fontFace:'Arial' });
+      slide.addText(`${card.members.length}`, { x:cx+cw-1.0, y:cy+0.48, w:0.85, h:0.45, fontSize:24, bold:true, color:card.color, fontFace:'Arial', align:'right' });
+      const names = card.members.slice(0,10).map(m=>`${m.owner}  (${m.this_week}%)`).join('\n');
+      if (names) slide.addText(names, { x:cx+0.15, y:cy+0.9, w:cw-0.25, h:3.6, fontSize:10.5, color:DARKGRAY, fontFace:'Arial', valign:'top', paraSpaceAfter:2 });
+      if (card.members.length > 10) slide.addText(`+${card.members.length-10} more…`, { x:cx+0.15, y:cy+ch-0.35, w:cw-0.25, h:0.28, fontSize:9, color:MUTED, fontFace:'Arial' });
     });
-    addFooter(slide, 'RAG Status & KPIs');
+    addFooter(slide, '2');
 
-    // ── Slide 3: Escalation Watchlist ───────────────────────────────────
+    // ── SLIDE 3: Key Metrics ─────────────────────────────────────────────
     slide = pptx.addSlide();
-    slide.addText('⚠ Escalation Watchlist — PM Action Required', { x:0.5, y:0.35, w:12, h:0.6, fontSize:24, bold:true, color:DARKRED, fontFace:'Arial' });
+    addHeader(slide, 'Key Performance Metrics', 'Snapshot of this reporting period', TEAL);
+    const kpis = [
+      { label:'Overall Completion', value:`${S.completion}%`, sub:`${S.gDone} of ${S.gTotal} tasks done`,
+        icon:'📊', good:S.completion>=80, warn:S.completion>=50 },
+      { label:'Overdue Rate', value:`${S.overdueRate}%`, sub:`${S.gOv} tasks past due`,
+        icon:'⏰', good:S.overdueRate<=5, warn:S.overdueRate<=15 },
+      { label:'WIP Ratio', value:`${S.wipRatio}%`, sub:`${S.gIP} tasks in progress`,
+        icon:'⚙️', good:S.wipRatio<=25, warn:S.wipRatio<=40 },
+      { label:'Approval Queue', value:`${S.gWFA}`, sub:'waiting for sign-off',
+        icon:'✍️', good:S.gWFA<=3, warn:S.gWFA<=8 },
+      { label:'Team Members', value:`${S.total}`, sub:'active contributors',
+        icon:'👥', good:true },
+      { label:'Green Members', value:`${S.rag.green.length}`, sub:`${Math.round(S.rag.green.length/ragTotal*100)}% of team on track`,
+        icon:'✅', good:S.rag.green.length/ragTotal>=0.6, warn:S.rag.green.length/ragTotal>=0.4 },
+    ];
+    const kW = 4.0, kH = 1.55, kGap = 0.16, kX0 = 0.5, kY0 = 1.1;
+    kpis.forEach((k,i) => {
+      const col = i%3, row = Math.floor(i/3);
+      const kx = kX0 + col*(kW+kGap);
+      const ky = kY0 + row*(kH+kGap);
+      const col_ = k.good ? GREEN : k.warn ? AMBER : RED;
+      addKpiCard(slide, kx, ky, kW, kH, k.label, k.value, k.sub, col_, k.icon);
+    });
+    addFooter(slide, '3');
+
+    // ── SLIDE 4: Escalation Watchlist ────────────────────────────────────
+    slide = pptx.addSlide();
+    addHeader(slide, 'Escalation Watchlist', 'All members requiring PM attention — sorted by risk score', ORANGE);
     if (S.watchlist.length) {
-      const rows = [[
-        {text:'#', options:{bold:true,color:'FFFFFF',fill:{color:RED},align:'center'}},
-        {text:'Owner', options:{bold:true,color:'FFFFFF',fill:{color:RED}}},
-        {text:'Completion', options:{bold:true,color:'FFFFFF',fill:{color:RED},align:'center'}},
-        {text:'Reasons', options:{bold:true,color:'FFFFFF',fill:{color:RED}}},
+      // Split into pages if too many rows; show max 10 here
+      const show = S.watchlist.slice(0,10);
+      const tblRows = [[
+        {text:'#',          options:{bold:true,color:WHITE,fill:{color:ORANGE},align:'center',fontSize:11}},
+        {text:'Owner',      options:{bold:true,color:WHITE,fill:{color:ORANGE},fontSize:11}},
+        {text:'% Done',     options:{bold:true,color:WHITE,fill:{color:ORANGE},align:'center',fontSize:11}},
+        {text:'Overdue',    options:{bold:true,color:WHITE,fill:{color:ORANGE},align:'center',fontSize:11}},
+        {text:'WoW Δ',      options:{bold:true,color:WHITE,fill:{color:ORANGE},align:'center',fontSize:11}},
+        {text:'Flags',      options:{bold:true,color:WHITE,fill:{color:ORANGE},fontSize:11}},
       ]];
-      S.watchlist.forEach((r,i) => {
-        rows.push([
-          {text:String(i+1), options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
-          {text:r.owner, options:{bold:true, fill:{color:i%2?LIGHT:'FFFFFF'}}},
-          {text:`${r.this_week}% (${r.completed}/${r.total})`, options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
-          {text:r._reasons.join(' · '), options:{color:DARKRED, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+      show.forEach((r,i) => {
+        const bg = i%2 ? LIGHT : WHITE;
+        const dStr = r.delta===null||r.delta===undefined?'N/A':(r.delta>=0?'+':'')+r.delta+'%';
+        const dCol = r.delta>0?GREEN:r.delta<0?RED:SLATE;
+        tblRows.push([
+          {text:String(i+1),             options:{align:'center', fill:{color:bg}, fontSize:11}},
+          {text:r.owner,                  options:{bold:true, fill:{color:bg}, fontSize:11, color:DARKGRAY}},
+          {text:`${r.this_week}%`,        options:{align:'center', fill:{color:bg}, fontSize:11}},
+          {text:`${r.overdue||0}`,        options:{align:'center', fill:{color:bg}, fontSize:11, color:r.overdue>=4?RED:r.overdue>=1?ORANGE:SLATE, bold:r.overdue>0}},
+          {text:dStr,                     options:{align:'center', fill:{color:bg}, fontSize:11, color:dCol}},
+          {text:r._reasons.join(' · '),   options:{fill:{color:bg}, fontSize:10, color:SLATE}},
         ]);
       });
-      slide.addTable(rows, { x:0.5, y:1.2, w:12.3, colW:[0.7,3.2,2.4,6.0], fontSize:12, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.5}, autoPage:false, rowH:0.5 });
+      slide.addTable(tblRows, { x:0.4, y:1.05, w:12.5, colW:[0.6,2.5,1.2,1.1,1.1,6.0],
+        fontSize:11, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.4}, rowH:0.42, autoPage:false });
+      if (S.watchlist.length > 10) {
+        slide.addText(`+ ${S.watchlist.length-10} additional members with concerns — see full dashboard for details.`,
+          { x:0.4, y:7.0, w:12.5, h:0.22, fontSize:9, color:MUTED, fontFace:'Arial', italic:true });
+      }
     } else {
-      slide.addText('✓ No escalations — all members operating within tolerance.', { x:0.5, y:1.3, w:12, h:0.5, fontSize:16, color:GREEN, bold:true, fontFace:'Arial' });
+      slide.addShape('roundRect', { x:1.5, y:2.0, w:10.3, h:2.5, rectRadius:0.12, fill:{color:'F0FDF4'}, line:{color:'BBF7D0',width:1} });
+      slide.addText('🎉', { x:1.5, y:2.2, w:10.3, h:1.0, fontSize:48, align:'center', fontFace:'Arial' });
+      slide.addText('No escalations this week!', { x:1.5, y:3.1, w:10.3, h:0.6, fontSize:22, bold:true, color:GREEN, align:'center', fontFace:'Arial' });
+      slide.addText('All team members are operating within acceptable thresholds.', { x:1.5, y:3.65, w:10.3, h:0.4, fontSize:13, color:SLATE, align:'center', fontFace:'Arial' });
     }
-    addFooter(slide, 'Escalation Watchlist');
+    addFooter(slide, '4');
 
-    // ── Slide 4: Top Risks (from this week's AI analysis, if any) ──────
+    // ── SLIDE 5: Team Performance Breakdown ──────────────────────────────
+    slide = pptx.addSlide();
+    addHeader(slide, 'Team Performance Breakdown', 'Individual completion rates — all members', PURPLE);
+    const maxPerSlide = 12;
+    const teamShow = S.teamRows.slice(0, maxPerSlide);
+    if (teamShow.length) {
+      const tRows = [[
+        {text:'Member',      options:{bold:true,color:WHITE,fill:{color:PURPLE},fontSize:10}},
+        {text:'Done',        options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+        {text:'Total',       options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+        {text:'% Done',      options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+        {text:'Overdue',     options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+        {text:'WoW Δ',       options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+        {text:'Status',      options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:10}},
+      ]];
+      teamShow.forEach((r,i) => {
+        const bg = i%2 ? LIGHT : WHITE;
+        const pct = r.this_week||0, ov = r.overdue||0;
+        const status = pct>=80&&ov<=1?'✅ On Track':pct<50||ov>=4?'🔴 At Risk':'⚠️ Watch';
+        const stCol  = pct>=80&&ov<=1?GREEN:pct<50||ov>=4?RED:AMBER;
+        const dStr = r.delta===null||r.delta===undefined?'—':(r.delta>=0?'+':'')+r.delta+'%';
+        tRows.push([
+          {text:r.owner,                         options:{bold:true,fill:{color:bg},fontSize:10,color:DARKGRAY}},
+          {text:String(r.completed||0),          options:{align:'center',fill:{color:bg},fontSize:10}},
+          {text:String(r.total||0),              options:{align:'center',fill:{color:bg},fontSize:10}},
+          {text:`${pct}%`,                       options:{align:'center',fill:{color:bg},fontSize:10,bold:true,color:pct>=80?GREEN:pct<50?RED:AMBER}},
+          {text:String(ov),                      options:{align:'center',fill:{color:bg},fontSize:10,color:ov>=4?RED:ov>=1?ORANGE:SLATE,bold:ov>0}},
+          {text:dStr,                            options:{align:'center',fill:{color:bg},fontSize:10,color:r.delta>0?GREEN:r.delta<0?RED:SLATE}},
+          {text:status,                          options:{align:'center',fill:{color:bg},fontSize:10,color:stCol,bold:true}},
+        ]);
+      });
+      slide.addTable(tRows, { x:0.35, y:1.05, w:12.6, colW:[2.5,0.9,0.9,1.1,1.1,1.1,5.0],
+        fontSize:10, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.4}, rowH:0.39, autoPage:false });
+      if (S.teamRows.length > maxPerSlide) {
+        slide.addText(`Showing ${maxPerSlide} of ${S.teamRows.length} members. See full dashboard for complete view.`,
+          { x:0.35, y:7.0, w:12.6, h:0.22, fontSize:9, color:MUTED, italic:true, fontFace:'Arial' });
+      }
+    }
+    addFooter(slide, '5');
+
+    // ── SLIDE 6: Key Risks ───────────────────────────────────────────────
     if (risks.length) {
       slide = pptx.addSlide();
-      slide.addText('🔎 Key Risks This Week', { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:NAVY, fontFace:'Arial' });
-      let ry = 1.25;
-      risks.forEach(r => {
-        const h = 1.05;
-        slide.addShape('roundRect', { x:0.5, y:ry, w:12.3, h, rectRadius:0.06, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
-        slide.addShape('rect', { x:0.5, y:ry, w:0.08, h, fill:{color:AMBER} });
-        slide.addText(r.name||'', { x:0.75, y:ry+0.08, w:11.8, h:0.35, fontSize:15, bold:true, color:NAVY, fontFace:'Arial' });
-        slide.addText(r.note||'', { x:0.75, y:ry+0.42, w:11.8, h:0.3, fontSize:11.5, color:SLATE, fontFace:'Arial' });
-        if (r.tip) slide.addText(`💡 ${r.tip}`, { x:0.75, y:ry+0.72, w:11.8, h:0.28, fontSize:10.5, italic:true, color:'92640C', fontFace:'Arial' });
-        ry += h + 0.15;
+      addHeader(slide, 'Key Risks & Issues', 'AI-identified risks requiring attention this week', AMBER);
+      const riskColors = [RED, ORANGE, AMBER, TEAL, PURPLE, NAVY2];
+      let ry = 1.08;
+      risks.forEach((r, ri) => {
+        const rh = r.tip ? 1.18 : 0.95;
+        slide.addShape('roundRect', { x:0.45, y:ry, w:12.4, h:rh, rectRadius:0.07, fill:{color:LIGHT}, line:{color:'E2E8F0',width:0.6} });
+        slide.addShape('rect', { x:0.45, y:ry, w:0.09, h:rh, fill:{color:riskColors[ri%riskColors.length]} });
+        slide.addText(`Risk ${ri+1}`, { x:0.62, y:ry+0.06, w:1.2, h:0.26, fontSize:9, bold:true, color:riskColors[ri%riskColors.length], fontFace:'Arial' });
+        slide.addText(r.name||'', { x:1.7, y:ry+0.06, w:11.0, h:0.3, fontSize:13, bold:true, color:DARKGRAY, fontFace:'Arial' });
+        if (r.note) slide.addText(r.note, { x:0.62, y:ry+0.38, w:12.1, h:0.3, fontSize:11, color:SLATE, fontFace:'Arial' });
+        if (r.tip)  slide.addText(`💡 Mitigation: ${r.tip}`, { x:0.62, y:ry+0.7, w:12.1, h:0.3, fontSize:10.5, italic:true, color:'92640C', fontFace:'Arial' });
+        ry += rh + 0.1;
       });
-      addFooter(slide, 'Key Risks');
+      addFooter(slide, '6');
     }
 
-    // ── Slide 5: Wins & Next Steps ──────────────────────────────────────
+    // ── SLIDE 7: Wins & Highlights ───────────────────────────────────────
     slide = pptx.addSlide();
-    slide.addText("✓ This Week's Wins & Next Steps", { x:0.5, y:0.35, w:12, h:0.6, fontSize:26, bold:true, color:GREEN, fontFace:'Arial' });
+    addHeader(slide, "This Week's Wins", 'Top performers and positive momentum', GREEN);
     if (S.wins.length) {
-      const winsRows = [[
-        {text:'Owner', options:{bold:true,color:'FFFFFF',fill:{color:GREEN}}},
-        {text:'Completion', options:{bold:true,color:'FFFFFF',fill:{color:GREEN},align:'center'}},
-        {text:'Change (WoW)', options:{bold:true,color:'FFFFFF',fill:{color:GREEN},align:'center'}},
+      const wRows = [[
+        {text:'Member',        options:{bold:true,color:WHITE,fill:{color:GREEN},fontSize:11}},
+        {text:'Completion',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
+        {text:'Tasks Done',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
+        {text:'WoW Change',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
+        {text:'Highlight',     options:{bold:true,color:WHITE,fill:{color:GREEN},fontSize:11}},
       ]];
       S.wins.forEach((r,i) => {
+        const bg = i%2 ? LIGHT : WHITE;
         const d = r.delta;
-        winsRows.push([
-          {text:r.owner, options:{bold:true, fill:{color:i%2?LIGHT:'FFFFFF'}}},
-          {text:`${r.this_week}%`, options:{align:'center', fill:{color:i%2?LIGHT:'FFFFFF'}}},
-          {text: d===null||d===undefined?'NEW':(d>=0?'+':'')+d+'%', options:{align:'center', color: d>=0?GREEN:RED, fill:{color:i%2?LIGHT:'FFFFFF'}}},
+        const dStr = d===null||d===undefined?'NEW':(d>=0?'+':'')+d+'%';
+        const highlight = r.this_week>=100?'✅ Fully complete!':r.this_week>=90?'Outstanding progress':r.this_week>=80?'On track & strong':'Great weekly jump';
+        wRows.push([
+          {text:r.owner,                            options:{bold:true,fill:{color:bg},fontSize:11,color:DARKGRAY}},
+          {text:`${r.this_week}%`,                  options:{align:'center',fill:{color:bg},fontSize:14,bold:true,color:GREEN}},
+          {text:`${r.completed||0}/${r.total||0}`,  options:{align:'center',fill:{color:bg},fontSize:11}},
+          {text:dStr,                               options:{align:'center',fill:{color:bg},fontSize:11,bold:true,color:d>=0?GREEN:RED}},
+          {text:highlight,                          options:{fill:{color:bg},fontSize:10.5,color:SLATE,italic:true}},
         ]);
       });
-      slide.addTable(winsRows, { x:0.5, y:1.2, w:6.0, colW:[2.6,1.8,1.6], fontSize:12, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.5}, autoPage:false, rowH:0.5 });
+      slide.addTable(wRows, { x:0.4, y:1.1, w:12.5, colW:[2.5,1.6,1.5,1.6,5.3],
+        fontSize:11, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.4}, rowH:0.48, autoPage:false });
     } else {
-      slide.addText('No standout movers this week.', { x:0.5, y:1.3, w:6, h:0.4, fontSize:13, color:SLATE, fontFace:'Arial' });
+      slide.addText('No standout performers this week — but the team is making steady progress.', { x:0.5, y:2.5, w:12.3, h:0.5, fontSize:15, color:SLATE, fontFace:'Arial' });
     }
+    // AI summary panel
     if (summaryText) {
-      slide.addText('AI Summary', { x:6.9, y:1.2, w:5.9, h:0.35, fontSize:13, bold:true, color:NAVY, fontFace:'Arial' });
-      slide.addShape('roundRect', { x:6.9, y:1.55, w:5.9, h:4.8, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA', width:1} });
-      slide.addText(summaryText, { x:7.1, y:1.7, w:5.5, h:4.5, fontSize:12, color:'0F172A', valign:'top', fontFace:'Arial' });
+      const tY = S.wins.length ? 1.1 + (S.wins.length+1)*0.48 + 0.3 : 1.3;
+      slide.addText('📝 AI-Generated Weekly Commentary', { x:0.4, y:tY, w:12.5, h:0.35, fontSize:12, bold:true, color:NAVY, fontFace:'Arial' });
+      const boxH = Math.max(0.8, 7.1 - tY - 0.45);
+      slide.addShape('roundRect', { x:0.4, y:tY+0.38, w:12.5, h:boxH, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA',width:0.7} });
+      slide.addText(summaryText, { x:0.6, y:tY+0.5, w:12.1, h:boxH-0.22, fontSize:11.5, color:DARKGRAY, valign:'top', fontFace:'Arial' });
     }
-    addFooter(slide, "Wins & Next Steps");
+    addFooter(slide, '7');
+
+    // ── SLIDE 8: Closing / Actions ───────────────────────────────────────
+    slide = pptx.addSlide();
+    slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
+    slide.addShape('rect', { x:0, y:0, w:0.35, h:7.5, fill:{color:ACCENT} });
+    slide.addShape('ellipse', { x:9.5, y:-1.5, w:5, h:5, fill:{color:ACCENT}, line:{color:ACCENT,width:0}, transparency:80 });
+    slide.addShape('ellipse', { x:10.5, y:3.5, w:4, h:4, fill:{color:TEAL}, line:{color:TEAL,width:0}, transparency:85 });
+
+    slide.addText('Recommended Actions', { x:0.6, y:1.0, w:10, h:0.7, fontSize:34, bold:true, color:WHITE, fontFace:'Arial' });
+    slide.addShape('rect', { x:0.6, y:1.72, w:4.5, h:0.04, fill:{color:ACCENT} });
+
+    const actions = [
+      S.watchlist.length > 0 ? `Follow up with ${S.watchlist.slice(0,3).map(w=>w.owner).join(', ')} on overdue items` : 'No immediate escalations required',
+      S.gWFA > 0 ? `Clear ${S.gWFA} approval queue item${S.gWFA>1?'s':''} to unblock progress` : 'Approval queue is clear ✓',
+      S.overdueRate > 10 ? `Address high overdue rate (${S.overdueRate}%) — review task distribution` : `Maintain low overdue rate (${S.overdueRate}%) with current approach`,
+      S.rag.red.length > 0 ? `${S.rag.red.length} member${S.rag.red.length>1?'s':''} at risk — schedule 1:1 check-ins` : 'All at-risk members have been addressed ✓',
+      risks.length > 0 ? `Monitor ${risks.length} identified risk${risks.length>1?'s':''} — see risk slide for mitigations` : 'No major risks flagged this week',
+    ];
+    actions.forEach((action, i) => {
+      slide.addShape('ellipse', { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fill:{color:ACCENT} });
+      slide.addText(String(i+1), { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fontSize:11, bold:true, color:WHITE, align:'center', valign:'middle', fontFace:'Arial' });
+      slide.addText(action, { x:1.05, y:2.0+i*0.75, w:10.5, h:0.4, fontSize:13, color:'CBD5E1', fontFace:'Arial', valign:'middle' });
+    });
+
+    slide.addText(`${projectName}  ·  ${reportDate}  ·  ${generatedAt}`, { x:0.6, y:6.9, w:11, h:0.25, fontSize:9, color:MUTED, fontFace:'Arial' });
 
     await pptx.writeFile({ fileName: `executive-summary-${reportDate || 'report'}.pptx` });
     toast('✓ Executive Summary downloaded.');
