@@ -4194,21 +4194,8 @@ async function exportOverduePNG(mobile) {
 // Pass either (issue, rawStatus) or (null, rawStatus, rev1Name, rev2Name, assigneeName).
 function _statusLabel(rawStatus, rev1Name, rev2Name, assigneeName) {
   const st  = (rawStatus || '').trim();
-  const stL = st.toLowerCase();
-  let owner = '';
-  if (stL.includes('revision level 2')) {
-    owner = rev2Name || assigneeName;
-  } else if (stL.includes('revision level 1')) {
-    owner = rev1Name || assigneeName;
-  } else if (stL.includes('waiting for approval') || stL.includes('approv')) {
-    owner = rev1Name || rev2Name || assigneeName;
-  } else {
-    // Open / In Progress / On Hold / Review Complete / Done etc → assignee
-    owner = assigneeName;
-  }
-  if (!owner) return st;
-  const short = owner.split(' ')[0];  // first name only keeps cells tidy
-  return `${st}\n(${short})`;
+  // Disabled owner name appending per user request.
+  return st;
 }
 // Raw integer days-overdue (unlike _overdueDaysAgo's human string) so the
 // Excel column can be coloured on a scale and still sorted/filtered as a number.
