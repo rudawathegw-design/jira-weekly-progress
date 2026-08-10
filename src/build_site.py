@@ -1669,9 +1669,25 @@ const _LIVE = {
     const assignee = f.assignee||{};
     const issuetype = f.issuetype||{};
     // ── reviewer / involved custom fields (for status+owner exports) ──
-    const rev1 = (f.customfield_10784||[])[0]||{};
-    const rev2 = (f.customfield_10785||[])[0]||{};
-    const involved = (f.customfield_10092||[])[0]||{};
+    // Jira may return these as a single user object OR an array of user objects.
+    // _firstUser() mirrors Python's _first_display_name() to handle both shapes.
+    const _firstUser = (fv) => {
+      if (!fv) return {};
+      if (Array.isArray(fv)) return fv[0] || {};
+      if (typeof fv === 'object' && (fv.displayName || fv.name || fv.accountId)) return fv;
+      return {};
+    };
+    const rev1 = _firstUser(f.customfield_10784);
+    const rev2 = _firstUser(f.customfield_10785);
+    // customfield_10092 is the Service Desk approval workflow (array of approval stages);
+    // extract the first approver from the first stage as a fallback involved name.
+    const _firstApprover = (approvals) => {
+      if (!Array.isArray(approvals) || !approvals.length) return {};
+      const stage = approvals[0];
+      const approvers = stage.approvers || [];
+      return (approvers[0] && approvers[0].approver) ? approvers[0].approver : {};
+    };
+    const involved = _firstUser(f.customfield_10520) || _firstApprover(f.customfield_10092);
     return {
       key: issue.key||'',
       summary: (f.summary||'').slice(0,200),

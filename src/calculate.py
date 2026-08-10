@@ -142,6 +142,39 @@ def issue_link_record(issue) -> dict:
                     return n
         return ""
 
+    def _first_approver_from_stages(approval_stages):
+        """Extract the first approver displayName from customfield_10092 approval stages."""
+        if not isinstance(approval_stages, list):
+            return ""
+        for stage in approval_stages:
+            for approver_entry in stage.get("approvers", []):
+                user = approver_entry.get("approver") or {}
+                n = user.get("displayName") or user.get("name") or ""
+                if n:
+                    return n
+        return ""
+
+    # Direct reviewer fields: customfield_10784 = Level 1, customfield_10785 = Level 2
+    # These may be a single user object OR a list, so _first_display_name handles both.
+    rev1_direct = _first_display_name(f.get("customfield_10784"))
+    rev2_direct = _first_display_name(f.get("customfield_10785"))
+
+    # Fallback: read names from the Service Desk approval workflow stages
+    # customfield_10092 has structured approval info with named stages (Revision Level 1, etc.)
+    approval_stages = f.get("customfield_10092") or []
+    if isinstance(approval_stages, list):
+        for stage in approval_stages:
+            stage_name = (stage.get("name") or "").lower()
+            for approver_entry in stage.get("approvers", []):
+                user = approver_entry.get("approver") or {}
+                n = user.get("displayName") or user.get("name") or ""
+                if not n:
+                    continue
+                if "level 2" in stage_name and not rev2_direct:
+                    rev2_direct = n
+                elif "level 1" in stage_name and not rev1_direct:
+                    rev1_direct = n
+
     return {
         "key":         issue.get("key", ""),
         "summary":     (f.get("summary") or "")[:200],
@@ -162,9 +195,10 @@ def issue_link_record(issue) -> dict:
         # the Team Directory; blanks are filled manually there.
         "assignee_email": assignee.get("emailAddress") or "",
         # Reviewer names for status-aware display in Excel exports.
-        # customfield_10784 = Level 1 Reviewers, customfield_10785 = Level 2 Reviewers
-        "rev1_name": _first_display_name(f.get("customfield_10784")),
-        "rev2_name": _first_display_name(f.get("customfield_10785")),
+        # customfield_10784 = Level 1 Reviewer, customfield_10785 = Level 2 Reviewer
+        # Falls back to approval stage participants when the direct fields are empty.
+        "rev1_name": rev1_direct,
+        "rev2_name": rev2_direct,
     }
 
 
