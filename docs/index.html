@@ -4145,7 +4145,7 @@ function _overdueDaysFill(days) {
   return 'FFE699';                      // just tipped over — amber
 }
 
-async function exportOverdueExcel() {
+function exportOverdueExcel() {
   if (!REPORT) return;
   const hide = (hiddenPeople && hiddenPeople.size) ? hiddenPeople : null;
   const items = _collectOverdue(hide);
@@ -4156,9 +4156,6 @@ async function exportOverdueExcel() {
   const projectName = (REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'PMO';
   const reportDate = REPORT.date || '';
 
-  // Same grouping/order as the on-screen modal and the Outlook copy: bucket
-  // by owner, worst (earliest) due date first, so the Excel reads the same
-  // as everything else in this feature.
   const groups = {};
   items.forEach(i => { (groups[i.owner] = groups[i.owner] || []).push(i); });
   const owners = Object.keys(groups).sort((a,b) => {
@@ -4182,6 +4179,20 @@ async function exportOverdueExcel() {
   try {
     await loadXlsxStyle();
 
+    // ── helper: append owner name beside status ──
+    function getStatusWithOwner(item){
+      const st = item.status || '';
+      const rev1 = item.rev1_name || '';
+      const rev2 = item.rev2_name || '';
+      const involved = item.involved_name || '';
+      const assignee = item.assignee_name || '';
+      if (st.includes('Revision Level 2') && rev2) return `${st} (${rev2})`;
+      if (st.includes('Revision Level 1') && rev1) return `${st} (${rev1})`;
+      if (st.includes('Waiting For Approval') && involved) return `${st} (${involved})`;
+      if (assignee) return `${st} (${assignee})`;
+      return st;
+    }
+
     const header = ['#','Key','Summary','Owner','Status','Due Date','Days Overdue','Link'];
     let n = 0;
     const rows = [];
@@ -4190,7 +4201,8 @@ async function exportOverdueExcel() {
         n++;
         rows.push({
           n, key: i.key, summary: i.summary || '(no summary)', owner,
-          status: i.status || '', due: i.due ? String(i.due).slice(0,10) : '—',
+          status: getStatusWithOwner(i),
+          due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
         });
       });
@@ -4209,7 +4221,7 @@ async function exportOverdueExcel() {
       ...rows.map(r => [r.n, r.key, r.summary, r.owner, r.status, r.due, r.days===null?'—':r.days, r.link])
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:20},{wch:12},{wch:13},{wch:40}];
+    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:28},{wch:12},{wch:13},{wch:40}];
     ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:24}))];
     ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:lastCol} }];
     ws['!freeze'] = {xSplit:0, ySplit:DATA_START};
@@ -4232,28 +4244,28 @@ async function exportOverdueExcel() {
       let addr = XLSX.utils.encode_cell({r:rr,c:0});
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'7F1D1D'},sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:1}); // Key — clickable
+      addr = XLSX.utils.encode_cell({r:rr,c:1});
       if (ws[addr]) {
         ws[addr].s = { font:{bold:true,color:{rgb:'1155CC'},underline:true,sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
       }
 
-      addr = XLSX.utils.encode_cell({r:rr,c:2}); // Summary
+      addr = XLSX.utils.encode_cell({r:rr,c:2});
       if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Owner badge
+      addr = XLSX.utils.encode_cell({r:rr,c:3});
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10}, fill:{fgColor:{rgb:ownerAccent[r.owner]}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:4}); // Status
+      addr = XLSX.utils.encode_cell({r:rr,c:4});
       if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.status)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Due date
+      addr = XLSX.utils.encode_cell({r:rr,c:5});
       if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'7F1D1D'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Days overdue
+      addr = XLSX.utils.encode_cell({r:rr,c:6});
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:(r.days!==null && r.days>=30)?'C00000':'7F1D1D'},sz:10}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Link
+      addr = XLSX.utils.encode_cell({r:rr,c:7});
       if (ws[addr]) {
         ws[addr].s = { font:{color:{rgb:'1155CC'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
@@ -4269,7 +4281,6 @@ async function exportOverdueExcel() {
     toast('Export failed: '+e.message);
   }
 }
-
 // Render the open person modal's task list to a canvas. Builds an offscreen
 // HTML version (same styling as the clipboard payload) and rasterises it via
 // html2canvas so the result is a clean image — no modal chrome, no scroll bars.
