@@ -4256,7 +4256,7 @@ async function exportOverdueExcel() {
         n++;
         rows.push({
           n, key: i.key, summary: i.summary || '(no summary)', owner,
-          status: _statusLabel(i.status || '', i.rev1 || '', i.rev2 || '', owner),
+          status: _statusLabel(i.status || '', i.rev1_name || i.rev1 || '', i.rev2_name || i.rev2 || '', owner),
           rawStatus: i.status || '',
           due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`

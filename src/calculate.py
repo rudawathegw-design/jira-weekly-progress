@@ -163,8 +163,8 @@ def issue_link_record(issue) -> dict:
         "assignee_email": assignee.get("emailAddress") or "",
         # Reviewer names for status-aware display in Excel exports.
         # customfield_10784 = Level 1 Reviewers, customfield_10785 = Level 2 Reviewers
-        "rev1": _first_display_name(f.get("customfield_10784")),
-        "rev2": _first_display_name(f.get("customfield_10785")),
+        "rev1_name": _first_display_name(f.get("customfield_10784")),
+        "rev2_name": _first_display_name(f.get("customfield_10785")),
     }
 
 
