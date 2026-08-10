@@ -121,8 +121,6 @@ def _extract_events(issue, max_age_days: int = 30) -> list:
 def issue_link_record(issue) -> dict:
     f = issue.get("fields", {}) or {}
     events = _extract_events(issue)
-    # Use the most recent status-change timestamp from the changelog so the
-    # ticker catches every transition, not just category changes.
     last_status_event = next((e for e in events if e["field"] == "status"), None)
     changed = (last_status_event["when"] if last_status_event
                else f.get("statuscategorychangedate") or f.get("updated"))
@@ -134,12 +132,21 @@ def issue_link_record(issue) -> dict:
         """Extract the first displayName from a Jira user custom field (array or single obj)."""
         if not field_val:
             return ""
-        arr = field_val if isinstance(field_val, list) else [field_val]
-        for u in arr:
-            if isinstance(u, dict):
-                n = u.get("displayName") or u.get("name") or ""
-                if n:
-                    return n
+        
+        # If it's a list, take the first item
+        if isinstance(field_val, list):
+            if not field_val:
+                return ""
+            field_val = field_val[0]
+        
+        # If it's a dict with displayName
+        if isinstance(field_val, dict):
+            return field_val.get("displayName") or field_val.get("name") or ""
+        
+        # If it's a string, return it
+        if isinstance(field_val, str):
+            return field_val
+        
         return ""
 
     def _first_approver_from_stages(approval_stages):
@@ -154,13 +161,13 @@ def issue_link_record(issue) -> dict:
                     return n
         return ""
 
-    # Direct reviewer fields: customfield_10784 = Level 1, customfield_10785 = Level 2
-    # These may be a single user object OR a list, so _first_display_name handles both.
+    # ✅ DIRECT REVIEWER FIELDS - FIXED
+    # customfield_10784 = Level 1 Reviewer
+    # customfield_10785 = Level 2 Reviewer
     rev1_direct = _first_display_name(f.get("customfield_10784"))
     rev2_direct = _first_display_name(f.get("customfield_10785"))
 
     # Fallback: read names from the Service Desk approval workflow stages
-    # customfield_10092 has structured approval info with named stages (Revision Level 1, etc.)
     approval_stages = f.get("customfield_10092") or []
     if isinstance(approval_stages, list):
         for idx, stage in enumerate(approval_stages):
@@ -170,15 +177,16 @@ def issue_link_record(issue) -> dict:
                 n = user.get("displayName") or user.get("name") or ""
                 if not n:
                     continue
-                if "level 2" in stage_name:
-                    rev2_direct = rev2_direct or n
-                elif "level 1" in stage_name:
-                    rev1_direct = rev1_direct or n
+                # If we already have a direct reviewer, prefer that
+                if "level 2" in stage_name and not rev2_direct:
+                    rev2_direct = n
+                elif "level 1" in stage_name and not rev1_direct:
+                    rev1_direct = n
                 else:
-                    if idx == 0:
-                        rev1_direct = rev1_direct or n
-                    elif idx == 1:
-                        rev2_direct = rev2_direct or n
+                    if idx == 0 and not rev1_direct:
+                        rev1_direct = n
+                    elif idx == 1 and not rev2_direct:
+                        rev2_direct = n
 
     return {
         "key":         issue.get("key", ""),
@@ -190,22 +198,14 @@ def issue_link_record(issue) -> dict:
         "overdue":     is_overdue(issue),
         "changed":     changed,
         "events":      events,
-        # Issue type ("Sub-task" | "Task" | "Story" | "Epic" | …) and whether
-        # it's a sub-task — powers the per-type filter in the Comment modal.
         "type":        issuetype.get("name") or "",
         "is_subtask":  bool(issuetype.get("subtask")),
-        # Assignee accountId → real Jira @owner mention when posting comments.
         "assignee_id": assignee.get("accountId") or "",
-        # Assignee email IF Jira exposes it (most users hide it → empty). Powers
-        # the Team Directory; blanks are filled manually there.
         "assignee_email": assignee.get("emailAddress") or "",
-        # Reviewer names for status-aware display in Excel exports.
-        # customfield_10784 = Level 1 Reviewer, customfield_10785 = Level 2 Reviewer
-        # Falls back to approval stage participants when the direct fields are empty.
-        "rev1_name": rev1_direct,
-        "rev2_name": rev2_direct,
+        # ✅ REVIEWER NAMES - FIXED
+        "rev1_name": rev1_direct,  # Level 1 Reviewer
+        "rev2_name": rev2_direct,  # Level 2 Reviewer
     }
-
 
 # ── main aggregation ───────────────────────────────────────────────────────
 def compute_rates(issues, hidden_people=None):
