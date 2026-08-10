@@ -1661,13 +1661,17 @@ const _LIVE = {
     out.sort((a,b)=> a.when < b.when ? 1 : a.when > b.when ? -1 : 0);
     return out.slice(0,20);
   },
-  issueRecord(issue){
+    issueRecord(issue){
     const f = issue.fields||{};
     const events = _LIVE.extractEvents(issue);
     const lastStatus = events.find(e=>e.field==='status') || null;
     const changed = lastStatus ? lastStatus.when : (f.statuscategorychangedate || f.updated);
     const assignee = f.assignee||{};
     const issuetype = f.issuetype||{};
+    // ── reviewer / involved custom fields (for status+owner exports) ──
+    const rev1 = (f.customfield_10784||[])[0]||{};
+    const rev2 = (f.customfield_10785||[])[0]||{};
+    const involved = (f.customfield_10092||[])[0]||{};
     return {
       key: issue.key||'',
       summary: (f.summary||'').slice(0,200),
@@ -1681,6 +1685,10 @@ const _LIVE = {
       is_subtask: !!issuetype.subtask,
       assignee_id: assignee.accountId||'',
       assignee_email: assignee.emailAddress||'',
+      assignee_name: assignee.displayName||assignee.name||'',
+      rev1_name: rev1.displayName||rev1.name||'',
+      rev2_name: rev2.displayName||rev2.name||'',
+      involved_name: involved.displayName||involved.name||'',
     };
   },
   computeRates(issues, hiddenSet){
@@ -6497,15 +6505,29 @@ async function exportEpicExcel(historyStart){
     if (!issues.length){ toast(`No tasks/subtasks found under ${EPIC_KEY}.`); return; }
 
     const startLabel = historyStart || EPIC_HISTORY_START;
-    const days = _epicDayList(startLabel); // startLabel … today, today last
+    const days = _epicDayList(startLabel);
     const now = new Date();
     const dateLabel = now.toISOString().slice(0,10);
 
-    // Owner-lookup map (kept for future use; each row now just shows its own assignee).
     const ownerByKey = {};
     issues.forEach(i => { ownerByKey[i.key] = (i.fields.assignee && i.fields.assignee.displayName) || 'Unassigned'; });
 
     const base = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
+
+    // ── helper: append owner name beside status ──
+    function getStatusWithOwner(issue, rawStatus){
+      const st = rawStatus || '';
+      const f = issue.fields || {};
+      const assignee = (f.assignee && (f.assignee.displayName || f.assignee.name)) || '';
+      const rev1 = ((f.customfield_10784||[])[0] && ((f.customfield_10784)[0].displayName || (f.customfield_10784)[0].name)) || '';
+      const rev2 = ((f.customfield_10785||[])[0] && ((f.customfield_10785)[0].displayName || (f.customfield_10785)[0].name)) || '';
+      const involved = ((f.customfield_10092||[])[0] && ((f.customfield_10092)[0].displayName || (f.customfield_10092)[0].name)) || '';
+      if (st.includes('Revision Level 2') && rev2) return `${st} (${rev2})`;
+      if (st.includes('Revision Level 1') && rev1) return `${st} (${rev1})`;
+      if (st.includes('Waiting For Approval') && involved) return `${st} (${involved})`;
+      if (assignee) return `${st} (${assignee})`;
+      return st;
+    }
 
     const rows = issues.map(issue=>{
       const f = issue.fields||{};
@@ -6513,20 +6535,17 @@ async function exportEpicExcel(historyStart){
       const owner = ownerByKey[key];
       const summary = (f.summary||'').slice(0,200);
       const type = ((f.issuetype||{}).name)||'';
-      const daily = _dailyStatuses(issue, days); // one entry per day, null = not created yet
+      const daily = _dailyStatuses(issue, days);
       const idle = _idleStreak(daily);
       const lastStatus = daily[daily.length-1];
       const link = `${base}/browse/${encodeURIComponent(key)}`;
-      return { key, owner, summary, type, daily, idle, lastStatus, link };
+      return { key, owner, summary, type, daily, idle, lastStatus, link, issue };
     });
 
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     s.onload = () => {
       try {
-        // Columns: Key/Summary/Owner/Type, then one status column per day
-        // (side by side, so a frozen status jumps out across the row),
-        // then Idle Days (how long the status has sat unchanged), then Link.
         const dayLabels = days.map((d,i)=>{
           const label = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
           return i === days.length-1 ? `${label} (Today)` : label;
@@ -6536,11 +6555,6 @@ async function exportEpicExcel(historyStart){
         const linkCol = idleCol + 1;
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
-        // Row 0 is a plain title/generated-on banner (merged across every
-        // column); row 1 is the real header; data starts at row 2. This is
-        // the "when was this pulled" note — today's column always says
-        // "(Today)" too, but this spells out the exact generation time so
-        // it's obvious the file is fresh even printed out or forwarded.
         const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
         const titleText = `Epic ${EPIC_KEY}  ·  ${startLabel} → ${dateLabel} (Today)  ·  Generated ${generatedAt}`;
         const HEADER_ROW = 1, DATA_START = 2;
@@ -6552,19 +6566,16 @@ async function exportEpicExcel(historyStart){
           header,
           ...rows.map(r=>[
             r.key, r.summary, r.owner, r.type,
-            ...r.daily.map(st => st===null ? '—' : st),
+            ...r.daily.map(st => st===null ? '—' : getStatusWithOwner(r.issue, st)),
             _isDoneStatus(r.lastStatus) ? `Completed (${r.idle}d)` : r.idle,
             r.link
           ])
         ];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        // Day columns are wider now and wrap, so a long status (e.g.
-        // "Revision Level 1") stays inside its own cell on 1-2 lines
-        // instead of overflowing across the neighbouring day columns.
-        ws['!cols'] = [{wch:12},{wch:60},{wch:20},{wch:12}, ...days.map(()=>({wch:16})), {wch:16},{wch:38}];
+        ws['!cols'] = [{wch:14},{wch:60},{wch:22},{wch:12}, ...days.map(()=>({wch:20})), {wch:16},{wch:38}];
         ws['!rows'] = [{hpx:20}, {hpx:34}, ...rows.map(()=>({hpx:32}))];
         ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:linkCol} }];
-        ws['!freeze'] = {xSplit:4, ySplit:DATA_START}; // Key/Summary/Owner/Type stay put; title+header stay put too
+        ws['!freeze'] = {xSplit:4, ySplit:DATA_START};
         ws['!autofilter'] = {ref:`A${HEADER_ROW+1}:${lastColLetter}${rows.length+DATA_START}`};
         const titleAddr = XLSX.utils.encode_cell({r:0,c:0});
         if (ws[titleAddr]) ws[titleAddr].s = titleStyle;
@@ -6572,7 +6583,7 @@ async function exportEpicExcel(historyStart){
           const addr = XLSX.utils.encode_cell({r:HEADER_ROW,c});
           if (ws[addr]) ws[addr].s = headStyle;
         }
-        const plainCols = [0,1,2]; // Key, Summary, Owner — banded, no special colour
+        const plainCols = [0,1,2];
         rows.forEach((r,i)=>{
           const rr = i+DATA_START;
           const bandFill = i%2===0 ? 'FFFFFF' : 'F2F6FA';
@@ -6587,6 +6598,7 @@ async function exportEpicExcel(historyStart){
             const c = 4+di;
             const addr = XLSX.utils.encode_cell({r:rr,c});
             if (!ws[addr]) return;
+            const displaySt = st===null ? null : getStatusWithOwner(r.issue, st);
             if (st === null){
               ws[addr].s = { font:{sz:10,color:{rgb:'AAAAAA'},italic:true}, fill:{fgColor:{rgb:'F2F2F2'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
             } else {
@@ -6596,8 +6608,6 @@ async function exportEpicExcel(historyStart){
           const idleAddr = XLSX.utils.encode_cell({r:rr,c:idleCol});
           if (ws[idleAddr]) {
             if (_isDoneStatus(r.lastStatus)) {
-              // Finished work sitting still isn't a problem — frame it as a
-              // positive outcome, not a stalled-task warning.
               ws[idleAddr].s = { font:{bold:true,color:{rgb:'2E7D32'}}, fill:{fgColor:{rgb:'C6EFCE'}}, alignment:{horizontal:'center',vertical:'center'}, border };
             } else {
               ws[idleAddr].s = { font:{bold:r.idle>=3,color:{rgb:r.idle>=5?'C00000':'333333'}}, fill:{fgColor:{rgb:_idleFill(r.idle)}}, alignment:{horizontal:'center',vertical:'center'}, border };
