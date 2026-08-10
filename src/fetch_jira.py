@@ -17,20 +17,17 @@ def get_headers(email, token):
 
 
 def fetch_all_issues(base_url, email, token, jql):
-    headers  = get_headers(email, token)
+    headers = get_headers(email, token)
     base_url = base_url.rstrip("/")
-    url      = f"{base_url}/rest/api/3/search/jql"
+    url = f"{base_url}/rest/api/3/search/jql"
     all_issues, next_page_token = [], None
 
     while True:
         params = {
             "jql": jql,
             "maxResults": 100,
-            # duedate added for overdue calculation; priority for richer AI analysis
+            # ✅ INCLUDED THE REVIEWER FIELDS
             "fields": "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated,customfield_10784,customfield_10785,customfield_10092,customfield_10520",
-            # expand=changelog returns the last 100 changelog entries per
-            # issue (author + field + from/to + timestamp). Powers the
-            # 'Activity Log' modal — who changed what, when.
             "expand": "changelog",
         }
         if next_page_token:
