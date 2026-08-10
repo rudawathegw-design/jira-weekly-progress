@@ -341,7 +341,7 @@ export default {
       const epicKey = String(body.epicKey || "FIBTMP-489").trim();
       const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
       const jhdr = { Accept: "application/json", Authorization: `Basic ${jauth}` };
-      const fields = "summary,assignee,status,issuetype,parent,duedate,created,customfield_10784,customfield_10785,customfield_10092";
+      const fields = "summary,assignee,status,issuetype,parent,duedate,created,customfield_10784,customfield_10785,customfield_10092,customfield_10520";
       // expand=changelog is what lets the dashboard compute "yesterday's
       // status" by CHECKING Jira's own status-change history instead of us
       // saving a snapshot file anywhere. Safe here (unlike the whole-project
