@@ -287,46 +287,40 @@ export default {
       return json(200, { projects: values });
     }
 
-    // ── Live Jira fetch (powers the dynamic dashboard) ──
-    // Read-only: pulls the project's issues with the Jira token (Worker secret).
-    if (body.action === "jira") {
-      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
-        return json(501, { message: "Jira not configured in Worker" });
-      }
-      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
-      const project = String(env.JIRA_PROJECT || "").trim();
-      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
-      // Quote the project key, and when none is configured fall back to a valid
-      // all-issues query (an unquoted/empty project makes Jira reject the JQL).
-      const jql = project
-        ? `project = "${project}" ORDER BY created DESC`
-        : `ORDER BY created DESC`;
-      let issues = [], token = null;
-      for (let i = 0; i < 80; i++) {           // safety cap (8000 issues)
-        // NOTE: do NOT expand "changelog" here. With ~hundreds of issues the
-        // changelog payload is huge and blows the Worker CPU budget (Cloudflare
-        // error 1102 → 503 → "Failed to fetch" in the dashboard). The live view
-        // only needs current status/dates; the weekly Python build still pulls
-        // changelog for the Activity Log on the published page.
-        const qs = new URLSearchParams({
-          jql, maxResults: "100",
-          fields: "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated",
-        });
-        if (token) qs.set("nextPageToken", token);
-        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
-          headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
-        });
-        if (!jr.ok) {
-          const t = await jr.text();
-          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
-        }
-        const d = await jr.json();
-        issues = issues.concat(d.issues || []);
-        token = d.nextPageToken;
-        if (!token || d.isLast) break;
-      }
-      return json(200, { issues });
+// ── Live Jira fetch (powers the dynamic dashboard) ──
+// Read-only: pulls the project's issues with the Jira token (Worker secret).
+if (body.action === "jira") {
+  if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+    return json(501, { message: "Jira not configured in Worker" });
+  }
+  const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+  const project = String(env.JIRA_PROJECT || "").trim();
+  const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+  const jql = project
+    ? `project = "${project}" ORDER BY created DESC`
+    : `ORDER BY created DESC`;
+  let issues = [], token = null;
+  for (let i = 0; i < 80; i++) {
+    const qs = new URLSearchParams({
+      jql, maxResults: "100",
+      // ✅ ADD THE REVIEWER FIELDS HERE
+      fields: "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated,customfield_10784,customfield_10785,customfield_10092,customfield_10520",
+    });
+    if (token) qs.set("nextPageToken", token);
+    const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
+      headers: { Accept: "application/json", Authorization: `Basic ${jauth}` },
+    });
+    if (!jr.ok) {
+      const t = await jr.text();
+      return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
     }
+    const d = await jr.json();
+    issues = issues.concat(d.issues || []);
+    token = d.nextPageToken;
+    if (!token || d.isLast) break;
+  }
+  return json(200, { issues });
+}
 
     // ── Epic export: all direct children of an epic + their subtasks ──
     // Powers the "Export Epic Excel" button. Two JQL passes: (1) the epic's
