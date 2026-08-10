@@ -4174,7 +4174,28 @@ async function exportOverduePNG(mobile) {
   }
 }
 
-// ── Overdue tasks → colour-coded Excel (grouped by owner, worst first) ─────
+// ── Shared helper: status name → "Status\n(FirstName)" label ──────────────
+// Works for both the Epic Excel (has full issue object with live fields) and
+// the Overdue Excel (has pre-computed r.rev1/r.rev2 from calculate.py).
+// Pass either (issue, rawStatus) or (null, rawStatus, rev1Name, rev2Name, assigneeName).
+function _statusLabel(rawStatus, rev1Name, rev2Name, assigneeName) {
+  const st  = (rawStatus || '').trim();
+  const stL = st.toLowerCase();
+  let owner = '';
+  if (stL.includes('revision level 2')) {
+    owner = rev2Name || assigneeName;
+  } else if (stL.includes('revision level 1')) {
+    owner = rev1Name || assigneeName;
+  } else if (stL.includes('waiting for approval') || stL.includes('approv')) {
+    owner = rev1Name || rev2Name || assigneeName;
+  } else {
+    // Open / In Progress / On Hold / Review Complete / Done etc → assignee
+    owner = assigneeName;
+  }
+  if (!owner) return st;
+  const short = owner.split(' ')[0];  // first name only keeps cells tidy
+  return `${st}\n(${short})`;
+}
 // Raw integer days-overdue (unlike _overdueDaysAgo's human string) so the
 // Excel column can be coloured on a scale and still sorted/filtered as a number.
 function _overdueDaysNum(due) {
@@ -4235,7 +4256,9 @@ async function exportOverdueExcel() {
         n++;
         rows.push({
           n, key: i.key, summary: i.summary || '(no summary)', owner,
-          status: i.status || '', due: i.due ? String(i.due).slice(0,10) : '—',
+          status: _statusLabel(i.status || '', i.rev1 || '', i.rev2 || '', owner),
+          rawStatus: i.status || '',
+          due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
         });
       });
@@ -4254,8 +4277,8 @@ async function exportOverdueExcel() {
       ...rows.map(r => [r.n, r.key, r.summary, r.owner, r.status, r.due, r.days===null?'—':r.days, r.link])
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:20},{wch:12},{wch:13},{wch:40}];
-    ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:24}))];
+    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:26},{wch:12},{wch:13},{wch:40}];
+    ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:36}))];  // taller rows for 2-line status
     ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:lastCol} }];
     ws['!freeze'] = {xSplit:0, ySplit:DATA_START};
     ws['!autofilter'] = {ref:`A${HEADER_ROW+1}:${lastColLetter}${rows.length+DATA_START}`};
@@ -4290,7 +4313,7 @@ async function exportOverdueExcel() {
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10}, fill:{fgColor:{rgb:ownerAccent[r.owner]}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:4}); // Status
-      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.status)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
+      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:5}); // Due date
       if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'7F1D1D'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
@@ -6514,19 +6537,25 @@ async function exportEpicExcel(historyStart){
 
     const base = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
 
-    // ── helper: append owner name beside status ──
+    // ── helper: extract display name from a Jira user custom field ──────────
+    // Jira returns these as an array of user objects [{displayName,accountId,…}]
+    // but occasionally as a single object or null.
+    function _fieldNames(fieldVal){
+      if (!fieldVal) return [];
+      const arr = Array.isArray(fieldVal) ? fieldVal : [fieldVal];
+      return arr.map(u => {
+        if (!u) return null;
+        return u.displayName || u.name || null;
+      }).filter(Boolean);
+    }
+
+    // ── helper: append the responsible person's name beside the status ────────
     function getStatusWithOwner(issue, rawStatus){
-      const st = rawStatus || '';
-      const f = issue.fields || {};
-      const assignee = (f.assignee && (f.assignee.displayName || f.assignee.name)) || '';
-      const rev1 = ((f.customfield_10784||[])[0] && ((f.customfield_10784)[0].displayName || (f.customfield_10784)[0].name)) || '';
-      const rev2 = ((f.customfield_10785||[])[0] && ((f.customfield_10785)[0].displayName || (f.customfield_10785)[0].name)) || '';
-      const involved = ((f.customfield_10092||[])[0] && ((f.customfield_10092)[0].displayName || (f.customfield_10092)[0].name)) || '';
-      if (st.includes('Revision Level 2') && rev2) return `${st} (${rev2})`;
-      if (st.includes('Revision Level 1') && rev1) return `${st} (${rev1})`;
-      if (st.includes('Waiting For Approval') && involved) return `${st} (${involved})`;
-      if (assignee) return `${st} (${assignee})`;
-      return st;
+      const f    = (issue && issue.fields) || {};
+      const l1   = (_fieldNames(f.customfield_10784)[0]) || '';
+      const l2   = (_fieldNames(f.customfield_10785)[0]) || '';
+      const asgn = (f.assignee && (f.assignee.displayName || f.assignee.name)) || '';
+      return _statusLabel(rawStatus, l1, l2, asgn);
     }
 
     const rows = issues.map(issue=>{
