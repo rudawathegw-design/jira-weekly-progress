@@ -6571,14 +6571,19 @@ async function exportEpicExcel(historyStart){
       
       const approvals = f.customfield_10092 || [];
       if (Array.isArray(approvals)) {
-        approvals.forEach(stage => {
+        approvals.forEach((stage, idx) => {
           const sname = (stage.name || '').toLowerCase();
           (stage.approvers || []).forEach(a => {
             const u = a.approver;
             const n = u && (u.displayName || u.name);
             if (!n) return;
-            if (sname.includes('level 2') && !l2) l2 = n;
-            else if (sname.includes('level 1') && !l1) l1 = n;
+            if (sname.includes('level 2')) { l2 = l2 || n; }
+            else if (sname.includes('level 1')) { l1 = l1 || n; }
+            else {
+              // If stage name doesn't contain "level 1/2", use array index
+              if (idx === 0) l1 = l1 || n;
+              else if (idx === 1) l2 = l2 || n;
+            }
           });
         });
       }

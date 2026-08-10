@@ -163,17 +163,22 @@ def issue_link_record(issue) -> dict:
     # customfield_10092 has structured approval info with named stages (Revision Level 1, etc.)
     approval_stages = f.get("customfield_10092") or []
     if isinstance(approval_stages, list):
-        for stage in approval_stages:
+        for idx, stage in enumerate(approval_stages):
             stage_name = (stage.get("name") or "").lower()
             for approver_entry in stage.get("approvers", []):
                 user = approver_entry.get("approver") or {}
                 n = user.get("displayName") or user.get("name") or ""
                 if not n:
                     continue
-                if "level 2" in stage_name and not rev2_direct:
-                    rev2_direct = n
-                elif "level 1" in stage_name and not rev1_direct:
-                    rev1_direct = n
+                if "level 2" in stage_name:
+                    rev2_direct = rev2_direct or n
+                elif "level 1" in stage_name:
+                    rev1_direct = rev1_direct or n
+                else:
+                    if idx == 0:
+                        rev1_direct = rev1_direct or n
+                    elif idx == 1:
+                        rev2_direct = rev2_direct or n
 
     return {
         "key":         issue.get("key", ""),
