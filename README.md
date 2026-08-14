@@ -87,6 +87,95 @@ comparisons appear.)
 
 ---
 
+## Owner attribution (who a task counts against)
+
+The assignee owns **delivery**. But once a task moves to **Revision Level 1/2**,
+the assignee has handed off — the person who must act is that level's reviewer.
+Counting such a task (especially an overdue one) against the assignee blames the
+wrong person and sends the follow-up to the wrong desk.
+
+The dashboard's **attribution bar** (top of the page, above the stats) controls this:
+
+| Mode | Counts a task against |
+|------|-----------------------|
+| **Assignee** | The assignee, always (classic behaviour) |
+| **Accountable Now** *(default)* | The reviewer while the task is in review; the assignee otherwise |
+| **Review Queue** | Only work awaiting a review decision, grouped by the reviewer who owes it |
+
+Alongside it: an **issue-type scope** filter (Task / Sub-task / Epic / …) and a
+**Status mapping** panel that decides which reporting column each Jira status
+rolls up into. All three persist in `localStorage`, so a refresh keeps your view.
+
+### How the reviewer is resolved
+
+`src/accountability.py` is the single source of truth (mirrored in the browser as
+`_ACC` in `build_site.py`, so the live 10-second refresh can never disagree with
+the built page). First hit wins:
+
+1. A **pending** entry in the *Approvals* field (`customfield_10092`) — names both
+   the level and who still owes the decision.
+2. The level implied by the status name → that level's Reviewers field
+   (`customfield_10784` for Level 1, `customfield_10785` for Level 2).
+3. *Waiting For Approval* (no level of its own) → Level 1 Reviewers, then Level 2.
+4. Otherwise the assignee, flagged **unresolved** — "in review but no reviewer
+   configured in Jira" is surfaced as a governance gap rather than silently
+   blamed on the assignee.
+
+`customfield_10520` (*Involved Users*) is deliberately **not** part of this chain
+— being involved in a task doesn't make you the person who owes the decision. It
+still travels through to the exports as `involved_name`.
+
+Where a level has several reviewers, the **first carries the count** and the rest
+are listed as co-reviewers. Each task counts exactly once, so per-person totals
+always sum to the team total.
+
+Two consequences worth knowing:
+
+- **Team completion % is unchanged by the mode.** Only the per-person
+  distribution moves; completed work is always attributed to its assignee.
+- **`Revision Level 1/2` now roll up into *Waiting For Approval*.** The old rule
+  tested only `"wait"`/`"approv"`, which matches neither, so every task parked in
+  review fell through to *Open* and overstated it. Change it back in the Status
+  mapping panel if you prefer the old split.
+
+History snapshots store a series **per mode**, so week-over-week deltas compare
+like with like. Snapshots written before this feature only have the assignee-mode
+series; in another mode the change column is hidden rather than shown wrongly.
+
+### In the Excel export
+
+`Export Excel` names the person actually on the hook. The **Tasks** sheet carries
+`Assignee`, `Accountable Now`, `Accountable Role`, `Pending Level`,
+`Co-reviewers`, `Involved Users`, and an `Overdue Reason` separating *delivery
+not complete* from *awaiting review decision*. A **Review Bottlenecks** sheet
+ranks reviewers by queue size, and a **Report Info** cover sheet records the
+mode, scope, and status mapping the numbers were produced under.
+
+---
+
+## Versioning
+
+`SITE_VERSION` in `src/build_site.py` is stamped into every build and shown:
+
+- on the **sign-in screen**, bottom-right — deliberately outside the password
+  gate, so you can confirm which build is live without logging in;
+- in the **footer** once you're in;
+- on the **Report Info** sheet of the Excel export.
+
+The badge reads `v<version> · <build date> · <short commit>`. Bump the MINOR
+digit for a feature, PATCH for a fix.
+
+> **After changing `worker/github-proxy.js`, redeploy the Worker** — otherwise
+> the every-10s live refresh keeps returning the old field set and the live view
+> silently falls back to assignee attribution while the built page uses the new
+> one. The dashboard detects this case and says so rather than reporting "no
+> reviewer set in Jira" for everything:
+> ```bash
+> cd worker && npx wrangler deploy
+> ```
+
+---
+
 ## Commenting on overdue issues
 
 Open the **âš  Overdue** modal on the dashboard and click **ðŸ’¬ Comment in Jira**:
@@ -182,6 +271,7 @@ python src/main.py
 | Path                          | Purpose                                  |
 |-------------------------------|------------------------------------------|
 | `src/fetch_jira.py`           | Pulls issues from Jira                    |
+| `src/accountability.py`       | Resolves who is on the hook per issue (assignee vs. review-level reviewer) |
 | `src/calculate.py`            | Completion % + week-over-week comparison  |
 | `src/analyze.py`              | DeepSeek analysis                         |
 | `src/build_site.py`           | Renders the HTML report                   |

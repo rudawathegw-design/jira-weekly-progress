@@ -95,6 +95,25 @@ body{
 .pw-card .btn-primary:hover{opacity:1;transform:translateY(-1px);
   box-shadow:0 14px 30px -10px rgba(10,59,124,.6)}
 .pw-foot{margin-top:18px;font-size:11px;color:#a8a294;line-height:1.6}
+/* Version badge — deliberately OUTSIDE the password gate so which build is
+   deployed can be confirmed without logging in. Carries no data, only the
+   version, build date and short commit. */
+.ver-badge{position:fixed;bottom:14px;right:16px;z-index:501;
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.82);border:1px solid #e2ddd2;border-radius:999px;
+  padding:5px 12px;font-size:10.5px;font-weight:700;color:#8b8578;
+  letter-spacing:.06em;backdrop-filter:blur(8px);
+  font-family:'JetBrains Mono',monospace;user-select:text}
+.ver-badge .ver-num{color:#1366cc;font-weight:800}
+.ver-badge .ver-sep{opacity:.4}
+.ver-badge:hover{color:#5b564c;border-color:#cfc9bb}
+html.theme-dark .ver-badge{background:rgba(48,48,46,.8);border-color:#4a4844;color:#b8b5ad}
+html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
+/* Inside the app the same version rides in the footer. */
+.ver-inline{font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  font-weight:700;color:#94a3b8;letter-spacing:.05em}
+.ver-inline .ver-num{color:#2563eb}
+@media (max-width:520px){ .ver-badge{bottom:8px;right:8px;font-size:9.5px;padding:4px 9px} }
 .inp{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;
   color:#1e293b;font-size:15px;padding:11px 15px;outline:none;
   font-family:inherit;transition:border .2s,background .2s}
@@ -170,6 +189,91 @@ body{
 .cmp-match{color:#059669;font-weight:700}
 .cmp-diff{color:#dc2626;font-weight:700}
 .cmp-missing{color:#94a3b8;font-style:italic}
+
+/* ── attribution bar ─────────────────────────────────────────── */
+/* Sits directly above the stats so the reader knows WHOSE numbers they are
+   looking at before they read a single figure. Lives inside #app, so the
+   dark-mode filter handles the dark palette automatically. */
+.attr-bar{background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;
+  padding:12px 16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.04)}
+.attr-main{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.attr-group{display:flex;align-items:center;gap:9px;min-width:0}
+.attr-group-end{margin-left:auto;gap:6px}
+.attr-label{font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.1em;color:#94a3b8;white-space:nowrap}
+/* segmented control */
+.attr-seg{display:inline-flex;background:#f1f5f9;border:1.5px solid #e2e8f0;
+  border-radius:10px;padding:3px;gap:2px}
+.attr-seg-btn{border:none;background:transparent;border-radius:7px;
+  padding:6px 13px;font-size:12.5px;font-weight:600;color:#475569;
+  cursor:pointer;font-family:inherit;white-space:nowrap;
+  transition:background .15s,color .15s,box-shadow .15s}
+.attr-seg-btn:hover{color:#1e293b;background:rgba(255,255,255,.7)}
+.attr-seg-btn.on{background:#fff;color:#1d4ed8;font-weight:700;
+  box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.attr-seg-btn .attr-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  opacity:.6;margin-left:5px;font-weight:600}
+.attr-seg-btn .attr-short{display:none}
+/* issue-type toggles */
+.attr-types{display:inline-flex;gap:5px;flex-wrap:wrap}
+.attr-type{border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:8px;
+  padding:5px 11px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;
+  font-family:inherit;transition:all .15s;white-space:nowrap;user-select:none}
+.attr-type:hover{border-color:#cbd5e1;color:#334155}
+.attr-type.on{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+.attr-type .attr-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;
+  opacity:.7;margin-left:4px}
+/* buttons */
+.attr-btn{display:inline-flex;align-items:center;gap:5px;border:1.5px solid #e2e8f0;
+  background:#f8fafc;border-radius:8px;padding:6px 11px;font-size:12px;
+  font-weight:600;color:#475569;cursor:pointer;font-family:inherit;
+  transition:all .15s;white-space:nowrap}
+.attr-btn:hover{border-color:#cbd5e1;color:#1e293b;background:#f1f5f9}
+.attr-btn.ghost{background:transparent;border-color:transparent;color:#94a3b8}
+.attr-btn.ghost:hover{color:#475569;background:#f1f5f9}
+.attr-dot{width:6px;height:6px;border-radius:50%;background:#f59e0b;
+  display:inline-block;margin-left:2px}
+/* explanatory line under the controls */
+.attr-note{font-size:12px;color:#64748b;margin-top:9px;line-height:1.55;
+  padding-top:9px;border-top:1px dashed #e2e8f0}
+.attr-note strong{color:#334155;font-weight:700}
+.attr-note .attr-warn{color:#b45309;font-weight:600}
+.attr-note .attr-flag{color:#b91c1c;font-weight:600}
+.attr-note code{font-family:'JetBrains Mono',monospace;font-size:11px;
+  background:#f1f5f9;padding:1px 5px;border-radius:4px}
+/* The FAB rail is viewport-fixed and floats over the right edge of the card
+   until the viewport is wide enough to clear the 1400px wrap. Keep the note's
+   text out from under it so the sentence stays readable. */
+@media (max-width:1560px){ .attr-note{padding-right:58px} }
+/* status-mapping modal */
+.smap-row{display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid #f1f5f9}
+.smap-row:last-child{border-bottom:none}
+.smap-name{flex:1;font-size:13px;font-weight:600;color:#1e293b;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smap-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:#94a3b8;
+  min-width:38px;text-align:right}
+.smap-sel{border:1.5px solid #e2e8f0;border-radius:8px;background:#f8fafc;
+  color:#1e293b;font-size:12.5px;padding:6px 9px;outline:none;
+  font-family:inherit;cursor:pointer;min-width:170px}
+.smap-sel:focus{border-color:#3b82f6}
+.smap-sel.changed{border-color:#fbbf24;background:#fffbeb}
+.smap-review{font-size:10.5px;font-weight:700;color:#7c3aed;
+  background:#f5f3ff;border:1px solid #ddd6fe;border-radius:5px;padding:1px 5px}
+@media (max-width:820px){
+  .attr-main{gap:12px}
+  /* Let the label sit on its own line so the segmented control gets the full
+     width — otherwise the third mode is pushed off-screen on a phone. */
+  .attr-group{width:100%;flex-wrap:wrap;gap:6px}
+  .attr-group-end{margin-left:0;justify-content:flex-start}
+  .attr-label{width:100%}
+  .attr-seg{width:100%}
+  .attr-seg-btn{flex:1;min-width:0;text-align:center;padding:7px 6px;font-size:12px}
+  .attr-seg-btn .attr-count{margin-left:3px}
+  .attr-seg-btn .attr-full{display:none}
+  .attr-seg-btn .attr-short{display:inline}
+  .attr-note{padding-right:0}
+}
 
 /* ── top bar ─────────────────────────────────────────────────── */
 .topbar{display:flex;align-items:center;justify-content:space-between;
@@ -932,6 +1036,33 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   </div>
 </div>
 
+<!-- Version badge — outside the gate on purpose: lets anyone confirm which
+     build is live without signing in. Contains no report data. -->
+<div class="ver-badge" id="ver-badge" title="Dashboard build — v__VERSION__, built __BUILD_TIME__ (commit __COMMIT__)">
+  <span class="ver-num">v__VERSION__</span>
+  <span class="ver-sep">·</span>
+  <span>__BUILD_DATE__</span>
+  <span class="ver-sep">·</span>
+  <span>__COMMIT__</span>
+</div>
+
+<!-- ═══════════════ Status Mapping Modal ═══════════════════════════════════ -->
+<div class="modal-overlay hidden" id="smap-modal">
+  <div class="modal">
+    <h3>🗂 Status mapping</h3>
+    <p style="font-size:12.5px;color:#64748b;line-height:1.6;margin-bottom:16px">
+      Choose which reporting column each Jira status rolls up into. Statuses marked
+      <span class="smap-review">in review</span> also hand the task to its reviewer
+      when <strong>Accountable Now</strong> is selected.
+    </p>
+    <div id="smap-list"></div>
+    <div class="modal-actions">
+      <button class="btn-modal ghost" onclick="resetStatusMap()">Restore defaults</button>
+      <button class="btn-modal blue" onclick="closeModal('smap-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ Export Modal ═══════════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="export-modal">
   <div class="modal">
@@ -1403,6 +1534,31 @@ CC: @cc</textarea>
     </div>
   </div>
 
+  <!-- ═══════════ Attribution bar — who each task counts against ═══════════ -->
+  <section class="attr-bar" id="attr-bar">
+    <div class="attr-main">
+      <div class="attr-group">
+        <span class="attr-label">Count tasks against</span>
+        <div class="attr-seg" id="attr-mode-seg" role="tablist" aria-label="Attribution mode"></div>
+      </div>
+
+      <div class="attr-group">
+        <span class="attr-label">Scope</span>
+        <div class="attr-types" id="attr-types"></div>
+      </div>
+
+      <div class="attr-group attr-group-end">
+        <button class="attr-btn" onclick="openStatusMapModal()" id="attr-map-btn"
+                title="Choose which reporting column each Jira status rolls up into">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          Status mapping<span id="attr-map-dot" class="attr-dot" style="display:none" title="Customised"></span>
+        </button>
+        <button class="attr-btn ghost" onclick="resetAttribution()" title="Back to the recommended defaults">Reset</button>
+      </div>
+    </div>
+    <div class="attr-note" id="attr-note"></div>
+  </section>
+
   <!-- Stats -->
   <section class="stats" id="stats-row"></section>
 
@@ -1564,7 +1720,9 @@ CC: @cc</textarea>
 
   </div>
 
-  <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team</footer>
+  <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built __BUILD_TIME__ · commit __COMMIT__"><span class="ver-num">v__VERSION__</span> · __BUILD_DATE__ · __COMMIT__</span>
+  </footer>
 </div>
 </div>
 
@@ -1577,6 +1735,13 @@ const ENC_BLOB = __ENC_BLOB__;
 let REPORT   = null;
 let ANALYSIS = null;
 let GH_PAT   = '';
+
+// ── Build identity ─────────────────────────────────────────────────────────
+// Surfaced on the sign-in screen (outside the gate), in the footer, and on the
+// Excel cover sheet, so the deployed build can always be identified.
+const SITE_VERSION = "__VERSION__";
+const BUILD_TIME   = "__BUILD_TIME__";
+const BUILD_COMMIT = "__COMMIT__";
 
 // ── GitHub proxy (optional) ────────────────────────────────────────────────
 // If a Worker URL is configured (meta gh-proxy), the GitHub PAT lives in the
@@ -1607,6 +1772,200 @@ const GH_PROXY = (document.querySelector('meta[name=gh-proxy]')?.content || '').
   };
 })();
 
+// ── ATTRIBUTION CONFIG ──────────────────────────────────────────────────────
+// Who a task counts against, which issue types are in scope, and how each Jira
+// status rolls up. Persisted in localStorage so a refresh keeps the selection.
+const ATTR_MODES = {
+  assignee:    {label:'Assignee',        short:'Assignee',
+                desc:'Classic view — every task counts against the person it is assigned to.'},
+  accountable: {label:'Accountable Now', short:'Accountable',
+                desc:'Default — while a task sits at Revision Level 1/2 it counts against the reviewer holding it, not the assignee.'},
+  reviewer:    {label:'Review Queue',    short:'Reviewers',
+                desc:'Bottleneck board — only work currently awaiting a review decision, grouped by the reviewer who owes it.'},
+};
+const ATTR_BUCKETS = ['Open','In Progress','Waiting For Approval','Completed'];
+// Mirrors DEFAULT_STATUS_BUCKETS in src/accountability.py. "Revision Level 1/2"
+// used to fall through to Open, which overstated Open by every task actually
+// parked in review.
+const DEFAULT_STATUS_MAP = {
+  'open':'Open', 'on hold':'Open',
+  'in progress':'In Progress', 'review complete':'In Progress',
+  'waiting for approval':'Waiting For Approval',
+  'revision level 1':'Waiting For Approval',
+  'revision level 2':'Waiting For Approval',
+  'done':'Completed', 'available':'Completed',
+};
+const REVIEW_STATUSES = new Set(['waiting for approval','revision level 1','revision level 2']);
+const ATTR_LS_KEY = 'fibtmp_attribution_v1';
+
+const _ATTR = {
+  mode: 'accountable',
+  types: null,                 // null = every issue type; else Set of type names
+  statusMap: {...DEFAULT_STATUS_MAP},
+  load(){
+    try {
+      const raw = localStorage.getItem(ATTR_LS_KEY);
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      if (c.mode && ATTR_MODES[c.mode]) _ATTR.mode = c.mode;
+      if (Array.isArray(c.types)) _ATTR.types = c.types.length ? new Set(c.types) : null;
+      if (c.statusMap && typeof c.statusMap === 'object'){
+        // Merge over defaults so a status added in Jira later still gets a sane
+        // bucket instead of vanishing because an old saved map didn't list it.
+        _ATTR.statusMap = {...DEFAULT_STATUS_MAP, ...c.statusMap};
+      }
+    } catch(e){ console.warn('[attr] could not read saved config', e); }
+  },
+  save(){
+    try {
+      localStorage.setItem(ATTR_LS_KEY, JSON.stringify({
+        mode: _ATTR.mode,
+        types: _ATTR.types ? [..._ATTR.types] : [],
+        statusMap: _ATTR.statusMap,
+      }));
+    } catch(e){ console.warn('[attr] could not save config', e); }
+  },
+  reset(){
+    _ATTR.mode = 'accountable'; _ATTR.types = null;
+    _ATTR.statusMap = {...DEFAULT_STATUS_MAP};
+    _ATTR.save();
+  },
+  isDefaultMap(){
+    const k = new Set([...Object.keys(DEFAULT_STATUS_MAP), ...Object.keys(_ATTR.statusMap)]);
+    for (const s of k) if (_ATTR.statusMap[s] !== DEFAULT_STATUS_MAP[s]) return false;
+    return true;
+  },
+};
+_ATTR.load();
+
+// ── ACCOUNTABILITY ──────────────────────────────────────────────────────────
+// Exact mirror of src/accountability.py. Both must agree, or the live 10s
+// refresh would silently disagree with the numbers baked into the page.
+//
+// customfield_10520 ("Involved Users") is deliberately NOT part of this chain —
+// being involved in a task does not make you the person who owes the decision.
+// It is still carried through to the exports as involved_name.
+const LEVEL_FIELDS = {1:'customfield_10784', 2:'customfield_10785'};
+const APPROVALS_FIELD = 'customfield_10092';
+const LEVEL_RE = /level\s*([0-9]+)/i;
+const ROLE_LABELS = {
+  assignee:'Assignee', level1:'Level 1 Reviewer', level2:'Level 2 Reviewer', approver:'Approver',
+};
+
+const _ACC = {
+  statusNorm(issue){ return (((issue.fields||{}).status||{}).name||'').trim().toLowerCase(); },
+  isDone(issue){
+    const st = (issue.fields||{}).status || {};
+    if ((st.name||'').trim().toLowerCase() === 'available') return true;
+    return ((st.statusCategory||{}).key) === 'done';
+  },
+  // Bucket from a status NAME + an explicit done flag, so this works both on raw
+  // Jira issues and on the stored per-issue records the baked page carries.
+  bucketOf(statusName, done, statusMap){
+    if (done) return 'Completed';
+    const n = (statusName||'').trim().toLowerCase();
+    const m = (statusMap || _ATTR.statusMap)[n];
+    if (ATTR_BUCKETS.includes(m)) return m;
+    if (n.includes('progress')) return 'In Progress';
+    if (n.includes('wait')||n.includes('approv')||n.includes('revision')||n.includes('review'))
+      return 'Waiting For Approval';
+    return 'Open';
+  },
+  bucketFor(issue, statusMap){
+    return _ACC.bucketOf(((issue.fields||{}).status||{}).name, _ACC.isDone(issue), statusMap);
+  },
+  isReviewStatus(issue, statusMap){
+    if (_ACC.isDone(issue)) return false;
+    const n = _ACC.statusNorm(issue);
+    if (REVIEW_STATUSES.has(n)) return true;
+    return (statusMap || _ATTR.statusMap)[n] === 'Waiting For Approval';
+  },
+  users(fields, fid){
+    let v = fields[fid] || [];
+    if (!Array.isArray(v)) v = [v];
+    return v.filter(u => u && u.accountId)
+            .map(u => ({id:u.accountId, name:u.displayName || 'Reviewer'}));
+  },
+  pendingApprovals(fields){
+    let v = fields[APPROVALS_FIELD] || [];
+    if (!Array.isArray(v)) v = [v];
+    const out = [];
+    for (const a of v){
+      if (!a || typeof a !== 'object') continue;
+      if ((a.finalDecision||'').trim().toLowerCase() !== 'pending') continue;
+      const m = LEVEL_RE.exec(a.name || '');
+      const level = m ? parseInt(m[1],10) : null;
+      const people = [];
+      for (const x of (a.approvers || [])){
+        // Raw Jira nests the user under .approver; the slimmed Worker shape is
+        // already the user object.
+        const u = (x && x.approver) ? x.approver : x;
+        if (u && u.accountId) people.push({id:u.accountId, name:u.displayName || 'Reviewer'});
+      }
+      if (people.length) out.push({level, people});
+    }
+    return out;
+  },
+  assignee(fields){
+    const a = fields.assignee;
+    if (a && a.accountId) return {id:a.accountId, name:a.displayName || 'Unassigned'};
+    if (a && a.displayName) return {id:'', name:a.displayName};
+    return null;
+  },
+  resolve(issue, statusMap){
+    const fields = issue.fields || {};
+    const a = _ACC.assignee(fields);
+    const aName = a ? a.name : 'Unassigned';
+    const aId   = a ? a.id : '';
+    const base = {
+      assignee:aName, assignee_id:aId, owner:aName, owner_id:aId,
+      role:'assignee', role_label:ROLE_LABELS.assignee,
+      level:null, co_owners:[], in_review:false, unresolved:false,
+    };
+    if (!_ACC.isReviewStatus(issue, statusMap)) return base;
+
+    const n = _ACC.statusNorm(issue);
+    const m = LEVEL_RE.exec(n);
+    const statusLevel = m ? parseInt(m[1],10) : null;
+    let people = [], level = statusLevel;
+
+    // 1) A pending approval names both the level and who still owes a decision.
+    const pending = _ACC.pendingApprovals(fields);
+    if (pending.length){
+      const match = statusLevel ? pending.find(p => p.level === statusLevel) : null;
+      const pick = match || pending[0];
+      level = pick.level; people = pick.people;
+    }
+    // 2) Otherwise the level implied by the status name.
+    if (!people.length && LEVEL_FIELDS[statusLevel]){
+      people = _ACC.users(fields, LEVEL_FIELDS[statusLevel]);
+      level = statusLevel;
+    }
+    // 3) "Waiting For Approval" carries no level — try L1 then L2. Gated on the
+    //    status having no level of its own: naming the Level 2 reviewer as the
+    //    "Level 1 Reviewer" would be worse than reporting it unrouted.
+    if (!people.length && statusLevel === null){
+      for (const lvl of [1,2]){
+        const found = _ACC.users(fields, LEVEL_FIELDS[lvl]);
+        if (found.length){ people = found; level = lvl; break; }
+      }
+    }
+    if (!people.length){
+      const role = statusLevel === 2 ? 'level2' : statusLevel === 1 ? 'level1' : 'approver';
+      return {...base, in_review:true, unresolved:true, level:statusLevel,
+              role, role_label:ROLE_LABELS[role]};
+    }
+    const role = level === 1 ? 'level1' : level === 2 ? 'level2' : 'approver';
+    return {
+      ...base,
+      owner: people[0].name, owner_id: people[0].id,
+      role, role_label: ROLE_LABELS[role], level,
+      co_owners: people.slice(1).map(p => p.name),
+      in_review: true, unresolved: false,
+    };
+  },
+};
+
 // ── LIVE DATA ───────────────────────────────────────────────────────────────
 // Recompute the REPORT object in-browser from fresh Jira issues, so the
 // dashboard can update WITHOUT a page reload or a GitHub rebuild. The Jira
@@ -1615,19 +1974,9 @@ const GH_PROXY = (document.querySelector('meta[name=gh-proxy]')?.content || '').
 // holds the token as a secret. This block mirrors src/calculate.py exactly so
 // the live numbers match what the weekly Python job would produce.
 const _LIVE = {
-  isDone(issue){
-    const st = (issue.fields||{}).status || {};
-    if ((st.name||'').trim().toLowerCase() === 'available') return true;
-    return ((st.statusCategory||{}).key) === 'done';
-  },
+  isDone(issue){ return _ACC.isDone(issue); },
   statusName(issue){ return ((issue.fields||{}).status||{}).name || 'Unknown'; },
-  excelCategory(issue){
-    if (_LIVE.isDone(issue)) return 'Completed';
-    const n = _LIVE.statusName(issue).toLowerCase();
-    if (n.includes('progress')) return 'In Progress';
-    if (n.includes('wait') || n.includes('approv')) return 'Waiting For Approval';
-    return 'Open';
-  },
+  excelCategory(issue){ return _ACC.bucketFor(issue); },
   isOverdue(issue){
     if (_LIVE.isDone(issue)) return false;
     const due = (issue.fields||{}).duedate;
@@ -1686,12 +2035,14 @@ const _LIVE = {
       return (approvers[0] && approvers[0].approver) ? approvers[0].approver : {};
     };
     const involved = _firstUser(f.customfield_10520) || _firstApprover(f.customfield_10092);
+    const acc = _ACC.resolve(issue);
     return {
       key: issue.key||'',
       summary: (f.summary||'').slice(0,200),
       status: _LIVE.statusName(issue),
       status_from: lastStatus ? lastStatus.from : null,
       category: _LIVE.excelCategory(issue),
+      done: _ACC.isDone(issue),
       due: f.duedate,
       overdue: _LIVE.isOverdue(issue),
       changed, events,
@@ -1699,40 +2050,25 @@ const _LIVE = {
       is_subtask: !!issuetype.subtask,
       assignee_id: assignee.accountId||'',
       assignee_email: assignee.emailAddress||'',
-      assignee_name: assignee.displayName||assignee.name||'',
+      assignee_name: acc.assignee,
       rev1_name: rev1.displayName||rev1.name||'',
       rev2_name: rev2.displayName||rev2.name||'',
       involved_name: involved.displayName||involved.name||'',
+      // Accountability — both attributions travel with the record so the view
+      // can be re-grouped without another Jira round-trip.
+      accountable:     acc.owner,
+      accountable_id:  acc.owner_id,
+      acc_role:        acc.role,
+      acc_role_label:  acc.role_label,
+      pending_level:   acc.level,
+      co_reviewers:    acc.co_owners,
+      in_review:       acc.in_review,
+      reviewer_unresolved: acc.unresolved,
     };
   },
-  computeRates(issues, hiddenSet){
-    const hidden = hiddenSet || new Set();
-    const counts = {};
-    for (const issue of issues){
-      const name = _LIVE.assigneeName(issue);
-      const cat  = _LIVE.excelCategory(issue);
-      const sname = _LIVE.statusName(issue);
-      if (!counts[name]) counts[name] = {total:0,completed:0,open:0,in_progress:0,waiting_for_approval:0,overdue:0,statuses:{},issues:[]};
-      const c = counts[name];
-      c.issues.push(_LIVE.issueRecord(issue));
-      c.total++;
-      if (cat==='Completed') c.completed++;
-      else if (cat==='In Progress') c.in_progress++;
-      else if (cat==='Waiting For Approval') c.waiting_for_approval++;
-      else c.open++;
-      if (_LIVE.isOverdue(issue)) c.overdue++;
-      c.statuses[sname] = (c.statuses[sname]||0)+1;
-    }
-    const people = {};
-    let grandTotal=0, grandDone=0;
-    for (const [name,c] of Object.entries(counts)){
-      const pct = c.total ? Math.round(1000*c.completed/c.total)/10 : 0;
-      people[name] = {total:c.total,open:c.open,in_progress:c.in_progress,waiting_for_approval:c.waiting_for_approval,overdue:c.overdue,completed:c.completed,pct,done:c.completed,statuses:c.statuses,issues:c.issues,hidden:hidden.has(name)};
-      if (!hidden.has(name)){ grandTotal+=c.total; grandDone+=c.completed; }
-    }
-    const teamPct = grandTotal ? Math.round(1000*grandDone/grandTotal)/10 : 0;
-    return {people, teamPct, grandTotal, grandDone};
-  },
+  // Flat, unfiltered record list. Grouping/bucketing is done by regroupReport()
+  // so the baked page and the live refresh share one code path.
+  records(issues){ return issues.map(i => _LIVE.issueRecord(i)); },
   parsePrev(v){
     if (v===null||v===undefined) return null;
     if (typeof v === 'object') return v;
@@ -1767,56 +2103,339 @@ const _LIVE = {
   // do NOT save a history snapshot here — the weekly job owns the canonical
   // history; live recompute only reads it to draw week-over-week deltas.
   buildReport(issues, history, hiddenSet, jiraBaseUrl){
-    const {people, teamPct, grandTotal, grandDone} = _LIVE.computeRates(issues, hiddenSet);
     const now = new Date();
-    const today = now.toISOString().slice(0,10);
-    const lastSnap = _LIVE.findBaseline(history, today);
-    const lastPeople = lastSnap ? (lastSnap.people||{}) : {};
-    let lastTeam = null;
-    if (lastSnap){
-      let tot=0, done=0;
-      for (const [n,p] of Object.entries(lastPeople)){
-        if (hiddenSet && hiddenSet.has(n)) continue;
-        if (p && typeof p === 'object'){
-          tot += p.total||0;
-          done += (p.done!=null ? p.done : (p.completed||0));
-        }
-      }
-      lastTeam = tot ? Math.round(1000*done/tot)/10 : null;
-    }
-    const rows = [];
-    for (const name of Object.keys(people).sort((a,b)=>a.toLowerCase()<b.toLowerCase()?-1:1)){
-      const t = people[name];
-      const prev = _LIVE.parsePrev(lastPeople[name]);
-      const delta = prev!=null ? Math.round((t.pct - prev.pct)*10)/10 : null;
-      const lp = (k,def=0)=> prev==null ? def : (prev[k]!=null?prev[k]:def);
-      rows.push({
-        owner:name,
-        total:t.total, open:t.open, in_progress:t.in_progress,
-        waiting_for_approval:t.waiting_for_approval, overdue:t.overdue,
-        completed:t.completed, this_week:t.pct,
-        last_week: prev?prev.pct:null,
-        last_total:lp('total'), last_open:lp('open'), last_in_progress:lp('in_progress'),
-        last_wfa:lp('waiting_for_approval'), last_overdue:lp('overdue'), last_completed:lp('completed'),
-        delta, done:t.completed, statuses:t.statuses, issues:t.issues,
-        hidden:t.hidden, last_statuses: prev?(prev.statuses||{}):{},
-      });
-    }
-    const teamDelta = lastTeam!=null ? Math.round((teamPct-lastTeam)*10)/10 : null;
-    return {
-      date: today,
+    // Did the Worker actually send the approval-routing fields? A Worker
+    // deployed before those fields were added returns none of them, which would
+    // make every in-review task look like "no reviewer configured in Jira" —
+    // alarming and wrong. Detect it so the UI can say what's really going on.
+    const accFieldsPresent = issues.some(i => {
+      const f = i.fields || {};
+      return !!(f[LEVEL_FIELDS[1]] || f[LEVEL_FIELDS[2]] || f[APPROVALS_FIELD]);
+    });
+    return regroupReport({
+      date: now.toISOString().slice(0,10),
       timestamp: now.toISOString(),
       jira_base_url: jiraBaseUrl || (typeof REPORT!=='undefined' && REPORT && REPORT.jira_base_url) || 'https://fibtask.atlassian.net',
-      last_snap_date: lastSnap?lastSnap.date:null,
-      last_snap_time: lastSnap?(lastSnap.timestamp||null):null,
-      team_total: teamPct, team_last_week: lastTeam, team_delta: teamDelta,
-      grand_total: grandTotal, grand_done: grandDone,
-      rows, has_previous: lastSnap!=null,
       is_today_weekly: now.getUTCDay()===3,
       history: history||[],
-    };
+      records: _LIVE.records(issues),
+      acc_fields_present: accFieldsPresent,
+    }, hiddenSet);
   },
 };
+
+// ── REGROUPING ──────────────────────────────────────────────────────────────
+// The single place that turns a flat list of issue records into the REPORT the
+// page renders. Both the baked page and the live 10s refresh go through here,
+// so switching attribution mode is instant (no Jira round-trip) and the two
+// paths can never drift apart.
+//
+// `base.records` is the full, unfiltered record list. Everything else — mode,
+// issue-type scope, status mapping — is applied here from _ATTR.
+function regroupReport(base, hiddenSet){
+  const hidden = hiddenSet || new Set();
+  const mode   = _ATTR.mode;
+  const smap   = _ATTR.statusMap;
+  const types  = _ATTR.types;
+
+  const counts = {};
+  let scoped = 0, outOfScope = 0;
+  for (const rec of (base.records || [])){
+    if (types && rec.type && !types.has(rec.type)){ outOfScope++; continue; }
+    // Reviewer mode looks only at work actually sitting in a review queue.
+    if (mode === 'reviewer' && !rec.in_review) continue;
+    const name = (mode === 'assignee') ? (rec.assignee_name || 'Unassigned')
+                                       : (rec.accountable   || 'Unassigned');
+    scoped++;
+    const cat = _ACC.bucketOf(rec.status, rec.done, smap);
+    if (!counts[name]) counts[name] = {
+      total:0, completed:0, open:0, in_progress:0, waiting_for_approval:0,
+      overdue:0, overdue_delivery:0, overdue_review:0, in_review:0,
+      reviewer_unresolved:0, statuses:{}, issues:[],
+    };
+    const c = counts[name];
+    c.issues.push(rec);
+    c.total++;
+    if (cat==='Completed') c.completed++;
+    else if (cat==='In Progress') c.in_progress++;
+    else if (cat==='Waiting For Approval') c.waiting_for_approval++;
+    else c.open++;
+    if (rec.overdue){
+      c.overdue++;
+      if (rec.in_review) c.overdue_review++; else c.overdue_delivery++;
+    }
+    if (rec.in_review) c.in_review++;
+    if (rec.reviewer_unresolved) c.reviewer_unresolved++;
+    c.statuses[rec.status] = (c.statuses[rec.status]||0)+1;
+  }
+
+  const people = {};
+  let grandTotal=0, grandDone=0;
+  for (const [name,c] of Object.entries(counts)){
+    const pct = c.total ? Math.round(1000*c.completed/c.total)/10 : 0;
+    people[name] = {...c, pct, done:c.completed, hidden:hidden.has(name)};
+    if (!hidden.has(name)){ grandTotal+=c.total; grandDone+=c.completed; }
+  }
+  const teamPct = grandTotal ? Math.round(1000*grandDone/grandTotal)/10 : 0;
+
+  // Baseline: compare like with like. Snapshots written by this version carry a
+  // series per mode; older ones only have the assignee-mode `people`. When the
+  // matching series is missing we show NO delta rather than a confidently wrong
+  // one computed against differently-attributed numbers.
+  const today    = base.date;
+  const lastSnap = _LIVE.findBaseline(base.history, today);
+  const snapPeople = _snapshotPeople(lastSnap, mode);
+  const modeGap  = !!lastSnap && snapPeople === null;
+  const lastPeople = snapPeople || {};
+
+  let lastTeam = null;
+  if (lastSnap && !modeGap){
+    let tot=0, done=0;
+    for (const [n,p] of Object.entries(lastPeople)){
+      if (hidden.has(n)) continue;
+      if (p && typeof p === 'object'){
+        tot  += p.total||0;
+        done += (p.done!=null ? p.done : (p.completed||0));
+      }
+    }
+    lastTeam = tot ? Math.round(1000*done/tot)/10 : null;
+  }
+
+  const rows = [];
+  for (const name of Object.keys(people).sort((a,b)=>a.toLowerCase()<b.toLowerCase()?-1:1)){
+    const t = people[name];
+    const prev = _LIVE.parsePrev(lastPeople[name]);
+    const delta = prev!=null ? Math.round((t.pct - prev.pct)*10)/10 : null;
+    const lp = (k,def=0)=> prev==null ? def : (prev[k]!=null?prev[k]:def);
+    rows.push({
+      owner:name,
+      total:t.total, open:t.open, in_progress:t.in_progress,
+      waiting_for_approval:t.waiting_for_approval, overdue:t.overdue,
+      overdue_delivery:t.overdue_delivery, overdue_review:t.overdue_review,
+      in_review:t.in_review, reviewer_unresolved:t.reviewer_unresolved,
+      completed:t.completed, this_week:t.pct,
+      last_week: prev?prev.pct:null,
+      last_total:lp('total'), last_open:lp('open'), last_in_progress:lp('in_progress'),
+      last_wfa:lp('waiting_for_approval'), last_overdue:lp('overdue'), last_completed:lp('completed'),
+      delta, done:t.completed, statuses:t.statuses, issues:t.issues,
+      hidden:t.hidden, last_statuses: prev?(prev.statuses||{}):{},
+    });
+  }
+
+  const teamDelta = lastTeam!=null ? Math.round((teamPct-lastTeam)*10)/10 : null;
+  return {
+    date: base.date,
+    timestamp: base.timestamp,
+    jira_base_url: base.jira_base_url,
+    last_snap_date: lastSnap?lastSnap.date:null,
+    last_snap_time: lastSnap?(lastSnap.timestamp||null):null,
+    team_total: teamPct, team_last_week: lastTeam, team_delta: teamDelta,
+    grand_total: grandTotal, grand_done: grandDone,
+    rows, has_previous: lastSnap!=null && !modeGap,
+    is_today_weekly: base.is_today_weekly,
+    history: base.history||[],
+    // Attribution context for the UI banner + Excel export.
+    records: base.records,
+    acc_fields_present: base.acc_fields_present,
+    attribution_mode: mode,
+    scoped_count: scoped,
+    out_of_scope_count: outOfScope,
+    baseline_mode_gap: modeGap,
+  };
+}
+
+// Per-person numbers from a snapshot, for a given attribution mode.
+// Returns null when the snapshot predates dual-mode history.
+function _snapshotPeople(snap, mode){
+  if (!snap) return {};
+  if (mode === 'assignee') return snap.people || {};
+  const key = (mode === 'accountable') ? 'people_acc' : 'people_rev';
+  if (key in snap) return snap[key] || {};
+  return null;
+}
+
+// The base report (flat record list + history), kept so mode switches re-group
+// instantly without another Jira fetch.
+let _BASE_REPORT = null;
+
+// Turn the report baked in at build time into a regroupable base. The Python
+// build groups rows under the DEFAULT attribution mode, so flattening every
+// row's issues yields each issue exactly once — the same flat list the live
+// path produces. Called once the encrypted payload is decrypted, before the
+// first render, so a saved non-default mode is honoured on first paint.
+function adoptBaseReport(rep){
+  if (!rep) return;
+  const records = rep.records || (rep.rows || []).flatMap(r => r.issues || []);
+  _BASE_REPORT = {
+    date: rep.date, timestamp: rep.timestamp,
+    jira_base_url: rep.jira_base_url, is_today_weekly: rep.is_today_weekly,
+    history: rep.history || [], records,
+  };
+  // Re-group without rendering — init() runs right after and draws once.
+  applyAttribution({render:false});
+}
+
+// Re-group + re-render from _BASE_REPORT under the current _ATTR settings.
+function applyAttribution(opts){
+  if (!_BASE_REPORT) return;
+  const hidden = (typeof hiddenPeople!=='undefined' && hiddenPeople && hiddenPeople.size)
+    ? hiddenPeople : new Set();
+  REPORT = regroupReport(_BASE_REPORT, hidden);
+  if (!opts || opts.render !== false) init();
+}
+
+// ── Attribution bar ─────────────────────────────────────────────────────────
+function setAttrMode(mode){
+  if (!ATTR_MODES[mode] || _ATTR.mode === mode) return;
+  _ATTR.mode = mode; _ATTR.save();
+  applyAttribution();
+  toast(`Counting tasks against: ${ATTR_MODES[mode].label}`);
+}
+
+function toggleAttrType(type){
+  const all = _attrAllTypes();
+  // null means "everything"; materialise it before removing one.
+  let sel = _ATTR.types ? new Set(_ATTR.types) : new Set(all);
+  if (sel.has(type)) sel.delete(type); else sel.add(type);
+  if (!sel.size){ toast('Keep at least one issue type in scope.'); return; }
+  _ATTR.types = (sel.size === all.length) ? null : sel;
+  _ATTR.save();
+  applyAttribution();
+}
+
+function resetAttribution(){
+  _ATTR.reset();
+  applyAttribution();
+  toast('✓ Attribution settings restored to defaults.');
+}
+
+function _attrAllTypes(){
+  const s = new Set();
+  for (const r of (_BASE_REPORT?.records || [])) if (r.type) s.add(r.type);
+  return [...s].sort();
+}
+
+// Counts per mode / per type, computed from the FULL record set so the numbers
+// on the unselected buttons preview what choosing them would show.
+function _attrCounts(){
+  const recs = _BASE_REPORT?.records || [];
+  const types = _ATTR.types;
+  const inScope = r => !types || !r.type || types.has(r.type);
+  const byType = {};
+  for (const r of recs) byType[r.type||'—'] = (byType[r.type||'—']||0)+1;
+  const scoped = recs.filter(inScope);
+  return {
+    byType,
+    people: {
+      assignee:    new Set(scoped.map(r => r.assignee_name||'Unassigned')).size,
+      accountable: new Set(scoped.map(r => r.accountable  ||'Unassigned')).size,
+      reviewer:    new Set(scoped.filter(r=>r.in_review).map(r => r.accountable||'Unassigned')).size,
+    },
+    reviewCount: scoped.filter(r => r.in_review).length,
+    movedCount:  scoped.filter(r => r.in_review && r.accountable !== r.assignee_name).length,
+    unresolved:  scoped.filter(r => r.reviewer_unresolved).length,
+    overdueReview: scoped.filter(r => r.overdue && r.in_review).length,
+  };
+}
+
+function renderAttrBar(){
+  const seg = document.getElementById('attr-mode-seg');
+  const tw  = document.getElementById('attr-types');
+  const note= document.getElementById('attr-note');
+  if (!seg || !tw || !note) return;
+  const c = _attrCounts();
+
+  // Both labels are emitted; CSS shows the short one on narrow screens, where
+  // the full names would run into each other.
+  seg.innerHTML = Object.entries(ATTR_MODES).map(([k,m]) => `
+    <button class="attr-seg-btn ${_ATTR.mode===k?'on':''}" role="tab"
+            aria-selected="${_ATTR.mode===k}" onclick="setAttrMode('${k}')"
+            title="${esc(m.desc)}"><span class="attr-full">${esc(m.label)}</span><span
+            class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span></button>
+  `).join('');
+
+  const all = _attrAllTypes();
+  tw.innerHTML = all.map(t => {
+    const on = !_ATTR.types || _ATTR.types.has(t);
+    return `<button class="attr-type ${on?'on':''}" onclick="toggleAttrType('${esc(t).replace(/'/g,"\\'")}')"
+             title="${on?'Click to exclude':'Click to include'} ${esc(t)}">${esc(t)}<span class="attr-count">${c.byType[t]||0}</span></button>`;
+  }).join('');
+
+  const dot = document.getElementById('attr-map-dot');
+  if (dot) dot.style.display = _ATTR.isDefaultMap() ? 'none' : 'inline-block';
+
+  // The note explains, in plain words, what the current selection is doing —
+  // and flags anything the reader should not silently trust.
+  const bits = [];
+  if (_ATTR.mode === 'accountable'){
+    bits.push(`<strong>${c.movedCount}</strong> task${c.movedCount===1?'':'s'} currently in review ${c.movedCount===1?'is':'are'} counted against the reviewer holding ${c.movedCount===1?'it':'them'}, not the assignee.`);
+    if (c.overdueReview) bits.push(`<span class="attr-warn">${c.overdueReview} overdue item${c.overdueReview===1?'':'s'} ${c.overdueReview===1?'is':'are'} waiting on a review decision, not on delivery.</span>`);
+  } else if (_ATTR.mode === 'assignee'){
+    bits.push(`Classic view — every task counts against its assignee, including <strong>${c.reviewCount}</strong> currently parked in review.`);
+  } else {
+    bits.push(`Showing only the <strong>${c.reviewCount}</strong> task${c.reviewCount===1?'':'s'} awaiting a review decision, grouped by the reviewer who owes it.`);
+  }
+  if (_ATTR.types) bits.push(`Scope limited to ${[..._ATTR.types].join(', ')}.`);
+  // A Worker deployed before the reviewer fields were added sends none of them,
+  // which would otherwise read as "nobody has a reviewer configured". Say what
+  // is actually wrong instead of reporting a data problem that isn't there.
+  if (REPORT && REPORT.acc_fields_present === false && c.reviewCount){
+    bits.push(`<span class="attr-flag">Reviewer fields missing from the live feed</span> — the Cloudflare Worker needs redeploying (<code>cd worker &amp;&amp; npx wrangler deploy</code>). Until then in-review tasks stay with their assignee.`);
+  } else if (c.unresolved) {
+    bits.push(`<span class="attr-flag">${c.unresolved} in review with no reviewer set in Jira</span> — left with the assignee; worth fixing in Jira.`);
+  }
+  if (REPORT && REPORT.baseline_mode_gap) bits.push(`<span class="attr-warn">The baseline snapshot predates this view, so period-over-period change is hidden rather than shown wrongly.</span>`);
+  if (!_ATTR.isDefaultMap()) bits.push(`Status mapping customised.`);
+  note.innerHTML = bits.join(' ');
+}
+
+// ── Status mapping modal ────────────────────────────────────────────────────
+function openStatusMapModal(){
+  renderStatusMap();
+  openModal('smap-modal');
+}
+
+function renderStatusMap(){
+  const wrap = document.getElementById('smap-list');
+  if (!wrap) return;
+  // Every status actually present in the data, so the list matches reality
+  // rather than a hard-coded guess.
+  const counts = {};
+  for (const r of (_BASE_REPORT?.records||[])){
+    const s = r.status || 'Unknown';
+    counts[s] = (counts[s]||0)+1;
+  }
+  const names = [...new Set(Object.keys(counts))].sort((a,b)=>(counts[b]||0)-(counts[a]||0));
+  wrap.innerHTML = names.map(name => {
+    const k = name.trim().toLowerCase();
+    const cur = _ATTR.statusMap[k] || _ACC.bucketOf(name, false, {});
+    const changed = DEFAULT_STATUS_MAP[k] !== undefined && DEFAULT_STATUS_MAP[k] !== cur;
+    const isRev = REVIEW_STATUSES.has(k) || cur === 'Waiting For Approval';
+    return `<div class="smap-row">
+      <span class="smap-name">${esc(name)}${isRev?' <span class="smap-review">in review</span>':''}</span>
+      <span class="smap-count">${counts[name]||0}</span>
+      <select class="smap-sel ${changed?'changed':''}" onchange="setStatusBucket(${JSON.stringify(k).replace(/"/g,'&quot;')}, this.value)">
+        ${ATTR_BUCKETS.map(b=>`<option value="${b}" ${b===cur?'selected':''}>${b}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('') || '<p style="font-size:12.5px;color:#94a3b8">No statuses in the current data.</p>';
+}
+
+function setStatusBucket(statusKey, bucket){
+  if (!ATTR_BUCKETS.includes(bucket)) return;
+  _ATTR.statusMap[statusKey] = bucket;
+  _ATTR.save();
+  applyAttribution();
+  renderStatusMap();
+}
+
+function resetStatusMap(){
+  _ATTR.statusMap = {...DEFAULT_STATUS_MAP};
+  _ATTR.save();
+  applyAttribution();
+  renderStatusMap();
+  toast('✓ Status mapping restored to defaults.');
+}
 
 // Pull fresh issues from the Worker (read-only Jira proxy). Returns issues[].
 async function fetchLiveIssues(){
@@ -1861,6 +2480,14 @@ async function refreshLive(btn){
     const history = (typeof REPORT!=='undefined' && REPORT && REPORT.history) ? REPORT.history : [];
     const base    = (typeof REPORT!=='undefined' && REPORT && REPORT.jira_base_url) || '';
     REPORT = _LIVE.buildReport(issues, history, hidden, base);
+    // Keep the flat record list so switching attribution mode re-groups
+    // instantly instead of waiting on another Jira fetch.
+    _BASE_REPORT = {
+      date: REPORT.date, timestamp: REPORT.timestamp,
+      jira_base_url: REPORT.jira_base_url, is_today_weekly: REPORT.is_today_weekly,
+      history: REPORT.history, records: REPORT.records,
+      acc_fields_present: REPORT.acc_fields_present,
+    };
     window._LIVE_FETCHED_AT = Date.now();   // LIVE chip counts from this moment
     init();   // full re-render from the fresh REPORT (ANALYSIS stays as-is)
     toast(`✓ Live · ${issues.length} issues · team ${REPORT.team_total}%`);
@@ -2174,6 +2801,10 @@ async function checkPw(){
     err.textContent = '';
     // Then try to refresh from API for any live changes since build
     await _loadHiddenListRemote();
+    // Re-group under the saved attribution settings before the first paint, so
+    // a non-default mode is honoured immediately instead of flashing the
+    // build-time grouping and then swapping.
+    adoptBaseReport(data.report);
     unlock();
     init();
   } catch(e){
@@ -2192,6 +2823,10 @@ function playIntro(){
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  // The floating badge is for the signed-out screen; inside the app the same
+  // version lives in the footer, clear of the FAB stack in the corner.
+  const vb = document.getElementById('ver-badge');
+  if (vb) vb.style.display = 'none';
   playIntro();
 }
 // Require the password on every page load (including refresh): clear any
@@ -5043,9 +5678,15 @@ function init() {
   // Populate baseline picker
   populateBaselineSelector();
 
+  // Attribution bar — must render before the stats so the reader sees WHOSE
+  // numbers these are before reading them.
+  renderAttrBar();
+
   // stats
   const tw=REPORT.team_total, lw=REPORT.team_last_week, d=REPORT.team_delta;
   const totalOv = REPORT.rows.reduce((s,r)=>s+(r.overdue||0),0);
+  const ovReview   = REPORT.rows.reduce((s,r)=>s+(r.overdue_review||0),0);
+  const ovDelivery = REPORT.rows.reduce((s,r)=>s+(r.overdue_delivery||0),0);
   const isNew = d===null||d===undefined;
   const ds = pStyle(d,tw,isNew);
 
@@ -5068,7 +5709,8 @@ function init() {
     <div class="stat">
       <div class="lbl">Members</div>
       <div class="val val-blue">${REPORT.rows.length}</div>
-      <div class="sub">Assigned</div>
+      <div class="sub">${_ATTR.mode==='reviewer' ? 'Reviewers with a queue'
+                        : _ATTR.mode==='accountable' ? 'Currently accountable' : 'Assigned'}</div>
     </div>
     <div class="stat">
       <div class="lbl">Total Tasks</div>
@@ -5078,7 +5720,9 @@ function init() {
     ${totalOv>0?`<div class="stat">
       <div class="lbl">Overdue</div>
       <div class="val val-red">${totalOv}</div>
-      <div class="sub">Past due date</div>
+      <div class="sub">${ovReview>0
+        ? `${ovDelivery} delivery · ${ovReview} in review`
+        : 'Past due date'}</div>
     </div>`:''}
   `;
 
@@ -5895,18 +6539,97 @@ function saveSnapshotNow() {
 }
 
 // ── export Excel ───────────────────────────────────────────────────────────
+// The workbook names the person who is ACTUALLY on the hook for each task. When
+// a task sits at "Revision Level 1", the Accountable column carries that level's
+// reviewer — not the assignee — because attributing review latency to the
+// assignee is exactly the misreport this export exists to prevent. Both names
+// are always present so nothing is lost.
 function exportExcel() {
   toast('Generating Excel…');
   const s=document.createElement('script');
   s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-  s.onload=()=>{
+  const buildWorkbook=()=>{
     const wb = XLSX.utils.book_new();
-    const h1=['Owner','Total','Open','In Progress','Waiting For Approval','Overdue','Completed','Done %','Last Period %','Change'];
+    const modeLabel = (ATTR_MODES[_ATTR.mode]||{}).label || _ATTR.mode;
+    const ownerHdr  = _ATTR.mode==='assignee' ? 'Assignee' : 'Accountable';
+
+    // ── Cover — makes the workbook self-explanatory once it leaves the
+    // dashboard, so nobody has to guess how the numbers were derived.
+    const recs = (REPORT.records || REPORT.rows.flatMap(r=>r.issues||[]));
+    const inReview = recs.filter(r=>r.in_review);
+    const cover = [
+      ['FIBTMP Progress Report'],
+      [],
+      ['Report date',            REPORT.date||''],
+      ['Generated',              new Date().toLocaleString()],
+      ['Dashboard version',      (typeof SITE_VERSION!=='undefined'?SITE_VERSION:'')],
+      [],
+      ['Attribution mode',       modeLabel],
+      ['Meaning',                (ATTR_MODES[_ATTR.mode]||{}).desc || ''],
+      ['Issue types in scope',   _ATTR.types ? [..._ATTR.types].join(', ') : 'All'],
+      ['Status mapping',         _ATTR.isDefaultMap() ? 'Default' : 'Customised — see Status Mapping sheet'],
+      [],
+      ['Tasks in scope',         REPORT.grand_total||0],
+      ['Completed',              REPORT.grand_done||0],
+      ['Team completion',        (REPORT.team_total||0)+'%'],
+      ['Baseline snapshot',      REPORT.last_snap_date || 'none'],
+      ['Period-over-period',     REPORT.baseline_mode_gap
+        ? 'Not shown — the baseline snapshot predates this attribution mode'
+        : (REPORT.team_delta!=null ? (REPORT.team_delta>0?'+':'')+REPORT.team_delta+'%' : 'no baseline')],
+      [],
+      ['Currently awaiting review',      inReview.length],
+      ['…re-attributed to a reviewer',   inReview.filter(r=>r.accountable!==r.assignee_name).length],
+      ['…overdue while awaiting review', inReview.filter(r=>r.overdue).length],
+      ['…in review with NO reviewer set in Jira', recs.filter(r=>r.reviewer_unresolved).length],
+    ];
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cover),'Report Info');
+
+    const h1=[ownerHdr,'Total','Open','In Progress','Waiting For Approval','Overdue',
+              'Overdue (delivery)','Overdue (in review)','In Review','Completed',
+              'Done %','Last Period %','Change'];
     const d1=REPORT.rows.map(r=>[r.owner,r.total,r.open,r.in_progress,
-      r.waiting_for_approval,r.overdue,r.completed,r.this_week+'%',
+      r.waiting_for_approval,r.overdue,r.overdue_delivery||0,r.overdue_review||0,
+      r.in_review||0,r.completed,r.this_week+'%',
       r.last_week!==null?r.last_week+'%':'N/A',
       r.delta!==null?(r.delta>0?'+':'')+r.delta+'%':'NEW']);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([h1,...d1]),'This Week');
+
+    // ── EVERY task, with both names spelled out. This is the sheet that
+    // answers "who do I actually chase for this one?".
+    const h4=['Key','Summary','Type','Status','Reporting Column','Assignee',
+              'Accountable Now','Accountable Role','Pending Level','Co-reviewers',
+              'Involved Users','Due','Overdue','Overdue Reason','Reviewer Missing'];
+    const d4=recs.slice().sort((a,b)=>
+        (a.accountable||'').toLowerCase() < (b.accountable||'').toLowerCase() ? -1 : 1)
+      .map(r=>[
+        r.key||'', r.summary||'', r.type||'', r.status||'',
+        _ACC.bucketOf(r.status, r.done, _ATTR.statusMap),
+        r.assignee_name || '',
+        r.accountable || '',
+        r.acc_role_label || 'Assignee',
+        r.pending_level!=null ? ('Level '+r.pending_level) : '',
+        (r.co_reviewers||[]).join(', '),
+        r.involved_name || '',
+        r.due || '',
+        r.overdue ? 'Yes' : '',
+        r.overdue ? (r.in_review ? 'Awaiting review decision' : 'Delivery not complete') : '',
+        r.reviewer_unresolved ? 'Yes — no reviewer set in Jira' : '',
+      ]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([h4,...d4]),'Tasks');
+
+    // ── The review bottleneck — who is holding work up, and for what.
+    if (inReview.length){
+      const h5=['Reviewer','Role','Level','Tasks Awaiting','Overdue','Keys'];
+      const by={};
+      for (const r of inReview){
+        const k=r.accountable||'Unassigned';
+        if(!by[k]) by[k]={role:r.acc_role_label||'',lvl:r.pending_level,n:0,ov:0,keys:[]};
+        by[k].n++; if(r.overdue) by[k].ov++; by[k].keys.push(r.key);
+      }
+      const d5=Object.entries(by).sort((a,b)=>b[1].n-a[1].n)
+        .map(([n,v])=>[n,v.role,v.lvl!=null?('Level '+v.lvl):'',v.n,v.ov,v.keys.join(', ')]);
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([h5,...d5]),'Review Bottlenecks');
+    }
 
     const h2=['Owner','Total','Open','In Progress','Waiting For Approval','Overdue','Completed','Done %'];
     const d2=REPORT.rows.filter(r=>r.last_week!==null).map(r=>[
@@ -5924,17 +6647,36 @@ function exportExcel() {
     });
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([h3,...d3]),'Changes');
 
+    // History uses the series matching the selected mode, so the trend and the
+    // rest of the workbook are on one consistent basis.
     const hist=REPORT.history||[];
     if(hist.length){
-      const pp=[...new Set(hist.flatMap(s=>Object.keys(s.people||{})))].sort();
+      const seriesOf = s => _snapshotPeople(s, _ATTR.mode) || {};
+      const pp=[...new Set(hist.flatMap(s=>Object.keys(seriesOf(s))))].sort();
       const hh=['Date','Team %',...pp];
-      const dh=hist.slice().reverse().map(s=>[s.date,s.team_total+'%',
-        ...pp.map(p=>{const v=(s.people||{})[p];return v===undefined?'':(typeof v==='object'?v.pct+'%':v+'%');})]);
+      const dh=hist.slice().reverse().map(s=>{
+        const ser=seriesOf(s);
+        return [s.date, (s.team_total!=null?s.team_total+'%':''),
+          ...pp.map(p=>{const v=ser[p];return v===undefined?'':(typeof v==='object'?v.pct+'%':v+'%');})];
+      });
       XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hh,...dh]),'History');
     }
-    XLSX.writeFile(wb,`progress-${REPORT.date}.xlsx`);
+
+    if (!_ATTR.isDefaultMap()){
+      const hm=['Jira Status','Reporting Column','Default'];
+      const keys=[...new Set([...Object.keys(DEFAULT_STATUS_MAP),...Object.keys(_ATTR.statusMap)])].sort();
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([hm,
+        ...keys.map(k=>[k,_ATTR.statusMap[k]||'',DEFAULT_STATUS_MAP[k]||''])]),'Status Mapping');
+    }
+
+    XLSX.writeFile(wb,`progress-${REPORT.date}-${_ATTR.mode}.xlsx`);
     toast('✓ Excel downloaded.');
   };
+  // Only fetch the library when it isn't already loaded. Re-appending the
+  // script on every export made a second export depend on the CDN answering
+  // again — and fail silently when it didn't.
+  if (window.XLSX) { buildWorkbook(); return; }
+  s.onload = buildWorkbook;
   s.onerror=()=>toast('Failed to load XLSX library.');
   document.head.appendChild(s);
 }
@@ -8385,6 +9127,38 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ── Site version ───────────────────────────────────────────────────────────
+# Bump MINOR for a feature, PATCH for a fix. Rendered on the sign-in screen
+# (outside the password gate) so which build is live can be confirmed without
+# logging in, and again in the footer + the Excel cover sheet.
+#
+#   2.1.0  Owner attribution by review level: tasks at "Revision Level 1/2" are
+#          counted against that level's reviewer instead of the assignee;
+#          attribution-mode selector, configurable status mapping, overdue split
+#          into delivery vs. review, and Excel naming the accountable person.
+SITE_VERSION = "2.1.0"
+
+
+def _build_stamp():
+    """(build_time, build_date, short_commit) for the version badge."""
+    from datetime import datetime as _dt, timezone as _tz
+    now = _dt.now(_tz.utc)
+    commit = (os.environ.get("GITHUB_SHA", "") or "")[:7]
+    if not commit:
+        try:
+            import subprocess
+            commit = subprocess.run(
+                ["git", "rev-parse", "--short=7", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            ).stdout.strip()
+        except Exception:
+            commit = ""
+    return (now.strftime("%Y-%m-%d %H:%M UTC"),
+            now.strftime("%Y-%m-%d"),
+            commit or "local")
+
+
 def build(report, analysis, hidden_people=None):
     pw_hash  = os.environ.get("SITE_PASSWORD_HASH", "")
     password = os.environ.get("SITE_PASSWORD", "")
@@ -8424,11 +9198,17 @@ def build(report, analysis, hidden_people=None):
     enc_blob = encrypt_payload(payload, password)
     enc_blob_json = json.dumps(enc_blob)
 
+    build_time, build_date, commit = _build_stamp()
+
     index = (_INDEX
              .replace("__REPO__",     repo)
              .replace("__ENC_BLOB__", enc_blob_json)
              .replace("__DELETE_HASH__", delete_hash)
              .replace("__GH_PROXY__",  proxy_url)
+             .replace("__VERSION__",   SITE_VERSION)
+             .replace("__BUILD_TIME__", build_time)
+             .replace("__BUILD_DATE__", build_date)
+             .replace("__COMMIT__",    commit)
              .replace("__DATE__",     report.get("date", "")))
 
     # Admin gets a smaller encrypted blob containing only the PAT
@@ -8436,6 +9216,10 @@ def build(report, analysis, hidden_people=None):
     admin = (_ADMIN
              .replace("__ENC_BLOB__", json.dumps(admin_blob))
              .replace("__GH_PROXY__",  proxy_url)
+             .replace("__VERSION__",   SITE_VERSION)
+             .replace("__BUILD_TIME__", build_time)
+             .replace("__BUILD_DATE__", build_date)
+             .replace("__COMMIT__",    commit)
              .replace("__REPO__",     repo))
 
     os.makedirs(DOCS_DIR, exist_ok=True)

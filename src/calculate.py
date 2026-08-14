@@ -5,12 +5,25 @@ Produces per-person stats matching the Excel layout:
 
 "Overdue" = not-Done + past due date (cross-cutting; overlaps with Open/IP/WFA).
 "Available" status is treated as Completed.
+
+Attribution: an issue at "Revision Level 1/2" is counted against that level's
+reviewer, not the assignee — see accountability.py. The dashboard can re-group
+client-side into any mode, so this module bakes BOTH series into every history
+snapshot (`people` = assignee mode, `people_acc` = accountable mode) and picks
+the matching one when computing week-over-week deltas.
 """
 
 import os
 import sys
 import json
 from datetime import datetime, timezone, timedelta
+
+from accountability import (
+    resolve_accountable, owner_for_mode, bucket_for,
+    DEFAULT_STATUS_BUCKETS,
+    MODE_ASSIGNEE, MODE_ACCOUNTABLE, MODE_REVIEWER,
+    BUCKET_COMPLETED, BUCKET_PROGRESS, BUCKET_WFA,
+)
 
 HISTORY_PATH  = os.path.join(os.path.dirname(__file__), "..", "data", "history.json")
 SCHEDULE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "schedule.json")
@@ -51,16 +64,15 @@ def get_status_name(issue) -> str:
     return (issue.get("fields", {}).get("status") or {}).get("name") or "Unknown"
 
 
-def get_excel_category(issue) -> str:
-    """Map any Jira status → one of: Open | In Progress | Waiting For Approval | Completed"""
-    if is_done(issue):
-        return "Completed"
-    name = get_status_name(issue).lower()
-    if "progress" in name:
-        return "In Progress"
-    if "wait" in name or "approv" in name:
-        return "Waiting For Approval"
-    return "Open"
+def get_excel_category(issue, status_map=None) -> str:
+    """Map any Jira status → one of: Open | In Progress | Waiting For Approval | Completed
+
+    NOTE: "Revision Level 1"/"Revision Level 2" now land in Waiting For Approval.
+    The previous rule tested only "wait"/"approv", which matches neither, so
+    every task parked in review fell through to Open and overstated it.
+    The dashboard exposes this mapping in a Status Mapping panel.
+    """
+    return bucket_for(issue, status_map)
 
 
 def is_overdue(issue) -> bool:
@@ -118,9 +130,10 @@ def _extract_events(issue, max_age_days: int = 30) -> list:
     return out[:20]   # cap per issue
 
 
-def issue_link_record(issue) -> dict:
+def issue_link_record(issue, status_map=None) -> dict:
     f = issue.get("fields", {}) or {}
     events = _extract_events(issue)
+    acc = resolve_accountable(issue, status_map)
     last_status_event = next((e for e in events if e["field"] == "status"), None)
     changed = (last_status_event["when"] if last_status_event
                else f.get("statuscategorychangedate") or f.get("updated"))
@@ -193,7 +206,11 @@ def issue_link_record(issue) -> dict:
         "summary":     (f.get("summary") or "")[:200],
         "status":      get_status_name(issue),
         "status_from": status_from,
-        "category":    get_excel_category(issue),
+        "category":    get_excel_category(issue, status_map),
+        # Explicit done flag: the browser re-buckets issues when the admin edits
+        # the Status Mapping, and done-ness comes from Jira's status CATEGORY,
+        # which isn't recoverable from the status name alone.
+        "done":        is_done(issue),
         "due":         f.get("duedate"),
         "overdue":     is_overdue(issue),
         "changed":     changed,
@@ -205,18 +222,49 @@ def issue_link_record(issue) -> dict:
         # ✅ REVIEWER NAMES - FIXED
         "rev1_name": rev1_direct,  # Level 1 Reviewer
         "rev2_name": rev2_direct,  # Level 2 Reviewer
+        # "Involved Users" (customfield_10520) — participants, not approvers.
+        # Carried through for the exports; NOT used to decide accountability.
+        "involved_name": _first_display_name(f.get("customfield_10520")),
+        # ── Accountability ────────────────────────────────────────────────
+        # Who the task is *assigned* to vs. who must act on it *right now*.
+        # Both travel with the record so the browser can re-group into any
+        # attribution mode without another Jira round-trip.
+        "assignee_name":   acc["assignee"],
+        "accountable":     acc["owner"],
+        "accountable_id":  acc["owner_id"],
+        "acc_role":        acc["role"],
+        "acc_role_label":  acc["role_label"],
+        "pending_level":   acc["level"],
+        "co_reviewers":    acc["co_owners"],
+        "in_review":       acc["in_review"],
+        # In review but Jira has no reviewer configured — a routing gap the
+        # dashboard surfaces rather than silently blaming the assignee for.
+        "reviewer_unresolved": acc["unresolved"],
     }
 
 # ── main aggregation ───────────────────────────────────────────────────────
-def compute_rates(issues, hidden_people=None):
-    """Aggregate issues per assignee. ALL people are returned so the client
+def compute_rates(issues, hidden_people=None, mode=MODE_ACCOUNTABLE, status_map=None):
+    """Aggregate issues per person. ALL people are returned so the client
     can toggle hide/unhide freely; team totals are computed from the
-    NON-hidden subset only so AI + headline stats exclude them."""
+    NON-hidden subset only so AI + headline stats exclude them.
+
+    `mode` decides who each issue counts against:
+      assignee     — classic; always the assignee
+      accountable  — default; the reviewer while the task sits in review
+      reviewer     — only in-review work, grouped by the reviewer holding it
+
+    Each issue counts exactly ONCE (the primary reviewer carries it, with any
+    co-reviewers listed but not counted), so per-person totals always sum to the
+    team total and completion %% stays meaningful.
+    """
     hidden = set(hidden_people or [])
     counts = {}
     for issue in issues:
-        name = assignee_name(issue)
-        cat  = get_excel_category(issue)
+        acc  = resolve_accountable(issue, status_map)
+        name = owner_for_mode(acc, mode)
+        if name is None:            # reviewer mode: not in review → out of scope
+            continue
+        cat  = get_excel_category(issue, status_map)
         sname = get_status_name(issue)
         over  = is_overdue(issue)
 
@@ -225,15 +273,27 @@ def compute_rates(issues, hidden_people=None):
                 "total": 0, "completed": 0, "open": 0,
                 "in_progress": 0, "waiting_for_approval": 0,
                 "overdue": 0, "statuses": {}, "issues": [],
+                # Overdue split by WHY it is late: work not delivered vs. a
+                # review decision not made. Same task, very different follow-up.
+                "overdue_delivery": 0, "overdue_review": 0,
+                "in_review": 0, "reviewer_unresolved": 0,
             }
-        counts[name]["issues"].append(issue_link_record(issue))
+        counts[name]["issues"].append(issue_link_record(issue, status_map))
         counts[name]["total"] += 1
-        if   cat == "Completed":           counts[name]["completed"] += 1
-        elif cat == "In Progress":         counts[name]["in_progress"] += 1
-        elif cat == "Waiting For Approval": counts[name]["waiting_for_approval"] += 1
-        else:                              counts[name]["open"] += 1
+        if   cat == BUCKET_COMPLETED: counts[name]["completed"] += 1
+        elif cat == BUCKET_PROGRESS:  counts[name]["in_progress"] += 1
+        elif cat == BUCKET_WFA:       counts[name]["waiting_for_approval"] += 1
+        else:                         counts[name]["open"] += 1
         if over:
             counts[name]["overdue"] += 1
+            if acc["in_review"]:
+                counts[name]["overdue_review"] += 1
+            else:
+                counts[name]["overdue_delivery"] += 1
+        if acc["in_review"]:
+            counts[name]["in_review"] += 1
+        if acc["unresolved"]:
+            counts[name]["reviewer_unresolved"] += 1
         counts[name]["statuses"][sname] = counts[name]["statuses"].get(sname, 0) + 1
 
     people = {}
@@ -246,6 +306,10 @@ def compute_rates(issues, hidden_people=None):
             "in_progress": c["in_progress"],
             "waiting_for_approval": c["waiting_for_approval"],
             "overdue": c["overdue"],
+            "overdue_delivery": c["overdue_delivery"],
+            "overdue_review": c["overdue_review"],
+            "in_review": c["in_review"],
+            "reviewer_unresolved": c["reviewer_unresolved"],
             "completed": c["completed"],
             "pct": pct,
             "done": c["completed"],   # legacy alias
@@ -341,22 +405,47 @@ def _find_baseline(history, today_str):
     return prior[-1]
 
 
+def _snapshot_people(snap, mode):
+    """Per-person numbers from a history snapshot, for the given attribution mode.
+
+    Snapshots written from this version carry a series per mode. Older snapshots
+    have only the assignee-mode `people` — for those we return None in another
+    mode rather than comparing against numbers computed a different way, so a
+    delta is shown as "new" instead of a confidently wrong figure.
+    """
+    if not snap:
+        return {}
+    if mode == MODE_ASSIGNEE:
+        return snap.get("people") or {}
+    key = "people_acc" if mode == MODE_ACCOUNTABLE else "people_rev"
+    if key in snap:
+        return snap.get(key) or {}
+    return None          # snapshot predates dual-mode history
+
+
 # ── report builder ─────────────────────────────────────────────────────────
-def build_report(issues, save_history=True, hidden_people=None):
-    people, team_pct, grand_total, grand_done = compute_rates(issues, hidden_people)
+def build_report(issues, save_history=True, hidden_people=None,
+                 mode=MODE_ACCOUNTABLE, status_map=None):
+    people, team_pct, grand_total, grand_done = compute_rates(
+        issues, hidden_people, mode, status_map)
     history = load_history()
 
     now_utc = datetime.now(timezone.utc)
     today   = now_utc.strftime("%Y-%m-%d")
 
     last_snap    = _find_baseline(history, today)
-    last_people  = last_snap["people"] if last_snap else {}
+    # Compare like with like: pull the baseline series computed under the SAME
+    # attribution mode. None means the snapshot predates dual-mode history.
+    last_people  = _snapshot_people(last_snap, mode)
+    baseline_mode_gap = last_snap is not None and last_people is None
+    if last_people is None:
+        last_people = {}
     # Recompute baseline team_total from the baseline's people excluding
     # currently-hidden members. The stored snap["team_total"] is frozen with
     # whatever hidden list was active at SAVE time, which makes the delta
     # against today's (current-hidden-list) value misleading.
     last_team = None
-    if last_snap:
+    if last_snap and last_people:
         hidden_set = set(hidden_people or [])
         tot = done = 0
         for n, p in last_people.items():
@@ -385,6 +474,12 @@ def build_report(issues, save_history=True, hidden_people=None):
             "in_progress":        this["in_progress"],
             "waiting_for_approval": this["waiting_for_approval"],
             "overdue":            this["overdue"],
+            # Why the overdue items are late: undelivered work vs. an unmade
+            # review decision. Drives the split shown in the Overdue panel.
+            "overdue_delivery":   this["overdue_delivery"],
+            "overdue_review":     this["overdue_review"],
+            "in_review":          this["in_review"],
+            "reviewer_unresolved": this["reviewer_unresolved"],
             "completed":          this["completed"],
             "this_week":          this["pct"],
             # Last week (baseline = most recent prior Wednesday, fallback most recent prior)
@@ -429,6 +524,11 @@ def build_report(issues, save_history=True, hidden_people=None):
         "has_previous":     last_snap is not None,
         "is_today_weekly":  mark_weekly,
         "history":          history,
+        # Attribution context, so the page can label what it is showing and warn
+        # when a baseline cannot be compared like-for-like.
+        "attribution_mode":  mode,
+        "status_map":        status_map or DEFAULT_STATUS_BUCKETS,
+        "baseline_mode_gap": baseline_mode_gap,
     }
 
     # ── History saving ──────────────────────────────────────────────
@@ -436,25 +536,49 @@ def build_report(issues, save_history=True, hidden_people=None):
     # Wednesdays get tagged is_weekly=true so they're the canonical baseline.
     # If today's date already in history, REPLACE it (no duplicates per day).
     if save_history:
+        def _series(pp):
+            return {
+                n: {
+                    "pct":   pp[n]["pct"],
+                    "done":  pp[n]["completed"],
+                    "total": pp[n]["total"],
+                    "open":  pp[n]["open"],
+                    "in_progress":         pp[n]["in_progress"],
+                    "waiting_for_approval": pp[n]["waiting_for_approval"],
+                    "overdue":   pp[n]["overdue"],
+                    "overdue_delivery": pp[n].get("overdue_delivery", 0),
+                    "overdue_review":   pp[n].get("overdue_review", 0),
+                    "in_review":        pp[n].get("in_review", 0),
+                    "completed": pp[n]["completed"],
+                    "statuses":  pp[n]["statuses"],
+                }
+                for n in pp
+            }
+
+        # Snapshot EVERY attribution mode, not just the active one. The mode is
+        # a per-user client-side choice, so a snapshot written under one mode
+        # must still yield an honest week-over-week delta under another. Storing
+        # all three costs a little space and removes the whole class of
+        # apples-to-oranges comparison bugs.
+        assignee_people, assignee_team, _, _ = compute_rates(
+            issues, hidden_people, MODE_ASSIGNEE, status_map)
+        reviewer_people, _, _, _ = compute_rates(
+            issues, hidden_people, MODE_REVIEWER, status_map)
+        acc_people = (people if mode == MODE_ACCOUNTABLE else
+                      compute_rates(issues, hidden_people, MODE_ACCOUNTABLE, status_map)[0])
+
         snapshot = {
             "date":       today,
             "timestamp":  now_utc.isoformat(timespec="seconds"),
-            "team_total": team_pct,
+            # team_total stays the assignee-mode figure so the existing History
+            # tab and every previously saved snapshot remain on one comparable
+            # scale. Mode-specific team %s are derived from the series below.
+            "team_total": assignee_team,
             "is_weekly":  mark_weekly,
-            "people": {
-                n: {
-                    "pct":   people[n]["pct"],
-                    "done":  people[n]["completed"],
-                    "total": people[n]["total"],
-                    "open":  people[n]["open"],
-                    "in_progress":         people[n]["in_progress"],
-                    "waiting_for_approval": people[n]["waiting_for_approval"],
-                    "overdue":   people[n]["overdue"],
-                    "completed": people[n]["completed"],
-                    "statuses":  people[n]["statuses"],
-                }
-                for n in people
-            },
+            "snapshot_mode": mode,
+            "people":     _series(assignee_people),   # classic (assignee)
+            "people_acc": _series(acc_people),        # accountable-now
+            "people_rev": _series(reviewer_people),   # reviewer workload
         }
         # Remove existing entry for today (in case of multiple runs same day)
         history = [s for s in history if s.get("date") != today]

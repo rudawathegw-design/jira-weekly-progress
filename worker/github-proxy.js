@@ -21,6 +21,89 @@
 
 const GH = "https://api.github.com";
 
+// ── Approval-routing fields ────────────────────────────────────────────────
+// Who is ACTUALLY accountable for an issue right now. Once a task moves to
+// "Revision Level 1/2" the assignee has handed off, and the person who must act
+// is that level's reviewer. Mirrors src/fetch_jira.py + src/accountability.py.
+// customfield_10520 ("Involved Users") is a participant list, not an approver —
+// carried through for the exports but never used to decide accountability.
+const LEVEL_FIELDS = { 1: "customfield_10784", 2: "customfield_10785" };
+const APPROVALS_FIELD = "customfield_10092";
+const INVOLVED_FIELD = "customfield_10520";
+const JIRA_BASE_FIELDS =
+  "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated";
+const JIRA_LIVE_FIELDS =
+  `${JIRA_BASE_FIELDS},${LEVEL_FIELDS[1]},${LEVEL_FIELDS[2]},${APPROVALS_FIELD},${INVOLVED_FIELD}`;
+
+// Keep only the user identity we actually render. Jira inlines four avatar URLs
+// (~400 bytes) per user reference; on a 465-issue project that alone is most of
+// the payload. Dropping them makes the live response SMALLER than it was before
+// the approval fields were added, which matters on the every-10s refresh.
+function slimUser(u) {
+  if (!u || !u.accountId) return null;
+  const out = { accountId: u.accountId, displayName: u.displayName || "" };
+  if (u.emailAddress) out.emailAddress = u.emailAddress;   // Team Directory
+  return out;
+}
+
+function slimUsers(v) {
+  if (!v) return null;
+  const arr = (Array.isArray(v) ? v : [v]).map(slimUser).filter(Boolean);
+  return arr.length ? arr : null;
+}
+
+// The sd-approvals field carries a full approver object graph per approval.
+// We need only: which level, whether it is still pending, and who owes it.
+function slimApprovals(v) {
+  if (!v) return null;
+  const arr = (Array.isArray(v) ? v : [v])
+    .map((a) => {
+      if (!a || typeof a !== "object") return null;
+      const approvers = (a.approvers || [])
+        .map((x) => slimUser(x && x.approver))
+        .filter(Boolean);
+      return {
+        name: a.name || "",
+        finalDecision: a.finalDecision || "",
+        approvers,
+      };
+    })
+    .filter(Boolean);
+  return arr.length ? arr : null;
+}
+
+// Strip a raw Jira issue down to exactly the shape the dashboard reads.
+function slimIssue(i) {
+  const f = i.fields || {};
+  const st = f.status || {};
+  const it = f.issuetype || {};
+  const out = {
+    key: i.key || "",
+    fields: {
+      summary: f.summary || "",
+      duedate: f.duedate || null,
+      updated: f.updated || null,
+      statuscategorychangedate: f.statuscategorychangedate || null,
+      assignee: slimUser(f.assignee),
+      status: {
+        name: st.name || "",
+        statusCategory: { key: ((st.statusCategory || {}).key) || "" },
+      },
+      issuetype: { name: it.name || "", subtask: !!it.subtask },
+      priority: f.priority ? { name: f.priority.name || "" } : null,
+    },
+  };
+  const l1 = slimUsers(f[LEVEL_FIELDS[1]]);
+  const l2 = slimUsers(f[LEVEL_FIELDS[2]]);
+  const ap = slimApprovals(f[APPROVALS_FIELD]);
+  const iv = slimUsers(f[INVOLVED_FIELD]);
+  if (l1) out.fields[LEVEL_FIELDS[1]] = l1;
+  if (l2) out.fields[LEVEL_FIELDS[2]] = l2;
+  if (ap) out.fields[APPROVALS_FIELD] = ap;
+  if (iv) out.fields[INVOLVED_FIELD] = iv;
+  return out;
+}
+
 function cors(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -310,7 +393,9 @@ export default {
         // changelog for the Activity Log on the published page.
         const qs = new URLSearchParams({
           jql, maxResults: "100",
-          fields: "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated",
+          // Includes the Level 1/2 Reviewer + Approvals fields so the dashboard
+          // can attribute an in-review task to its reviewer, not its assignee.
+          fields: JIRA_LIVE_FIELDS,
         });
         if (token) qs.set("nextPageToken", token);
         const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, {
@@ -321,7 +406,9 @@ export default {
           return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
         }
         const d = await jr.json();
-        issues = issues.concat(d.issues || []);
+        // Slim each page as it arrives so the accumulated array never holds the
+        // full fat payload (keeps Worker memory + CPU well inside budget).
+        issues = issues.concat((d.issues || []).map(slimIssue));
         token = d.nextPageToken;
         if (!token || d.isLast) break;
       }
