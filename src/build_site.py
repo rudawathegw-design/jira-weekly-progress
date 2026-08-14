@@ -1775,13 +1775,14 @@ const GH_PROXY = (document.querySelector('meta[name=gh-proxy]')?.content || '').
 // ── ATTRIBUTION CONFIG ──────────────────────────────────────────────────────
 // Who a task counts against, which issue types are in scope, and how each Jira
 // status rolls up. Persisted in localStorage so a refresh keeps the selection.
+// Two choices, deliberately: who the task is assigned to, and who is holding it
+// right now. (A saved "reviewer" mode from an earlier build no longer validates
+// and falls back to the default — see _ATTR.load.)
 const ATTR_MODES = {
-  assignee:    {label:'Assignee',        short:'Assignee',
-                desc:'Classic view — every task counts against the person it is assigned to.'},
-  accountable: {label:'Accountable Now', short:'Accountable',
-                desc:'Default — while a task sits at Revision Level 1/2 it counts against the reviewer holding it, not the assignee.'},
-  reviewer:    {label:'Review Queue',    short:'Reviewers',
-                desc:'Bottleneck board — only work currently awaiting a review decision, grouped by the reviewer who owes it.'},
+  assignee:    {label:'Assigned To',   short:'Assigned',
+                desc:'Every task counts against the person it is assigned to in Jira.'},
+  accountable: {label:'Current Owner', short:'Current',
+                desc:'A task at Revision Level 1/2 counts against the reviewer holding it; everything else counts against the assignee.'},
 };
 const ATTR_BUCKETS = ['Open','In Progress','Waiting For Approval','Completed'];
 // Mirrors DEFAULT_STATUS_BUCKETS in src/accountability.py. "Revision Level 1/2"
@@ -2368,12 +2369,10 @@ function renderAttrBar(){
   // and flags anything the reader should not silently trust.
   const bits = [];
   if (_ATTR.mode === 'accountable'){
-    bits.push(`<strong>${c.movedCount}</strong> task${c.movedCount===1?'':'s'} currently in review ${c.movedCount===1?'is':'are'} counted against the reviewer holding ${c.movedCount===1?'it':'them'}, not the assignee.`);
-    if (c.overdueReview) bits.push(`<span class="attr-warn">${c.overdueReview} overdue item${c.overdueReview===1?'':'s'} ${c.overdueReview===1?'is':'are'} waiting on a review decision, not on delivery.</span>`);
-  } else if (_ATTR.mode === 'assignee'){
-    bits.push(`Classic view — every task counts against its assignee, including <strong>${c.reviewCount}</strong> currently parked in review.`);
+    bits.push(`<strong>${c.movedCount}</strong> task${c.movedCount===1?'':'s'} in review counted against the reviewer holding ${c.movedCount===1?'it':'them'}.`);
+    if (c.overdueReview) bits.push(`<span class="attr-warn">${c.overdueReview} overdue ${c.overdueReview===1?'item is':'items are'} waiting on a review decision, not delivery.</span>`);
   } else {
-    bits.push(`Showing only the <strong>${c.reviewCount}</strong> task${c.reviewCount===1?'':'s'} awaiting a review decision, grouped by the reviewer who owes it.`);
+    bits.push(`Every task counts against its assignee, including <strong>${c.reviewCount}</strong> parked in review.`);
   }
   if (_ATTR.types) bits.push(`Scope limited to ${[..._ATTR.types].join(', ')}.`);
   // A Worker deployed before the reviewer fields were added sends none of them,
@@ -4827,10 +4826,20 @@ async function exportOverduePNG(mobile) {
 // Works for both the Epic Excel (has full issue object with live fields) and
 // the Overdue Excel (has pre-computed r.rev1/r.rev2 from calculate.py).
 // Pass either (issue, rawStatus) or (null, rawStatus, rev1Name, rev2Name, assigneeName).
+// "Revision Level 1" on its own doesn't say who is holding it. Append the name
+// of the person who actually owes the decision, picked by LEVEL: Level 1 gets
+// the Level 1 reviewer, Level 2 gets the Level 2 reviewer, a plain approval
+// falls back to L1 then L2. Everything else stays bare — the Owner column
+// already names the assignee, so repeating it would just add noise.
 function _statusLabel(rawStatus, rev1Name, rev2Name, assigneeName) {
-  const st  = (rawStatus || '').trim();
-  // Disabled owner name appending per user request.
-  return st;
+  const st = (rawStatus || '').trim();
+  const n  = st.toLowerCase();
+  let who = '';
+  if (n.includes('level 2'))      who = rev2Name || '';
+  else if (n.includes('level 1')) who = rev1Name || '';
+  else if (n.includes('wait') || n.includes('approv')) who = rev1Name || rev2Name || '';
+  if (!who) return st;
+  return `${st} — ${who}`;
 }
 // Raw integer days-overdue (unlike _overdueDaysAgo's human string) so the
 // Excel column can be coloured on a scale and still sorted/filtered as a number.
@@ -4884,15 +4893,24 @@ async function exportOverdueExcel() {
   try {
     await loadXlsxStyle();
 
-    const header = ['#','Key','Summary','Owner','Status','Due Date','Days Overdue','Link'];
+    // Two owner columns: who it is assigned to, and who is actually holding it
+    // now. For a task at "Revision Level 1" those are different people, and
+    // chasing the assignee for a decision that is sitting with a reviewer is
+    // exactly the mistake this export is meant to stop.
+    const header = ['#','Key','Summary','Assigned To','Current Owner','Role','Status','Due Date','Days Overdue','Link'];
     let n = 0;
     const rows = [];
     owners.forEach(owner => {
       groups[owner].forEach(i => {
         n++;
+        const assigned = i.assignee_name || owner;
+        const current  = i.accountable || assigned;
         rows.push({
-          n, key: i.key, summary: i.summary || '(no summary)', owner,
-          status: _statusLabel(i.status || '', i.rev1_name || i.rev1 || '', i.rev2_name || i.rev2 || '', owner),
+          n, key: i.key, summary: i.summary || '(no summary)',
+          owner,                       // grouping key (kept for the colour band)
+          assigned, current,
+          role: i.acc_role_label || 'Assignee',
+          status: _statusLabel(i.status || '', i.rev1_name || i.rev1 || '', i.rev2_name || i.rev2 || '', assigned),
           rawStatus: i.status || '',
           due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
@@ -4910,10 +4928,10 @@ async function exportOverdueExcel() {
     const aoa = [
       [titleText],
       header,
-      ...rows.map(r => [r.n, r.key, r.summary, r.owner, r.status, r.due, r.days===null?'—':r.days, r.link])
+      ...rows.map(r => [r.n, r.key, r.summary, r.assigned, r.current, r.role, r.status, r.due, r.days===null?'—':r.days, r.link])
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:5},{wch:14},{wch:60},{wch:20},{wch:26},{wch:12},{wch:13},{wch:40}];
+    ws['!cols'] = [{wch:5},{wch:14},{wch:52},{wch:20},{wch:20},{wch:17},{wch:34},{wch:12},{wch:13},{wch:40}];
     ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:36}))];  // taller rows for 2-line status
     ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:lastCol} }];
     ws['!freeze'] = {xSplit:0, ySplit:DATA_START};
@@ -4945,19 +4963,32 @@ async function exportOverdueExcel() {
       addr = XLSX.utils.encode_cell({r:rr,c:2}); // Summary
       if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Owner badge
+      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Assigned To — owner badge
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10}, fill:{fgColor:{rgb:ownerAccent[r.owner]}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:4}); // Status
+      // Current Owner — highlighted amber when it differs from the assignee, so
+      // the handed-off tasks are the ones that catch the eye.
+      addr = XLSX.utils.encode_cell({r:rr,c:4});
+      if (ws[addr]) {
+        const moved = r.current && r.current !== r.assigned;
+        ws[addr].s = { font:{bold:true,color:{rgb:moved?'7C2D12':'334155'},sz:10},
+                       fill:{fgColor:{rgb:moved?'FEF3C7':bandFill}},
+                       alignment:{horizontal:'center',vertical:'center'}, border };
+      }
+
+      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Role
+      if (ws[addr]) ws[addr].s = { font:{sz:9,color:{rgb:'64748B'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+
+      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Status (carries the reviewer name)
       if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Due date
+      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Due date
       if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'7F1D1D'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Days overdue
+      addr = XLSX.utils.encode_cell({r:rr,c:8}); // Days overdue
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:(r.days!==null && r.days>=30)?'C00000':'7F1D1D'},sz:10}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Link
+      addr = XLSX.utils.encode_cell({r:rr,c:9}); // Link
       if (ws[addr]) {
         ws[addr].s = { font:{color:{rgb:'1155CC'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
@@ -9136,7 +9167,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.1.0"
+SITE_VERSION = "2.2.0"
 
 
 def _build_stamp():
