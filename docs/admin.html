@@ -113,6 +113,59 @@ h1 span{color:#2563eb}
   color:#475569;transition:all .15s}
 .day-toggles label:has(input:checked){background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
 .day-toggles input{accent-color:#2563eb}
+
+/* ══════════════ glass surface layer ══════════════════════════════════
+   Same material as the report page so admin does not look like a different
+   product: translucent white panes on a deepened ground, one gloss band per
+   pane, accents left solid. Fill and rim only — layout is untouched. */
+:root{
+  --glass:linear-gradient(155deg,rgba(255,255,255,.78),rgba(255,255,255,.58));
+  --glass-2:linear-gradient(155deg,rgba(255,255,255,.68),rgba(255,255,255,.48));
+  --glass-brd:rgba(255,255,255,.82);
+  --glass-blur:blur(18px) saturate(1.6);
+  --glass-blur-sm:blur(12px) saturate(1.5);
+  --glass-shadow:0 1px 2px rgba(15,23,42,.04),
+                 0 20px 44px -26px rgba(15,23,42,.38);
+  --glass-rim:inset 0 1px 0 rgba(255,255,255,.9);
+  --glass-gloss:linear-gradient(180deg,rgba(255,255,255,.55),
+                                       rgba(255,255,255,.12) 46%,transparent);
+}
+body{
+  background:
+    radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.20),transparent 62%),
+    radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.16),transparent 64%),
+    linear-gradient(180deg,#eef2f8 0%,#e9eef6 52%,#e4ebf4 100%);
+  background-attachment:fixed;
+}
+.card,.pw-card,.run-item{
+  position:relative;
+  background:var(--glass);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-brd);
+  box-shadow:var(--glass-shadow),var(--glass-rim);
+  border-radius:16px;
+}
+.pw-card{border-radius:20px}
+.card::after,.pw-card::after{content:'';position:absolute;left:0;right:0;top:0;
+  height:44%;border-radius:inherit;
+  border-bottom-left-radius:0;border-bottom-right-radius:0;
+  background:var(--glass-gloss);pointer-events:none;z-index:0}
+.card > *,.pw-card > *{position:relative;z-index:1}
+#pw-overlay{background:
+    radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.28),transparent 62%),
+    radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.22),transparent 64%),
+    linear-gradient(180deg,#eef2f8 0%,#e6ecf5 100%)}
+.inp,.tok-inp,.sched-time,.back,.day-toggles label{
+  background:var(--glass-2);
+  -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.85)}
+.inp:focus,.tok-inp:focus,.sched-time:focus{background:rgba(255,255,255,.94)}
+.back:hover,.run-item:hover{background:linear-gradient(155deg,rgba(255,255,255,.9),
+                                       rgba(255,255,255,.68))}
+.run-item{border-radius:12px;margin-bottom:8px}
+.log-box{background:rgba(15,23,42,.9);
+  -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
 </style>
 </head>
 <body>
@@ -189,7 +242,7 @@ h1 span{color:#2563eb}
 </div>
 
 <script>
-const ENC_BLOB = {"salt": "we6ugOePSznIRGWOLO8yKA==", "nonce": "FJYr9pYmJnKwK6Zf", "ct": "F51HEsFIIxXiGLG9MUawp6XEdQm2znCJiIUn", "iter": 1000000};
+const ENC_BLOB = {"salt": "YaalOGm3cWOxHzxR8jT8NA==", "nonce": "W3iuCtfh7FmeEA5g", "ct": "OVnLW571n6fYWNC/iQCcWE/PWyMXqZ6sk3OE", "iter": 1000000};
 const REPO     = "rudawathegw-design/jira-weekly-progress";
 let GH_PAT = '';
 
