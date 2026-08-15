@@ -83,48 +83,52 @@ body{
 @media (min-width:2100px){ :root{ --page-max:1840px } }
 
 /* ── password overlay ────────────────────────────────────────── */
-/* Palette: white card on a soft light field, cool blue/teal wash, deep navy
-   as the single accent. One accent only — the button owns it. */
-#pw-overlay{position:fixed;inset:0;overflow:hidden;
+/* Plain white field with a drafting grid — no gradients, no color wash. The
+   card is the only object on it; navy is the single accent. */
+#pw-overlay{position:fixed;inset:0;overflow:hidden;background:#fff;
   --pw-ink:#0f1c33; --pw-accent:#0a3b7c; --pw-teal:#0e9f8f;
-  background:
-    radial-gradient(ellipse 65% 55% at 8% 0%,   hsla(205,90%,72%,.30), transparent 62%),
-    radial-gradient(ellipse 60% 50% at 96% 6%,  hsla(240,85%,78%,.26), transparent 62%),
-    radial-gradient(ellipse 75% 60% at 72% 112%,hsla(172,70%,70%,.28), transparent 64%),
-    radial-gradient(ellipse 50% 42% at 20% 98%, hsla(262,75%,80%,.20), transparent 66%),
-    linear-gradient(160deg,#ffffff 0%,#f4f7fc 55%,#eef3fa 100%);
   display:flex;align-items:center;justify-content:center;z-index:500;padding:24px}
-/* Slow aurora drift keeps the field alive without pulling focus. */
-#pw-overlay::before{content:'';position:absolute;inset:-25%;pointer-events:none;
-  background:conic-gradient(from 200deg at 50% 50%,
-    hsla(205,95%,70%,.20),hsla(240,90%,78%,.18),hsla(172,75%,65%,.18),hsla(205,95%,70%,.20));
-  filter:blur(90px);animation:pwDrift 26s linear infinite}
-@keyframes pwDrift{to{transform:rotate(1turn)}}
-/* Hairline grid, masked to the centre, gives the field scale. */
-#pw-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(15,28,51,.05) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(15,28,51,.05) 1px,transparent 1px);
-  background-size:64px 64px;
-  -webkit-mask-image:radial-gradient(ellipse 60% 55% at 50% 50%,#000,transparent 75%);
-          mask-image:radial-gradient(ellipse 60% 55% at 50% 50%,#000,transparent 75%)}
-.pw-card{position:relative;z-index:1;background:rgba(255,255,255,.92);
-  -webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);
-  border:1px solid rgba(15,28,51,.07);border-radius:20px;
-  box-shadow:0 40px 90px -34px rgba(12,34,74,.34),0 2px 8px rgba(12,34,74,.05),
-             inset 0 1px 0 #fff;
-  padding:34px 34px 24px;width:min(430px,94vw);text-align:left;
+/* Two-tier grid: 24px minor, 120px major, so it reads as ruled paper rather
+   than a flat texture. Fades out toward the edges. */
+#pw-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
+    linear-gradient(rgba(15,28,51,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(15,28,51,.045) 1px,transparent 1px);
+  background-size:120px 120px,120px 120px,24px 24px,24px 24px;
+  -webkit-mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 35%,transparent 100%);
+          mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 35%,transparent 100%)}
+/* Faint tint pooled behind the card — gives the glass something to refract so
+   the blur is visible against an otherwise white field. */
+#pw-overlay::after{content:'';position:absolute;left:50%;top:50%;width:760px;height:640px;
+  transform:translate(-50%,-50%);pointer-events:none;
+  background:
+    radial-gradient(ellipse 45% 50% at 32% 34%,rgba(19,102,204,.16),transparent 70%),
+    radial-gradient(ellipse 42% 46% at 72% 70%,rgba(14,159,143,.14),transparent 72%)}
+/* Glass card: translucent, blurred backdrop, bright top rim, soft inner glow. */
+.pw-card{position:relative;z-index:1;
+  background:linear-gradient(150deg,rgba(255,255,255,.72),rgba(255,255,255,.52));
+  -webkit-backdrop-filter:blur(26px) saturate(1.7);backdrop-filter:blur(26px) saturate(1.7);
+  border:1px solid rgba(255,255,255,.85);border-radius:20px;
+  box-shadow:0 30px 70px -30px rgba(12,34,74,.34),0 2px 6px rgba(12,34,74,.05),
+             inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(15,28,51,.05);
+  padding:32px 32px 24px;width:min(430px,94vw);text-align:left;
   animation:pwIn .5s cubic-bezier(.22,1,.36,1) both}
-/* Accent hairline along the top edge — the card's only decoration. */
-.pw-card::before{content:'';position:absolute;left:26px;right:26px;top:0;height:2px;border-radius:2px;
-  background:linear-gradient(90deg,transparent,var(--pw-teal),var(--pw-accent),transparent);opacity:.75}
+/* Specular highlight sweeping the top edge — the tell that this is glass. */
+.pw-card::before{content:'';position:absolute;left:0;right:0;top:0;height:40%;border-radius:20px 20px 0 0;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),transparent)}
 @keyframes pwIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.pw-card{animation:none}#pw-overlay::before{animation:none}}
 /* Header: mark left, identity stacked right. */
 .pw-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+/* Real FIB mark on its own glass tile, inlined as a data URI at build time. */
 .pw-brand{flex:none;width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
-  background:linear-gradient(140deg,#1e88e5,#0a3b7c 72%);color:#fff;font-weight:800;font-size:18px;
-  letter-spacing:.02em;box-shadow:0 12px 26px -12px rgba(10,59,124,.6),
-  inset 0 1px 0 rgba(255,255,255,.35)}
+  background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);
+  box-shadow:0 10px 22px -12px rgba(12,34,74,.45),inset 0 1px 0 rgba(255,255,255,.9)}
+.pw-brand img{width:30px;height:30px;object-fit:contain;display:block}
+.pw-brand img[src=""]{display:none}
 .pw-id{min-width:0}
 .pw-kicker{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
   color:var(--pw-teal);margin-bottom:5px}
@@ -136,15 +140,16 @@ body{
 .pw-lock{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.45;
   pointer-events:none;filter:grayscale(1)}
 .pw-card .inp{width:100%;text-align:left;letter-spacing:.14em;font-size:15px;
-  padding:13px 66px 13px 38px;border-radius:11px;background:#f7f9fc;
-  border:1px solid #dde4ee;color:var(--pw-ink);
+  padding:13px 66px 13px 38px;border-radius:12px;background:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.9);color:var(--pw-ink);
+  box-shadow:inset 0 1px 3px rgba(12,34,74,.06);
   transition:border-color .18s,box-shadow .18s,background .18s}
-.pw-card .inp::placeholder{color:#aab4c4;letter-spacing:.14em}
-.pw-card .inp:hover{border-color:#c6d0de}
-.pw-card .inp:focus{outline:none;background:#fff;border-color:var(--pw-teal);
-  box-shadow:0 0 0 3px rgba(14,159,143,.16)}
+.pw-card .inp::placeholder{color:#98a3b5;letter-spacing:.14em}
+.pw-card .inp:hover{background:rgba(255,255,255,.72)}
+.pw-card .inp:focus{outline:none;background:rgba(255,255,255,.92);border-color:var(--pw-teal);
+  box-shadow:0 0 0 3px rgba(14,159,143,.18)}
 .pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:none;
-  background:#eef2f8;color:#6b7a90;font-size:10px;font-weight:700;letter-spacing:.08em;
+  background:rgba(255,255,255,.8);color:#6b7a90;font-size:10px;font-weight:700;letter-spacing:.08em;
   cursor:pointer;padding:6px 10px;border-radius:8px;font-family:inherit;text-transform:uppercase;
   transition:background .15s,color .15s}
 .pw-eye:hover{background:#e3eaf5;color:var(--pw-accent)}
@@ -1005,24 +1010,45 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 @keyframes spFade{to{opacity:0;transform:scale(.96)}}
 #intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:26px;position:relative}
 #intro-splash .sp-fib,#intro-splash .sp-cbi{opacity:0;position:relative;overflow:hidden}
-#intro-splash .sp-fib{width:96px;height:96px;border-radius:24px;background:linear-gradient(135deg,#4F9D8B,#2E6557);display:grid;place-items:center;font:800 30px/1 system-ui,'Segoe UI',sans-serif;color:#fff;letter-spacing:.5px;box-shadow:0 18px 40px -14px rgba(46,101,87,.55)}
-#intro-splash .sp-cbi{width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#23695A,#143E34);display:grid;place-items:center;color:#E8C766;box-shadow:0 18px 40px -14px rgba(20,62,52,.6);border:3px solid #C9A227}
-#intro-splash .sp-cbi b{font:800 26px/1 Georgia,serif;letter-spacing:1px;display:block}
-#intro-splash .sp-cbi i{display:block;font:600 6.5px/1.4 system-ui,sans-serif;letter-spacing:.12em;font-style:normal;opacity:.9;margin-top:3px}
-#intro-splash.on .sp-fib{animation:spFromL .55s .05s cubic-bezier(.18,1.2,.3,1) forwards}
-#intro-splash.on .sp-cbi{animation:spFromR .55s .05s cubic-bezier(.18,1.2,.3,1) forwards}
-@keyframes spFromL{from{opacity:0;transform:translateX(-46vw) rotate(-28deg) scale(.7)}60%{opacity:1}to{opacity:1;transform:none}}
-@keyframes spFromR{from{opacity:0;transform:translateX(46vw) rotate(28deg) scale(.7)}60%{opacity:1}to{opacity:1;transform:none}}
+/* Both marks are real logo files inlined as data URIs at build time. The FIB
+   "B" sits on a white tile (the file is a coloured mark on transparency); the
+   CBI seal is the supplied artwork, untinted, on white. */
+#intro-splash .sp-fib{width:96px;height:96px;border-radius:24px;background:#fff;
+  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(46,101,87,.45),0 0 0 1px rgba(46,101,87,.10)}
+#intro-splash .sp-cbi{width:96px;height:96px;border-radius:50%;background:#fff;
+  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(20,62,52,.35),0 0 0 1px rgba(20,62,52,.08)}
+#intro-splash .sp-fib img{width:56px;height:56px;object-fit:contain;display:block}
+#intro-splash .sp-cbi img{width:80px;height:80px;object-fit:contain;display:block}
+/* A logo that failed to inline collapses to nothing rather than a broken icon. */
+#intro-splash .sp-fib img[src=""],#intro-splash .sp-cbi img[src=""]{display:none}
+#intro-splash.on .sp-fib{animation:spFromL .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
+#intro-splash.on .sp-cbi{animation:spFromR .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
+/* Converge: each mark travels in from its own side, overshoots slightly past
+   centre, then settles — reads as the two institutions meeting. */
+@keyframes spFromL{from{opacity:0;transform:translateX(-46vw) rotate(-18deg) scale(.7)}
+  55%{opacity:1}72%{transform:translateX(14px) rotate(2deg) scale(1.04)}to{opacity:1;transform:none}}
+@keyframes spFromR{from{opacity:0;transform:translateX(46vw) rotate(18deg) scale(.7)}
+  55%{opacity:1}72%{transform:translateX(-14px) rotate(-2deg) scale(1.04)}to{opacity:1;transform:none}}
 #intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
-#intro-splash.on .sp-fib::after{animation:spShine .5s .5s ease forwards}
-#intro-splash.on .sp-cbi::after{animation:spShine .5s .6s ease forwards}
+#intro-splash.on .sp-fib::after{animation:spShine .5s .62s ease forwards}
+#intro-splash.on .sp-cbi::after{animation:spShine .5s .70s ease forwards}
 @keyframes spShine{to{transform:translateX(130%) skewX(-18deg)}}
-#intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4)}
-#intro-splash.on .sp-link{animation:spPop .35s .45s cubic-bezier(.18,1.5,.4,1) forwards}
+#intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4);z-index:2;
+  box-shadow:0 6px 18px -6px rgba(201,162,39,.6)}
+#intro-splash.on .sp-link{animation:spPop .4s .62s cubic-bezier(.18,1.5,.4,1) forwards,
+  spHalo 1.1s .95s ease-out}
 @keyframes spPop{to{opacity:1;transform:scale(1)}}
-#intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid rgba(79,157,139,.5);opacity:0}
-#intro-splash.on .sp-ring{animation:spRing .7s .5s ease-out forwards}
-@keyframes spRing{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(2.6)}}
+/* Pulse leaving the link once the marks have met. */
+@keyframes spHalo{from{box-shadow:0 0 0 0 rgba(201,162,39,.55)}
+  to{box-shadow:0 0 0 26px rgba(201,162,39,0)}}
+/* Ring strokes itself on clockwise instead of fading — 415 ≈ 2πr for r=66. */
+#intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:172px;height:172px;
+  margin:-86px 0 0 -86px;overflow:visible;pointer-events:none}
+#intro-splash .sp-ring circle{fill:none;stroke:rgba(79,157,139,.45);stroke-width:2;
+  stroke-linecap:round;stroke-dasharray:415;stroke-dashoffset:415;
+  transform:rotate(-90deg);transform-origin:50% 50%}
+#intro-splash.on .sp-ring circle{animation:spDraw .85s .3s cubic-bezier(.5,0,.2,1) forwards}
+@keyframes spDraw{to{stroke-dashoffset:0}}
 #intro-splash .sp-title{margin-top:30px;opacity:0}
 #intro-splash .sp-title h1{margin:0;font:800 clamp(26px,4vw,40px)/1.15 system-ui,'Segoe UI',sans-serif;color:#3D3929}
 #intro-splash .sp-title h1 span{color:#3A7D6E}
@@ -1047,10 +1073,14 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <div class="sp-center">
   <div>
     <div class="sp-badges">
-      <div class="sp-ring"></div>
-      <div class="sp-fib">FIB</div>
+      <!-- Ring is drawn as an SVG stroke so it can animate on rather than
+           just fade — dasharray sweep, clockwise from 12 o'clock. -->
+      <svg class="sp-ring" viewBox="0 0 140 140" aria-hidden="true">
+        <circle cx="70" cy="70" r="66" />
+      </svg>
+      <div class="sp-fib"><img src="__LOGO_FIB__" alt="First Iraq Bank"></div>
       <div class="sp-link">&#10003;</div>
-      <div class="sp-cbi"><div><b>CBI</b><i>CENTRAL BANK<br>OF IRAQ</i></div></div>
+      <div class="sp-cbi"><img src="__LOGO_CBI__" alt="Central Bank of Iraq"></div>
     </div>
     <div class="sp-title">
       <h1><span>Weekly</span> Progress Report</h1>
@@ -1071,7 +1101,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     <!-- Header row: mark on the left, identity stacked beside it. Reads as a
          document header rather than a centred splash. -->
     <div class="pw-head">
-      <div class="pw-brand">FIB</div>
+      <div class="pw-brand"><img src="__LOGO_FIB__" alt="First Iraq Bank"></div>
       <div class="pw-id">
         <div class="pw-kicker">First Iraq Bank · PMO</div>
         <h2>FIBTMP Progress Report</h2>
@@ -9412,6 +9442,25 @@ def _build_stamp():
             commit or "local")
 
 
+def _asset_data_uri(filename):
+    """Inline assets/<filename> as a data: URI.
+
+    docs/index.html is served standalone (and opened from disk), so linking to
+    a sibling file is fragile — the logos ride inside the HTML instead. A
+    missing file degrades to an empty src, which the CSS hides.
+    """
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "assets", filename)
+    try:
+        with open(path, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode("ascii")
+    except OSError:
+        return ""
+    mime = "image/svg+xml" if filename.endswith(".svg") else "image/png"
+    return f"data:{mime};base64,{b64}"
+
+
 def build(report, analysis, hidden_people=None):
     pw_hash  = os.environ.get("SITE_PASSWORD_HASH", "")
     password = os.environ.get("SITE_PASSWORD", "")
@@ -9462,6 +9511,8 @@ def build(report, analysis, hidden_people=None):
              .replace("__BUILD_TIME__", build_time)
              .replace("__BUILD_DATE__", build_date)
              .replace("__COMMIT__",    commit)
+             .replace("__LOGO_FIB__",  _asset_data_uri("fib-logo.png"))
+             .replace("__LOGO_CBI__",  _asset_data_uri("cbi-logo.png"))
              .replace("__DATE__",     report.get("date", "")))
 
     # Admin gets a smaller encrypted blob containing only the PAT
