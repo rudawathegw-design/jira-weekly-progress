@@ -214,15 +214,6 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 .attr-seg-btn .attr-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;
   opacity:.6;margin-left:5px;font-weight:600}
 .attr-seg-btn .attr-short{display:none}
-/* issue-type toggles */
-.attr-types{display:inline-flex;gap:5px;flex-wrap:wrap}
-.attr-type{border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:8px;
-  padding:5px 11px;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;
-  font-family:inherit;transition:all .15s;white-space:nowrap;user-select:none}
-.attr-type:hover{border-color:#cbd5e1;color:#334155}
-.attr-type.on{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
-.attr-type .attr-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;
-  opacity:.7;margin-left:4px}
 /* buttons */
 .attr-btn{display:inline-flex;align-items:center;gap:5px;border:1.5px solid #e2e8f0;
   background:#f8fafc;border-radius:8px;padding:6px 11px;font-size:12px;
@@ -233,18 +224,6 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 .attr-btn.ghost:hover{color:#475569;background:#f1f5f9}
 .attr-dot{width:6px;height:6px;border-radius:50%;background:#f59e0b;
   display:inline-block;margin-left:2px}
-/* explanatory line under the controls */
-.attr-note{font-size:12px;color:#64748b;margin-top:9px;line-height:1.55;
-  padding-top:9px;border-top:1px dashed #e2e8f0}
-.attr-note strong{color:#334155;font-weight:700}
-.attr-note .attr-warn{color:#b45309;font-weight:600}
-.attr-note .attr-flag{color:#b91c1c;font-weight:600}
-.attr-note code{font-family:'JetBrains Mono',monospace;font-size:11px;
-  background:#f1f5f9;padding:1px 5px;border-radius:4px}
-/* The FAB rail is viewport-fixed and floats over the right edge of the card
-   until the viewport is wide enough to clear the 1400px wrap. Keep the note's
-   text out from under it so the sentence stays readable. */
-@media (max-width:1560px){ .attr-note{padding-right:58px} }
 /* status-mapping modal */
 .smap-row{display:flex;align-items:center;gap:10px;padding:7px 0;
   border-bottom:1px solid #f1f5f9}
@@ -263,7 +242,7 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 @media (max-width:820px){
   .attr-main{gap:12px}
   /* Let the label sit on its own line so the segmented control gets the full
-     width — otherwise the third mode is pushed off-screen on a phone. */
+     width — otherwise the modes get squeezed off-screen on a phone. */
   .attr-group{width:100%;flex-wrap:wrap;gap:6px}
   .attr-group-end{margin-left:0;justify-content:flex-start}
   .attr-label{width:100%}
@@ -272,7 +251,6 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
   .attr-seg-btn .attr-count{margin-left:3px}
   .attr-seg-btn .attr-full{display:none}
   .attr-seg-btn .attr-short{display:inline}
-  .attr-note{padding-right:0}
 }
 
 /* ── top bar ─────────────────────────────────────────────────── */
@@ -1542,11 +1520,6 @@ CC: @cc</textarea>
         <div class="attr-seg" id="attr-mode-seg" role="tablist" aria-label="Attribution mode"></div>
       </div>
 
-      <div class="attr-group">
-        <span class="attr-label">Scope</span>
-        <div class="attr-types" id="attr-types"></div>
-      </div>
-
       <div class="attr-group attr-group-end">
         <button class="attr-btn" onclick="openStatusMapModal()" id="attr-map-btn"
                 title="Choose which reporting column each Jira status rolls up into">
@@ -1556,7 +1529,6 @@ CC: @cc</textarea>
         <button class="attr-btn ghost" onclick="resetAttribution()" title="Back to the recommended defaults">Reset</button>
       </div>
     </div>
-    <div class="attr-note" id="attr-note"></div>
   </section>
 
   <!-- Stats -->
@@ -1801,7 +1773,6 @@ const ATTR_LS_KEY = 'fibtmp_attribution_v1';
 
 const _ATTR = {
   mode: 'accountable',
-  types: null,                 // null = every issue type; else Set of type names
   statusMap: {...DEFAULT_STATUS_MAP},
   load(){
     try {
@@ -1809,7 +1780,9 @@ const _ATTR = {
       if (!raw) return;
       const c = JSON.parse(raw);
       if (c.mode && ATTR_MODES[c.mode]) _ATTR.mode = c.mode;
-      if (Array.isArray(c.types)) _ATTR.types = c.types.length ? new Set(c.types) : null;
+      // c.types is deliberately ignored: the issue-type scope filter was
+      // removed, and honouring a saved filter with no UI to see or clear it
+      // would silently hide tasks from the totals.
       if (c.statusMap && typeof c.statusMap === 'object'){
         // Merge over defaults so a status added in Jira later still gets a sane
         // bucket instead of vanishing because an old saved map didn't list it.
@@ -1821,13 +1794,12 @@ const _ATTR = {
     try {
       localStorage.setItem(ATTR_LS_KEY, JSON.stringify({
         mode: _ATTR.mode,
-        types: _ATTR.types ? [..._ATTR.types] : [],
         statusMap: _ATTR.statusMap,
       }));
     } catch(e){ console.warn('[attr] could not save config', e); }
   },
   reset(){
-    _ATTR.mode = 'accountable'; _ATTR.types = null;
+    _ATTR.mode = 'accountable';
     _ATTR.statusMap = {...DEFAULT_STATUS_MAP};
     _ATTR.save();
   },
@@ -2131,23 +2103,18 @@ const _LIVE = {
 // so switching attribution mode is instant (no Jira round-trip) and the two
 // paths can never drift apart.
 //
-// `base.records` is the full, unfiltered record list. Everything else — mode,
-// issue-type scope, status mapping — is applied here from _ATTR.
+// `base.records` is the full record list. Mode and status mapping are applied
+// here from _ATTR. Every issue type is always counted — there is no scope
+// filter, so the totals are the whole project.
 function regroupReport(base, hiddenSet){
   const hidden = hiddenSet || new Set();
   const mode   = _ATTR.mode;
   const smap   = _ATTR.statusMap;
-  const types  = _ATTR.types;
 
   const counts = {};
-  let scoped = 0, outOfScope = 0;
   for (const rec of (base.records || [])){
-    if (types && rec.type && !types.has(rec.type)){ outOfScope++; continue; }
-    // Reviewer mode looks only at work actually sitting in a review queue.
-    if (mode === 'reviewer' && !rec.in_review) continue;
     const name = (mode === 'assignee') ? (rec.assignee_name || 'Unassigned')
                                        : (rec.accountable   || 'Unassigned');
-    scoped++;
     const cat = _ACC.bucketOf(rec.status, rec.done, smap);
     if (!counts[name]) counts[name] = {
       total:0, completed:0, open:0, in_progress:0, waiting_for_approval:0,
@@ -2239,8 +2206,6 @@ function regroupReport(base, hiddenSet){
     records: base.records,
     acc_fields_present: base.acc_fields_present,
     attribution_mode: mode,
-    scoped_count: scoped,
-    out_of_scope_count: outOfScope,
     baseline_mode_gap: modeGap,
   };
 }
@@ -2293,57 +2258,27 @@ function setAttrMode(mode){
   toast(`Counting tasks against: ${ATTR_MODES[mode].label}`);
 }
 
-function toggleAttrType(type){
-  const all = _attrAllTypes();
-  // null means "everything"; materialise it before removing one.
-  let sel = _ATTR.types ? new Set(_ATTR.types) : new Set(all);
-  if (sel.has(type)) sel.delete(type); else sel.add(type);
-  if (!sel.size){ toast('Keep at least one issue type in scope.'); return; }
-  _ATTR.types = (sel.size === all.length) ? null : sel;
-  _ATTR.save();
-  applyAttribution();
-}
-
 function resetAttribution(){
   _ATTR.reset();
   applyAttribution();
   toast('✓ Attribution settings restored to defaults.');
 }
 
-function _attrAllTypes(){
-  const s = new Set();
-  for (const r of (_BASE_REPORT?.records || [])) if (r.type) s.add(r.type);
-  return [...s].sort();
-}
-
-// Counts per mode / per type, computed from the FULL record set so the numbers
-// on the unselected buttons preview what choosing them would show.
+// Head-count per mode, from the full record set, so the number on the
+// unselected button previews what choosing it would show.
 function _attrCounts(){
   const recs = _BASE_REPORT?.records || [];
-  const types = _ATTR.types;
-  const inScope = r => !types || !r.type || types.has(r.type);
-  const byType = {};
-  for (const r of recs) byType[r.type||'—'] = (byType[r.type||'—']||0)+1;
-  const scoped = recs.filter(inScope);
   return {
-    byType,
     people: {
-      assignee:    new Set(scoped.map(r => r.assignee_name||'Unassigned')).size,
-      accountable: new Set(scoped.map(r => r.accountable  ||'Unassigned')).size,
-      reviewer:    new Set(scoped.filter(r=>r.in_review).map(r => r.accountable||'Unassigned')).size,
+      assignee:    new Set(recs.map(r => r.assignee_name||'Unassigned')).size,
+      accountable: new Set(recs.map(r => r.accountable  ||'Unassigned')).size,
     },
-    reviewCount: scoped.filter(r => r.in_review).length,
-    movedCount:  scoped.filter(r => r.in_review && r.accountable !== r.assignee_name).length,
-    unresolved:  scoped.filter(r => r.reviewer_unresolved).length,
-    overdueReview: scoped.filter(r => r.overdue && r.in_review).length,
   };
 }
 
 function renderAttrBar(){
   const seg = document.getElementById('attr-mode-seg');
-  const tw  = document.getElementById('attr-types');
-  const note= document.getElementById('attr-note');
-  if (!seg || !tw || !note) return;
+  if (!seg) return;
   const c = _attrCounts();
 
   // Both labels are emitted; CSS shows the short one on narrow screens, where
@@ -2355,37 +2290,8 @@ function renderAttrBar(){
             class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span></button>
   `).join('');
 
-  const all = _attrAllTypes();
-  tw.innerHTML = all.map(t => {
-    const on = !_ATTR.types || _ATTR.types.has(t);
-    return `<button class="attr-type ${on?'on':''}" onclick="toggleAttrType('${esc(t).replace(/'/g,"\\'")}')"
-             title="${on?'Click to exclude':'Click to include'} ${esc(t)}">${esc(t)}<span class="attr-count">${c.byType[t]||0}</span></button>`;
-  }).join('');
-
   const dot = document.getElementById('attr-map-dot');
   if (dot) dot.style.display = _ATTR.isDefaultMap() ? 'none' : 'inline-block';
-
-  // The note explains, in plain words, what the current selection is doing —
-  // and flags anything the reader should not silently trust.
-  const bits = [];
-  if (_ATTR.mode === 'accountable'){
-    bits.push(`<strong>${c.movedCount}</strong> task${c.movedCount===1?'':'s'} in review counted against the reviewer holding ${c.movedCount===1?'it':'them'}.`);
-    if (c.overdueReview) bits.push(`<span class="attr-warn">${c.overdueReview} overdue ${c.overdueReview===1?'item is':'items are'} waiting on a review decision, not delivery.</span>`);
-  } else {
-    bits.push(`Every task counts against its assignee, including <strong>${c.reviewCount}</strong> parked in review.`);
-  }
-  if (_ATTR.types) bits.push(`Scope limited to ${[..._ATTR.types].join(', ')}.`);
-  // A Worker deployed before the reviewer fields were added sends none of them,
-  // which would otherwise read as "nobody has a reviewer configured". Say what
-  // is actually wrong instead of reporting a data problem that isn't there.
-  if (REPORT && REPORT.acc_fields_present === false && c.reviewCount){
-    bits.push(`<span class="attr-flag">Reviewer fields missing from the live feed</span> — the Cloudflare Worker needs redeploying (<code>cd worker &amp;&amp; npx wrangler deploy</code>). Until then in-review tasks stay with their assignee.`);
-  } else if (c.unresolved) {
-    bits.push(`<span class="attr-flag">${c.unresolved} in review with no reviewer set in Jira</span> — left with the assignee; worth fixing in Jira.`);
-  }
-  if (REPORT && REPORT.baseline_mode_gap) bits.push(`<span class="attr-warn">The baseline snapshot predates this view, so period-over-period change is hidden rather than shown wrongly.</span>`);
-  if (!_ATTR.isDefaultMap()) bits.push(`Status mapping customised.`);
-  note.innerHTML = bits.join(' ');
 }
 
 // ── Status mapping modal ────────────────────────────────────────────────────
@@ -6643,7 +6549,7 @@ function exportExcel() {
       [],
       ['Attribution mode',       modeLabel],
       ['Meaning',                (ATTR_MODES[_ATTR.mode]||{}).desc || ''],
-      ['Issue types in scope',   _ATTR.types ? [..._ATTR.types].join(', ') : 'All'],
+      ['Issue types in scope',   'All'],
       ['Status mapping',         _ATTR.isDefaultMap() ? 'Default' : 'Customised — see Status Mapping sheet'],
       [],
       ['Tasks in scope',         REPORT.grand_total||0],
@@ -9221,7 +9127,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.3.0"
+SITE_VERSION = "2.4.0"
 
 
 def _build_stamp():
