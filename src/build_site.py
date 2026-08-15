@@ -3375,7 +3375,12 @@ function renderDonut() {
       paths += `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="${s.color}" />`;
     }
   });
-  const pctDone = Math.round(totals.done/total*100);
+  // One decimal, matching the "This Period" tile. Rounding to whole percent
+  // here made 78.5% render as "79%" beside a tile reading 78.5 — the same
+  // number twice, looking like two. A trailing ".0" is dropped so a clean
+  // figure still reads as one.
+  const _pctExact = Math.round(1000*totals.done/total)/10;
+  const pctDone = Number.isInteger(_pctExact) ? _pctExact : _pctExact.toFixed(1);
   wrap.innerHTML = `<svg viewBox="0 0 200 200" width="200" height="200">
     ${paths}
     <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="32" font-weight="800" fill="#0f172a" font-family="Inter,sans-serif">${pctDone}%</text>
@@ -10694,6 +10699,8 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.9.2  Donut centre shows the same precision as the "This Period" tile,
+#          so one figure stops looking like two.
 #   2.9.1  One definition of what counts toward the project: hidden people and
 #          unassigned work are excluded from every headline number, not just
 #          the analytics card. Totals drop accordingly and now agree.
@@ -10723,7 +10730,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.9.1"
+SITE_VERSION = "2.9.2"
 
 
 def _build_stamp():
