@@ -1225,6 +1225,17 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div id="epic-excel-scope-label" style="font-size:13px;font-weight:600;color:#1e293b;
            background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px"></div>
     </div>
+    <!-- Only shown for the "any epic" entry: paste a Jira link or type a key. -->
+    <div class="modal-section" id="epic-excel-key-row" style="display:none">
+      <div class="modal-section-label">Epic link or key</div>
+      <input type="text" id="epic-excel-key" class="inp" spellcheck="false"
+             placeholder="https://fibtask.atlassian.net/browse/FIBTMP-489  —  or just FIBTMP-489"
+             oninput="_epicKeyPreview()" onkeydown="if(event.key==='Enter')confirmEpicExcelExport()"
+             style="font-size:13px;padding:9px 12px">
+      <div class="persist-note" id="epic-excel-key-note" style="margin-top:8px">
+        Paste the epic straight from your browser's address bar — the key is picked out for you.
+      </div>
+    </div>
     <div class="modal-section">
       <div class="modal-section-label">From date</div>
       <input type="date" id="epic-excel-start" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:14px">
@@ -1341,7 +1352,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="15" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 18"/></svg>
         Copy as image
       </button>
-      <button class="col-hdr-btn" onclick="exportOverdueExcel()" title="Download a colour-coded Excel file, grouped by owner"
+      <button class="col-hdr-btn" data-new="overdue-xlsx" onclick="exportOverdueExcel()" title="Download a colour-coded Excel file, grouped by owner"
               style="background:linear-gradient(135deg,#1d6f42,#14532d);color:#fff;border-color:transparent">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="white" opacity="0.9"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="#1D6F42"/><rect x="15" y="7" width="4" height="1.5" fill="#1D6F42" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="#1D6F42" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="#1D6F42" rx="0.3"/></svg>
         Download Excel
@@ -1617,7 +1628,7 @@ CC: @cc</textarea>
         </button>
       <!-- "More" dropdown for everything else -->
       <div class="menu-dropdown">
-        <button class="chip" onclick="toggleMoreMenu(event)" id="more-btn" title="More actions">
+        <button class="chip" data-new="more" onclick="toggleMoreMenu(event)" id="more-btn" title="More actions">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           More
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1638,11 +1649,15 @@ CC: @cc</textarea>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
             <div class="menu-item-text"><div>Daily Status — Epic</div><div class="menu-item-sub">FIBTMP-489 · one status column per day</div></div>
           </button>
-          <button class="menu-item" onclick="openEpicExcelModal('project');closeMoreMenu()">
+          <button class="menu-item" data-new="daily-project" onclick="openEpicExcelModal('project');closeMoreMenu()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
             <div class="menu-item-text"><div>Daily Status — Whole Project</div><div class="menu-item-sub">Every task &amp; sub-task · one status column per day</div></div>
           </button>
-          <button class="menu-item" onclick="exportExecutivePPTX();closeMoreMenu()">
+          <button class="menu-item" data-new="epic-any" onclick="openEpicExcelModal('custom');closeMoreMenu()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
+            <div class="menu-item-text"><div>Daily Status — Any Epic</div><div class="menu-item-sub">Paste an epic link · one status column per day</div></div>
+          </button>
+          <button class="menu-item" data-new="pptx" onclick="exportExecutivePPTX();closeMoreMenu()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#C43E1C"/><rect x="5" y="6" width="9" height="1.5" fill="white" rx="0.4"/><rect x="5" y="9.5" width="7" height="1.5" fill="white" rx="0.4"/><rect x="5" y="13" width="6" height="1.5" fill="white" rx="0.4"/><circle cx="17" cy="16" r="4" fill="white" opacity="0.15"/><path d="M14.5 14.5l5 3-5 3V14.5z" fill="white"/></svg>
             <div class="menu-item-text"><div>Executive Summary (PPTX)</div><div class="menu-item-sub">RAG status, KPIs, risks &amp; escalations — one deck, ready to present</div></div>
           </button>
@@ -2468,6 +2483,7 @@ function renderAttrBar(){
       : m.desc;
     return `
     <button class="attr-seg-btn ${on?'on':''}" role="tab"
+            ${k === 'accountable' ? 'data-new="current-levels"' : ''}
             aria-selected="${on}" onclick="setAttrMode('${k}')"
             title="${esc(hint)}"><span class="attr-full">${esc(m.label)}</span><span
             class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span></button>`;
@@ -2475,7 +2491,50 @@ function renderAttrBar(){
 
   const dot = document.getElementById('attr-map-dot');
   if (dot) dot.style.display = _ATTR.isDefaultMap() ? 'none' : 'inline-block';
+  // This markup is rebuilt on every render, so a dismissed dot would come back.
+  if (typeof _applyNewMarkers === 'function') _applyNewMarkers();
 }
+
+// ── "New in this release" markers ───────────────────────────────────────────
+// Anything tagged data-new="<id>" shows a red dot until that person has used
+// it. Kept per browser (localStorage) and scoped to SITE_VERSION, so shipping a
+// new version re-arms every marker rather than leaving stale dots behind — and
+// a marker someone already dismissed does not come back on every visit.
+const _NEW_LS_KEY = 'fibtmp_seen_new';
+
+function _newSeen(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(_NEW_LS_KEY) || '{}');
+    // Different build → start fresh.
+    if (raw.v !== SITE_VERSION) return {v: SITE_VERSION, ids: []};
+    return {v: raw.v, ids: Array.isArray(raw.ids) ? raw.ids : []};
+  } catch(e){ return {v: SITE_VERSION, ids: []}; }
+}
+
+function _markNewSeen(id){
+  if (!id) return;
+  const s = _newSeen();
+  if (s.ids.includes(id)) return;
+  s.ids.push(id);
+  try { localStorage.setItem(_NEW_LS_KEY, JSON.stringify(s)); } catch(e){}
+  document.querySelectorAll(`[data-new="${id}"]`).forEach(el => el.removeAttribute('data-new'));
+}
+
+// Strip markers already dismissed. Runs on load and again after any render
+// that rebuilds tagged markup (the attribution bar, for one).
+function _applyNewMarkers(){
+  const seen = _newSeen().ids;
+  if (!seen.length) return;
+  seen.forEach(id => {
+    document.querySelectorAll(`[data-new="${id}"]`).forEach(el => el.removeAttribute('data-new'));
+  });
+}
+
+// One delegated listener: any click on (or inside) a tagged control retires it.
+document.addEventListener('click', e => {
+  const el = e.target && e.target.closest && e.target.closest('[data-new]');
+  if (el) _markNewSeen(el.getAttribute('data-new'));
+}, true);
 
 // ── Review Queue (Current Owner view) ───────────────────────────────────────
 // Everything sitting in a review status, grouped by whoever is holding it now
@@ -7580,8 +7639,8 @@ async function exportExecutivePPTX() {
 const EPIC_KEY = 'FIBTMP-489';
 const EPIC_HISTORY_START = '2026-07-13'; // yyyy-mm-dd, default start shown in the modal
 
-async function fetchEpicIssues(){
-  return _fetchIssuesFor({action:'epic_issues', epicKey: EPIC_KEY});
+async function fetchEpicIssues(key){
+  return _fetchIssuesFor({action:'epic_issues', epicKey: key || EPIC_KEY});
 }
 
 // Whole project, not one epic. Same shape (fields + status-only changelog), so
@@ -7788,8 +7847,47 @@ function _isDoneStatus(status){
 // project. Set by whichever menu item opened it.
 let _DAILY_SCOPE = 'epic';
 
+// Pull an issue key out of whatever the user pasted: a full browse URL, a
+// selected-issue URL with the key in the query string, or the bare key. Returns
+// '' when there is nothing key-shaped in there.
+function _parseEpicKey(raw){
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  // …/browse/FIBTMP-489  ·  …?selectedIssue=FIBTMP-489  ·  bare FIBTMP-489
+  const m = s.match(/(?:\/browse\/|selectedIssue=|^)\s*([A-Za-z][A-Za-z0-9_]*-\d+)/);
+  return m ? m[1].toUpperCase() : '';
+}
+
+// Live feedback under the input so a bad paste is obvious before downloading.
+function _epicKeyPreview(){
+  const note = document.getElementById('epic-excel-key-note');
+  const raw  = (document.getElementById('epic-excel-key')||{}).value || '';
+  const key  = _parseEpicKey(raw);
+  if (!note) return;
+  if (!raw.trim()){
+    note.style.color = '';
+    note.textContent = "Paste the epic straight from your browser's address bar — the key is picked out for you.";
+  } else if (key){
+    note.style.color = '#047857';
+    note.textContent = `Will export ${key} — its tasks and sub-tasks.`;
+  } else {
+    note.style.color = '#b91c1c';
+    note.textContent = "That doesn't look like a Jira issue — expected something like FIBTMP-489.";
+  }
+}
+
 function openEpicExcelModal(scope){
-  _DAILY_SCOPE = (scope === 'project') ? 'project' : 'epic';
+  _DAILY_SCOPE = (scope === 'project') ? 'project' : (scope === 'custom' ? 'custom' : 'epic');
+  // The key field only appears for the "any epic" entry.
+  const keyRow = document.getElementById('epic-excel-key-row');
+  if (keyRow) keyRow.style.display = (_DAILY_SCOPE === 'custom') ? '' : 'none';
+  if (_DAILY_SCOPE === 'custom'){
+    const inp = document.getElementById('epic-excel-key');
+    let last = null;
+    try { last = localStorage.getItem('epicExcelKey'); } catch(e){}
+    if (inp){ inp.value = last || ''; setTimeout(() => inp.focus(), 60); }
+    _epicKeyPreview();
+  }
   const inp = document.getElementById('epic-excel-start');
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10);
@@ -7800,8 +7898,9 @@ function openEpicExcelModal(scope){
   const lbl = document.getElementById('epic-excel-today-label');
   if (lbl) lbl.textContent = now.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ' (today)';
   const scopeLbl = document.getElementById('epic-excel-scope-label');
-  if (scopeLbl) scopeLbl.textContent = _DAILY_SCOPE === 'project'
-    ? 'Every task and sub-task in the project'
+  if (scopeLbl) scopeLbl.textContent =
+      _DAILY_SCOPE === 'project' ? 'Every task and sub-task in the project'
+    : _DAILY_SCOPE === 'custom'  ? 'The epic you paste below — its tasks and sub-tasks'
     : `Epic ${EPIC_KEY} — its tasks and sub-tasks`;
   openModal('epic-excel-modal');
 }
@@ -7812,24 +7911,40 @@ function confirmEpicExcelExport(){
   const inp = document.getElementById('epic-excel-start');
   const val = inp && inp.value;
   if (!val){ toast('Pick a start date first.'); return; }
+
+  // "Any epic" needs a valid key before we go anywhere near Jira.
+  let key = '';
+  if (_DAILY_SCOPE === 'custom'){
+    const raw = (document.getElementById('epic-excel-key')||{}).value || '';
+    key = _parseEpicKey(raw);
+    if (!key){
+      _epicKeyPreview();
+      toast('Paste a Jira epic link, or type a key like FIBTMP-489.');
+      return;
+    }
+    try { localStorage.setItem('epicExcelKey', key); } catch(e){}
+  }
+
   try { localStorage.setItem('epicExcelStart', val); } catch(e){}
   closeModal('epic-excel-modal');
-  exportEpicExcel(val, _DAILY_SCOPE);
+  exportEpicExcel(val, _DAILY_SCOPE, key);
 }
 
-async function exportEpicExcel(historyStart, scope){
+async function exportEpicExcel(historyStart, scope, epicKeyIn){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   const wholeProject = scope === 'project';
+  // Which epic: the pasted one, or the built-in default.
+  const epicKey = (scope === 'custom' && epicKeyIn) ? epicKeyIn : EPIC_KEY;
   const scopeName = wholeProject
     ? ((REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'Project')
-    : EPIC_KEY;
-  toast(`Pulling ${wholeProject ? 'the whole project' : EPIC_KEY} from Jira…`);
+    : epicKey;
+  toast(`Pulling ${wholeProject ? 'the whole project' : epicKey} from Jira…`);
   try {
     // The whole-project pull is paged, so report progress instead of leaving a
     // spinner up for what can be half a minute.
     const fetched = wholeProject
       ? await fetchProjectIssues((n,p) => toast(`Pulling from Jira — ${n} issues (page ${p})…`))
-      : await fetchEpicIssues();
+      : await fetchEpicIssues(epicKey);
 
     // Honour "Hide people from export". Every other export and on-screen table
     // filters on hiddenPeople; this one was pulling straight from Jira and
@@ -7933,7 +8048,7 @@ async function exportEpicExcel(historyStart, scope){
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
         const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+EPIC_KEY}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${issues.length} issue(s)  ·  Generated ${generatedAt}`;
+        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+epicKey}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${issues.length} issue(s)  ·  Generated ${generatedAt}`;
         const HEADER_ROW = 1, DATA_START = 2;
 
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
@@ -7997,8 +8112,8 @@ async function exportEpicExcel(historyStart, scope){
           }
         });
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, (wholeProject ? scopeName+' Daily' : EPIC_KEY).slice(0,31));
-        XLSX.writeFile(wb, `${wholeProject ? scopeName+'-project' : EPIC_KEY}-daily-status-${startLabel}_to_${dateLabel}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, (wholeProject ? scopeName+' Daily' : epicKey).slice(0,31));
+        XLSX.writeFile(wb, `${wholeProject ? scopeName+'-project' : epicKey}-daily-status-${startLabel}_to_${dateLabel}.xlsx`);
         toast('✓ Epic Excel downloaded.');
       } catch(e){
         console.error('[export-epic]', e);
@@ -9508,6 +9623,30 @@ document.addEventListener('keydown', function(e){
   /* The gloss belongs to the combined card, so only the top half carries it. */
   .attr-bar::after{display:none}
 
+  /* ══════════════ "New" markers ════════════════════════════════════════
+     A red dot on anything added or fixed this release, so people notice it
+     without being told. Tagged with data-new="<id>" in the markup; the dot
+     clears once that control has been used, per person, and the whole set
+     resets when SITE_VERSION changes. */
+  [data-new]{position:relative}
+  [data-new]::after{content:'';position:absolute;top:-3px;right:-3px;
+    width:9px;height:9px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#ff6b6b,#dc2626 70%);
+    border:1.5px solid #fff;
+    box-shadow:0 0 0 1px rgba(220,38,38,.35),0 2px 5px rgba(220,38,38,.5);
+    pointer-events:none;z-index:5;
+    animation:newPulse 2.4s ease-in-out infinite}
+  /* Inside the dropdown the rows are full-width, so the dot rides the left
+     edge next to the icon instead of hanging off the corner. */
+  .menu-item[data-new]::after{top:50%;right:auto;left:2px;margin-top:-11px;
+    width:7px;height:7px}
+  @keyframes newPulse{
+    0%,100%{box-shadow:0 0 0 1px rgba(220,38,38,.35),0 2px 5px rgba(220,38,38,.5)}
+    50%    {box-shadow:0 0 0 4px rgba(220,38,38,.16),0 2px 5px rgba(220,38,38,.5)}}
+  @media (prefers-reduced-motion:reduce){[data-new]::after{animation:none}}
+  /* Seen: attribute removed by script, so no rule needed — kept explicit for
+     anyone reading this and wondering where the dot goes. */
+
   /* ══════════════ Review Queue ═════════════════════════════════════════
      The "Current Owner" view: everything parked in review, grouped by the
      person holding it now, worst delay first. Ported from the design mockup
@@ -10193,6 +10332,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.7.0  Daily Status export for any epic you paste (link or key), and red
+#          "new" markers on controls added or fixed this release — they clear
+#          per person once used, and re-arm on the next version.
 #   2.6.0  "Current Levels" — selecting Current Owner now replaces the weekly
 #          tables, KPI strip and analytics dashboard with a Review Queue:
 #          everything sitting in review, grouped by whoever holds it now,
@@ -10203,7 +10345,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.6.0"
+SITE_VERSION = "2.7.0"
 
 
 def _build_stamp():
