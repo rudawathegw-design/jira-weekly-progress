@@ -83,10 +83,12 @@ body{
 @media (min-width:2100px){ :root{ --page-max:1840px } }
 
 /* ── password overlay ────────────────────────────────────────── */
-/* Plain white field with a drafting grid — no gradients, no color wash. The
-   card is the only object on it; navy is the single accent. */
-#pw-overlay{position:fixed;inset:0;overflow:hidden;background:#fff;
+/* Soft off-white field with a drafting grid and a low cloud bank. Pure white
+   was glare on a large monitor; this settles a couple of steps down and gives
+   the glass card something to sit against. */
+#pw-overlay{position:fixed;inset:0;overflow:hidden;
   --pw-ink:#0f1c33; --pw-accent:#0a3b7c; --pw-teal:#0e9f8f;
+  background:linear-gradient(180deg,#f7f9fc 0%,#eef2f8 55%,#e4ebf5 100%);
   display:flex;align-items:center;justify-content:center;z-index:500;padding:24px}
 /* Two-tier grid: 24px minor, 120px major, so it reads as ruled paper rather
    than a flat texture. Fades out toward the edges. */
@@ -99,13 +101,26 @@ body{
   background-size:120px 120px,120px 120px,24px 24px,24px 24px;
   -webkit-mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 35%,transparent 100%);
           mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 35%,transparent 100%)}
-/* Faint tint pooled behind the card — gives the glass something to refract so
-   the blur is visible against an otherwise white field. */
-#pw-overlay::after{content:'';position:absolute;left:50%;top:50%;width:760px;height:640px;
-  transform:translate(-50%,-50%);pointer-events:none;
+/* Cloud bank along the bottom. Overlapping soft ellipses, no images — three
+   layers drifting at different speeds so it reads as depth rather than a
+   repeating pattern. The tint behind the card rides in the same layer. */
+#pw-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:
-    radial-gradient(ellipse 45% 50% at 32% 34%,rgba(19,102,204,.16),transparent 70%),
-    radial-gradient(ellipse 42% 46% at 72% 70%,rgba(14,159,143,.14),transparent 72%)}
+    /* tint pooled behind the card, so the glass has something to refract */
+    radial-gradient(ellipse 26% 30% at 42% 44%,rgba(19,102,204,.13),transparent 70%),
+    radial-gradient(ellipse 24% 28% at 60% 58%,rgba(14,159,143,.11),transparent 72%),
+    /* near clouds — larger, lighter, sit lowest */
+    radial-gradient(ellipse 34% 24% at 12% 99%,rgba(255,255,255,.95),transparent 62%),
+    radial-gradient(ellipse 40% 28% at 46% 103%,rgba(255,255,255,.92),transparent 62%),
+    radial-gradient(ellipse 36% 25% at 84% 100%,rgba(255,255,255,.95),transparent 62%),
+    /* far clouds — bluer and slightly higher, for depth */
+    radial-gradient(ellipse 30% 19% at 26% 90%,rgba(206,224,245,.9),transparent 64%),
+    radial-gradient(ellipse 32% 21% at 68% 93%,rgba(200,220,243,.85),transparent 64%),
+    radial-gradient(ellipse 26% 17% at 97% 86%,rgba(210,227,246,.8),transparent 66%);
+  animation:pwClouds 90s ease-in-out infinite alternate}
+/* A few pixels of travel is enough to feel alive without being noticeable. */
+@keyframes pwClouds{from{transform:translateX(-14px)}to{transform:translateX(14px)}}
+@media (prefers-reduced-motion:reduce){#pw-overlay::after{animation:none}}
 /* Glass card: translucent, blurred backdrop, bright top rim, soft inner glow. */
 .pw-card{position:relative;z-index:1;
   background:linear-gradient(150deg,rgba(255,255,255,.72),rgba(255,255,255,.52));
@@ -208,9 +223,18 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
   backdrop-filter:blur(4px);display:flex;align-items:center;
   justify-content:center;z-index:400;padding:20px}
 .modal-overlay.hidden{display:none}
-.modal{background:#fff;border:1.5px solid #e2e8f0;border-radius:18px;
+/* One shape for every dialog on the site. The only thing a modal picks is a
+   width tier (m-sm / m-md / m-lg / m-xl); padding, radius, height cap and
+   scroll behaviour are identical everywhere so they stop feeling ad-hoc. */
+.modal{--modal-w:720px;
+  background:#fff;border:1.5px solid #e2e8f0;border-radius:18px;
   box-shadow:0 24px 64px rgba(0,0,0,.18);
-  padding:28px 30px;width:min(580px,96vw);max-height:90vh;overflow-y:auto}
+  padding:26px 28px;width:min(var(--modal-w),96vw);
+  max-height:min(86vh,880px);overflow-y:auto}
+.modal.m-sm{--modal-w:520px}
+.modal.m-md{--modal-w:720px}
+.modal.m-lg{--modal-w:920px}
+.modal.m-xl{--modal-w:1120px}
 .modal h3{font-size:17px;font-weight:800;letter-spacing:-.03em;margin-bottom:18px;
   display:flex;align-items:center;gap:8px}
 .modal-section{margin-bottom:18px}
@@ -785,7 +809,6 @@ body.laser-on{cursor:none}
 body.laser-on #laser-dot{display:block}
 
 /* ── person Jira-links modal ─────────────────────────────────── */
-#person-modal .modal{max-width:720px}
 .pm-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .pm-name{font-size:18px;font-weight:800;letter-spacing:-.02em;color:#0f172a}
 .pm-sub{font-size:11.5px;color:#64748b;font-family:'JetBrains Mono',monospace}
@@ -823,7 +846,6 @@ body.laser-on #laser-dot{display:block}
 .pm-due.over{color:#dc2626;font-weight:700}
 
 /* ── Activity Log modal ──────────────────────────────────────── */
-#activity-modal .modal{max-width:980px;width:96vw}
 .act-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;
   padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}
 .act-filter-input{flex:1;min-width:160px;border:1.5px solid #e2e8f0;
@@ -1134,7 +1156,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Status Mapping Modal ═══════════════════════════════════ -->
 <div class="modal-overlay hidden" id="smap-modal">
-  <div class="modal">
+  <div class="modal m-md">
     <h3>🗂 Status mapping</h3>
     <p style="font-size:12.5px;color:#64748b;line-height:1.6;margin-bottom:16px">
       Choose which reporting column each Jira status rolls up into. Statuses marked
@@ -1151,7 +1173,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Export Modal ═══════════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="export-modal">
-  <div class="modal">
+  <div class="modal m-md">
     <h3>📷 Export Image</h3>
 
     <div class="modal-section">
@@ -1192,7 +1214,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Epic Excel Modal (choose start date) ════════════════════ -->
 <div class="modal-overlay hidden" id="epic-excel-modal" onclick="if(event.target===this)closeModal('epic-excel-modal')">
-  <div class="modal" style="max-width:420px">
+  <div class="modal m-sm">
     <h3>Daily status export</h3>
     <div class="modal-section">
       <div class="modal-section-label">Scope</div>
@@ -1216,7 +1238,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Compare Excel Modal ════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="compare-modal">
-  <div class="modal">
+  <div class="modal m-md">
     <h3>📊 Compare with Excel</h3>
     <p style="font-size:12.5px;color:#64748b;margin-bottom:14px">
       Upload your Excel file. The tool reads the first sheet and matches
@@ -1236,7 +1258,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Compare Periods Modal ══════════════════════════════════ -->
 <div class="modal-overlay hidden" id="compare-mode-modal">
-  <div class="modal" style="max-width:900px;width:96vw">
+  <div class="modal m-lg">
     <h3>🔍 Compare Two Snapshots</h3>
     <p style="font-size:12.5px;color:#64748b;margin-bottom:14px">
       Select any two snapshots from history to compare side-by-side. Useful for PMO
@@ -1262,7 +1284,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Activity Log Modal ═════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="activity-modal" onclick="if(event.target===this)closeModal('activity-modal')">
-  <div class="modal">
+  <div class="modal m-xl">
     <div class="pm-head">
       <div style="flex:1;min-width:0">
         <div class="pm-name" style="color:#0369a1">🕒 Activity Log</div>
@@ -1292,7 +1314,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Overdue Tasks Modal ════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="overdue-modal" onclick="if(event.target===this)closeModal('overdue-modal')">
-  <div class="modal" style="max-width:880px">
+  <div class="modal m-lg">
     <div class="pm-head">
       <div style="flex:1;min-width:0">
         <div class="pm-name" id="ov-title" style="color:#991b1b">⚠ Overdue tasks</div>
@@ -1335,7 +1357,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Comment-on-Overdue Modal ═══════════════════════════════ -->
 <div class="modal-overlay hidden" id="comment-modal" onclick="if(event.target===this)closeModal('comment-modal')">
-  <div class="modal" style="max-width:760px">
+  <div class="modal m-md">
     <div class="pm-head">
       <div style="flex:1;min-width:0">
         <div class="pm-name" style="color:#15803d">💬 Comment on overdue issues</div>
@@ -1407,7 +1429,7 @@ CC: @cc</textarea>
 
 <!-- ═══════════════ Team Directory (emails) Modal ══════════════════════════ -->
 <div class="modal-overlay hidden" id="directory-modal" onclick="if(event.target===this)closeModal('directory-modal')">
-  <div class="modal" style="max-width:720px">
+  <div class="modal m-md">
     <div class="pm-head">
       <div style="flex:1;min-width:0">
         <div class="pm-name" style="color:#0f766e">👥 Team directory</div>
@@ -1427,7 +1449,7 @@ CC: @cc</textarea>
 
 <!-- ═══════════════ Person Jira Links Modal ════════════════════════════════ -->
 <div class="modal-overlay hidden" id="person-modal" onclick="if(event.target===this)closeModal('person-modal')">
-  <div class="modal">
+  <div class="modal m-md">
     <div class="pm-head">
       <div style="flex:1;min-width:0">
         <div class="pm-name" id="pm-name">—</div>
@@ -1444,7 +1466,7 @@ CC: @cc</textarea>
 
 <!-- ═══════════════ Send by Email Modal ════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="email-modal">
-  <div class="modal" style="max-width:580px">
+  <div class="modal m-sm">
     <h3>📧 Send Report by Email</h3>
     <p style="font-size:12.5px;color:#64748b;margin-bottom:6px" id="email-attach-info">
       Sends the default full report PNG. Use the Export Image button if you
@@ -3006,10 +3028,13 @@ function renderDonut() {
     const ir = r - sw;
     const ix1 = cx + ir*Math.cos(a1), iy1 = cy + ir*Math.sin(a1);
     const ix2 = cx + ir*Math.cos(a2), iy2 = cy + ir*Math.sin(a2);
-    // Full-circle edge case (one segment is 100%): use two arcs
+    // Full-circle edge case (one segment is 100%). A stroked circle, not a
+    // filled disc with a smaller white disc punched over it — the card is
+    // translucent now, so an opaque #fff hole reads as a bright blob instead
+    // of letting the glass through like every other slice does.
     if (s.val === total) {
-      paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${s.color}" />
-                <circle cx="${cx}" cy="${cy}" r="${ir}" fill="#fff" />`;
+      paths += `<circle cx="${cx}" cy="${cy}" r="${(r + ir) / 2}" fill="none"
+                        stroke="${s.color}" stroke-width="${r - ir}" />`;
     } else {
       paths += `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="${s.color}" />`;
     }
@@ -8926,6 +8951,216 @@ document.addEventListener('keydown', function(e){
   .sw3{background:#f7faf9;background-image:linear-gradient(#cfe3df 1px,transparent 1px),linear-gradient(90deg,#cfe3df 1px,transparent 1px);background-size:9px 9px}
   .sw4{background:repeating-linear-gradient(45deg,#f3f6ff,#f3f6ff 6px,#dde7ff 6px,#dde7ff 12px)}
   .sw5{background:radial-gradient(circle at 25% 25%,#d8f3ee,transparent 60%),radial-gradient(circle at 80% 70%,#e7dcff,transparent 60%),#fff}
+
+  /* ══════════════ glass surface layer ══════════════════════════════════
+     One material for every raised surface: a translucent white pane over a
+     blurred backdrop, a bright top rim, and a single soft drop shadow. This
+     block comes last on purpose — it restyles the surfaces defined earlier
+     without touching their layout, so spacing and behaviour stay as-is. */
+  :root{
+    /* Panes sit a couple of steps below pure white so a large screen full of
+       them is not glare; the ground behind is deepened to match, which is what
+       makes the glass read as glass instead of as flat white boxes. */
+    --glass:linear-gradient(155deg,rgba(255,255,255,.78),rgba(255,255,255,.58));
+    --glass-2:linear-gradient(155deg,rgba(255,255,255,.68),rgba(255,255,255,.48));
+    --glass-brd:rgba(255,255,255,.82);
+    --glass-blur:blur(18px) saturate(1.6);
+    --glass-blur-sm:blur(12px) saturate(1.5);
+    --glass-shadow:0 1px 2px rgba(15,23,42,.04),
+                   0 20px 44px -26px rgba(15,23,42,.38);
+    --glass-rim:inset 0 1px 0 rgba(255,255,255,.9);
+    /* The gloss: a specular band across the top edge of a pane. Applied via a
+       ::before overlay so it never repaints the pane's own background. */
+    --glass-gloss:linear-gradient(180deg,rgba(255,255,255,.55),
+                                         rgba(255,255,255,.12) 46%,transparent);
+  }
+  /* Ground. Deep enough that translucent panes have something to refract, light
+     enough to still read as a white page. */
+  body{
+    background:
+      radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.20),transparent 62%),
+      radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.16),transparent 64%),
+      linear-gradient(180deg,#eef2f8 0%,#e9eef6 52%,#e4ebf4 100%) !important;
+    background-attachment:fixed !important;
+  }
+  .stat,.card,.analytics-card,.attr-bar,.kpi-tile,.esc-row,.modal{
+    background:var(--glass) !important;
+    -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+    border:1px solid var(--glass-brd) !important;
+    box-shadow:var(--glass-shadow),var(--glass-rim) !important;
+  }
+  /* Radii step with the size of the surface, so a KPI tile does not carry the
+     same corner as a full-width card. */
+  .stat,.card,.analytics-card,.attr-bar{border-radius:16px !important}
+  .kpi-tile,.esc-row{border-radius:11px !important}
+  /* The accent rides as an inset pill, not a thick left border — a border
+     follows the 11px radius and curves into a sliver at the corners. */
+  .esc-row{position:relative;padding-left:18px}
+  .esc-row::before{content:'';position:absolute;left:7px;top:7px;bottom:7px;
+    width:3px;border-radius:2px;background:#ea7c2b}
+  .esc-row.amber::before{background:#d97706}
+  /* Hairline separator instead of a hard border, so the pane reads as one
+     piece of glass rather than stacked boxes. */
+  .analytics-header{border-bottom-color:rgba(15,23,42,.07)}
+  /* The small tiles are the ones people hover over; give them a little lift. */
+  .stat,.kpi-tile{transition:transform .18s cubic-bezier(.22,1,.36,1),
+                             box-shadow .18s}
+  .stat:hover,.kpi-tile:hover{transform:translateY(-2px);
+    box-shadow:0 1px 2px rgba(15,23,42,.05),
+               0 26px 52px -24px rgba(15,23,42,.42),var(--glass-rim) !important}
+
+  /* ── dialogs ──────────────────────────────────────────────────────────
+     Sizes live in the .m-sm/.m-md/.m-lg/.m-xl tiers on .modal. Here we give
+     every dialog the same chrome: a frosted scrim, a sticky title bar and a
+     sticky action row, so the header and buttons stay put on long lists. */
+  .modal-overlay{background:rgba(15,23,42,.42);
+    -webkit-backdrop-filter:blur(8px) saturate(1.2);
+    backdrop-filter:blur(8px) saturate(1.2)}
+  .modal{background:linear-gradient(155deg,rgba(255,255,255,.94),
+                                    rgba(255,255,255,.88)) !important;
+    box-shadow:0 40px 90px -30px rgba(15,23,42,.5),var(--glass-rim) !important;
+    animation:modalIn .22s cubic-bezier(.22,1,.36,1) both;
+    scrollbar-width:thin}
+  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.99)}
+                     to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.modal{animation:none}}
+  .modal > h3{position:sticky;top:-26px;z-index:3;
+    margin:-26px -28px 18px;padding:22px 28px 14px;
+    background:rgba(255,255,255,.9);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border-bottom:1px solid rgba(15,23,42,.07);border-radius:18px 18px 0 0}
+  .modal > .modal-actions{position:sticky;bottom:-26px;z-index:3;
+    margin:22px -28px -26px;padding:14px 28px 20px;
+    background:rgba(255,255,255,.9);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border-top:1px solid rgba(15,23,42,.07);border-radius:0 0 18px 18px}
+  .btn-modal{border-radius:10px;padding:10px 20px;
+    transition:transform .15s,box-shadow .15s,opacity .15s}
+  .btn-modal:hover{transform:translateY(-1px)}
+  .btn-modal.blue{box-shadow:0 8px 20px -10px rgba(29,78,216,.7)}
+  .btn-modal.ghost{background:rgba(15,23,42,.05);
+    border:1px solid rgba(15,23,42,.07)}
+  @media (max-width:640px){
+    .modal{padding:20px 18px;max-height:92vh;border-radius:16px}
+    .modal > h3{margin:-20px -18px 14px;padding:18px 18px 12px}
+    .modal > .modal-actions{margin:18px -18px -20px;padding:12px 18px 16px;
+      flex-wrap:wrap}
+  }
+
+  /* ══════════════ glass, everywhere else ═══════════════════════════════
+     Same material as above, extended to the surfaces the first pass missed:
+     the top bar, filter panels, weekly table cards, tab bar, chips, menus and
+     the theme popover. Layout is untouched — only fill, rim and shadow. */
+  .topbar,.panel > .filter-bar,.col-block,.ai-card,.theme-pop,.menu-items,
+  .ticker-strip,.pmo-section,.risk-card{
+    background:var(--glass) !important;
+    -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+    border:1px solid var(--glass-brd) !important;
+    box-shadow:var(--glass-shadow),var(--glass-rim) !important;
+    border-radius:16px !important;
+  }
+  /* The warning card keeps its amber identity, just as tinted glass. */
+  .risk-card{background:linear-gradient(155deg,rgba(255,251,235,.86),
+                                        rgba(254,243,199,.6)) !important;
+    border-color:rgba(253,230,138,.85) !important;border-radius:12px !important}
+
+  /* Gloss. One highlight sweeping the top edge — the tell that a pane is glass
+     rather than a flat white box. Non-interactive, clipped to the radius. */
+  .stat,.card,.analytics-card,.attr-bar,.kpi-tile,.topbar,
+  .panel > .filter-bar,.col-block,.ai-card{position:relative}
+  .stat::after,.card::after,.analytics-card::after,.attr-bar::after,
+  .kpi-tile::after,.topbar::after,.panel > .filter-bar::after,
+  .col-block::after,.ai-card::after{
+    content:'';position:absolute;left:0;right:0;top:0;height:44%;
+    border-radius:inherit;border-bottom-left-radius:0;border-bottom-right-radius:0;
+    background:var(--glass-gloss);pointer-events:none;z-index:0}
+  /* Content rides above the highlight. */
+  .topbar > *,.panel > .filter-bar > *,.col-block > *,.stat > *,
+  .kpi-tile > *,.analytics-card > *,.ai-card > *{position:relative;z-index:1}
+
+  /* ── tables inside a glass card ───────────────────────────────────────
+     Rows go transparent so the pane below shows through as one sheet; the
+     header keeps a faint frost and sticks to the top of the card. */
+  .col-block table{background:transparent}
+  .col-block thead tr{background:linear-gradient(180deg,rgba(255,255,255,.72),
+                                                 rgba(255,255,255,.42)) !important;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
+  .col-block thead th{border-bottom:1px solid rgba(15,23,42,.10)}
+  tbody tr.data-row{background:transparent !important}
+  tbody td{border-bottom:1px solid rgba(15,23,42,.055)}
+  tbody tr.data-row:hover{background:rgba(255,255,255,.55) !important}
+  /* Card header banner: frosted, hairline rule instead of the 2px slab. */
+  .col-hdr{background:linear-gradient(180deg,rgba(255,255,255,.62),
+                                      rgba(255,255,255,.28)) !important;
+    border-bottom:1px solid rgba(15,23,42,.09) !important}
+  /* The totals row stays the darkest value on the page, but as smoked glass so
+     it belongs to the same material family. */
+  .total-row td{background:linear-gradient(180deg,rgba(30,41,59,.92),
+                                           rgba(15,23,42,.94)) !important;
+    border-top:2px solid rgba(59,130,246,.75) !important}
+
+  /* ── small controls ───────────────────────────────────────────────────
+     Buttons, inputs and pills get the same translucency at a lighter weight.
+     Coloured variants (.chip.blue/.green/.primary) are left alone — they are
+     the page's accents and should stay solid. */
+  .chip:not(.blue):not(.green):not(.primary),
+  .col-hdr-btn,.tab-btn.active,.search-inp,.baseline-sel,.week-sel,
+  .attr-btn,.rbtn,.check-item,.act-filter-input,.act-filter-sel{
+    background:var(--glass-2) !important;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
+    border:1px solid rgba(255,255,255,.78) !important;
+    box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.85);
+  }
+  .chip:not(.blue):not(.green):not(.primary):hover,
+  .col-hdr-btn:hover,.attr-btn:hover,.rbtn:hover,.check-item:hover{
+    background:linear-gradient(155deg,rgba(255,255,255,.9),
+                               rgba(255,255,255,.68)) !important;
+    box-shadow:0 6px 16px -8px rgba(15,23,42,.35),
+               inset 0 1px 0 rgba(255,255,255,.95)}
+  .search-inp:focus,.baseline-sel:focus,.week-sel:focus{
+    background:rgba(255,255,255,.94) !important;
+    box-shadow:0 0 0 3px rgba(59,130,246,.16)}
+  /* Tab bar: the track is a recessed trough, the active tab a lifted pane. */
+  .tab-bar{background:rgba(255,255,255,.34) !important;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 3px rgba(15,23,42,.07)}
+  .tab-btn.active{box-shadow:0 4px 12px -6px rgba(15,23,42,.4),
+                             inset 0 1px 0 rgba(255,255,255,.95) !important}
+  /* The filter strip inside a card is part of the same sheet, not a grey band. */
+  .filter-bar{background:transparent;border-bottom-color:rgba(15,23,42,.07)}
+
+  /* Selected/active states keep their colour, rendered as tinted glass. */
+  .check-item.on{background:linear-gradient(155deg,rgba(219,234,254,.9),
+                                            rgba(191,219,254,.62)) !important;
+    border-color:rgba(147,197,253,.85) !important}
+  .vis-btn{background:linear-gradient(155deg,rgba(240,253,244,.88),
+                                      rgba(220,252,231,.6)) !important;
+    border-color:rgba(187,247,208,.9) !important;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
+  .vis-btn.hidden-person{background:linear-gradient(155deg,rgba(255,245,245,.9),
+                                                    rgba(254,226,226,.62)) !important;
+    border-color:rgba(254,202,202,.9) !important}
+
+  /* Image export: html2canvas cannot rasterise backdrop-filter, so freeze the
+     glass to a solid pane for the duration of the capture. */
+  body.capturing .stat,body.capturing .card,body.capturing .analytics-card,
+  body.capturing .attr-bar,body.capturing .kpi-tile,body.capturing .esc-row,
+  body.capturing .topbar,body.capturing .col-block,body.capturing .ai-card,
+  body.capturing .panel > .filter-bar,
+  body.capturing .modal{
+    background:#fff !important;border-color:#e4e7ec !important;
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    box-shadow:0 1px 3px rgba(15,23,42,.08) !important;transform:none !important}
+  /* The gloss overlay and the see-through rows are equally unrasterisable. */
+  body.capturing .stat::after,body.capturing .card::after,
+  body.capturing .analytics-card::after,body.capturing .attr-bar::after,
+  body.capturing .kpi-tile::after,body.capturing .topbar::after,
+  body.capturing .col-block::after,body.capturing .ai-card::after,
+  body.capturing .panel > .filter-bar::after{display:none}
+  body.capturing tbody tr.data-row{background:#fff !important}
+  body.capturing .col-block thead tr{background:#f1f5f9 !important}
+  body.capturing .col-hdr{background:#f8fafc !important}
 </style>
 
 <div class="fab-stack">
@@ -9103,6 +9338,59 @@ h1 span{color:#2563eb}
   color:#475569;transition:all .15s}
 .day-toggles label:has(input:checked){background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
 .day-toggles input{accent-color:#2563eb}
+
+/* ══════════════ glass surface layer ══════════════════════════════════
+   Same material as the report page so admin does not look like a different
+   product: translucent white panes on a deepened ground, one gloss band per
+   pane, accents left solid. Fill and rim only — layout is untouched. */
+:root{
+  --glass:linear-gradient(155deg,rgba(255,255,255,.78),rgba(255,255,255,.58));
+  --glass-2:linear-gradient(155deg,rgba(255,255,255,.68),rgba(255,255,255,.48));
+  --glass-brd:rgba(255,255,255,.82);
+  --glass-blur:blur(18px) saturate(1.6);
+  --glass-blur-sm:blur(12px) saturate(1.5);
+  --glass-shadow:0 1px 2px rgba(15,23,42,.04),
+                 0 20px 44px -26px rgba(15,23,42,.38);
+  --glass-rim:inset 0 1px 0 rgba(255,255,255,.9);
+  --glass-gloss:linear-gradient(180deg,rgba(255,255,255,.55),
+                                       rgba(255,255,255,.12) 46%,transparent);
+}
+body{
+  background:
+    radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.20),transparent 62%),
+    radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.16),transparent 64%),
+    linear-gradient(180deg,#eef2f8 0%,#e9eef6 52%,#e4ebf4 100%);
+  background-attachment:fixed;
+}
+.card,.pw-card,.run-item{
+  position:relative;
+  background:var(--glass);
+  -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-brd);
+  box-shadow:var(--glass-shadow),var(--glass-rim);
+  border-radius:16px;
+}
+.pw-card{border-radius:20px}
+.card::after,.pw-card::after{content:'';position:absolute;left:0;right:0;top:0;
+  height:44%;border-radius:inherit;
+  border-bottom-left-radius:0;border-bottom-right-radius:0;
+  background:var(--glass-gloss);pointer-events:none;z-index:0}
+.card > *,.pw-card > *{position:relative;z-index:1}
+#pw-overlay{background:
+    radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.28),transparent 62%),
+    radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.22),transparent 64%),
+    linear-gradient(180deg,#eef2f8 0%,#e6ecf5 100%)}
+.inp,.tok-inp,.sched-time,.back,.day-toggles label{
+  background:var(--glass-2);
+  -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.85)}
+.inp:focus,.tok-inp:focus,.sched-time:focus{background:rgba(255,255,255,.94)}
+.back:hover,.run-item:hover{background:linear-gradient(155deg,rgba(255,255,255,.9),
+                                       rgba(255,255,255,.68))}
+.run-item{border-radius:12px;margin-bottom:8px}
+.log-box{background:rgba(15,23,42,.9);
+  -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
 </style>
 </head>
 <body>
