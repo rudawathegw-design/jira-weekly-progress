@@ -7510,7 +7510,7 @@ async function exportEpicExcel(historyStart, scope){
 
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
-    s.onload = () => {
+    const buildSheet = () => {
       try {
         const dayLabels = days.map((d,i)=>{
           const label = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
@@ -7594,6 +7594,11 @@ async function exportEpicExcel(historyStart, scope){
         toast('Export failed: '+e.message);
       }
     };
+    // Only fetch the library when it isn't already loaded. Re-appending the
+    // script made every export after the first depend on the CDN answering
+    // again, and fail silently — no workbook, no error — when it didn't.
+    if (window.XLSX && XLSX.utils && XLSX.writeFile) { buildSheet(); return; }
+    s.onload = buildSheet;
     s.onerror = () => toast('Failed to load styled XLSX library.');
     document.head.appendChild(s);
   } catch(e){
@@ -9310,7 +9315,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.5.0"
+SITE_VERSION = "2.5.1"
 
 
 def _build_stamp():
