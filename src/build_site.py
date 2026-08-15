@@ -10115,11 +10115,17 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.6.0  "Current Levels" — selecting Current Owner now replaces the weekly
+#          tables, KPI strip and analytics dashboard with a Review Queue:
+#          everything sitting in review, grouped by whoever holds it now,
+#          worst delay first, with stage filters, an A–Z rail and per-stage
+#          headings. Glass surface treatment across the report, admin and
+#          portfolio pages.
 #   2.1.0  Owner attribution by review level: tasks at "Revision Level 1/2" are
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.5.1"
+SITE_VERSION = "2.6.0"
 
 
 def _build_stamp():
