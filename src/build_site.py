@@ -510,6 +510,7 @@ body.capturing .topbar-right{display:none !important}
 .donut-row-sw{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 .donut-row-name{flex:1;color:#334155}
 .donut-row-val{font-family:'JetBrains Mono',monospace;font-weight:700;color:#0f172a}
+.donut-note{font-size:10.5px;color:#94a3b8;line-height:1.45;margin-top:8px;padding-top:7px;border-top:1px dashed #e2e8f0}
 .analytics-bars{min-width:0}
 
 /* ── PMO Health Dashboard ────────────────────────────────────── */
@@ -548,6 +549,8 @@ body.capturing .topbar-right{display:none !important}
   text-transform:uppercase;letter-spacing:.08em;line-height:1.2}
 .kpi-tile-value{font-size:20px;font-weight:800;color:#0f172a;
   font-family:'JetBrains Mono',monospace;line-height:1.1;margin-top:4px}
+.kpi-d{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;margin-left:4px}
+.kpi-d.up{color:#047857}.kpi-d.down{color:#b91c1c}.kpi-d.flat{color:#94a3b8}
 .kpi-tile-sub{font-size:10.5px;color:#94a3b8;line-height:1.2;margin-top:2px}
 .kpi-good{color:#059669 !important}
 .kpi-warn{color:#d97706 !important}
@@ -563,6 +566,7 @@ body.capturing .topbar-right{display:none !important}
   color:#94a3b8;width:18px}
 .esc-name{font-weight:700;color:#0f172a;flex-shrink:0}
 .esc-reasons{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+.esc-chip.muted{background:#f1f5f9;border-color:#e2e8f0;color:#64748b}
 .esc-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;
   background:#fff3e0;color:#b45309}
 .esc-chip.amber{background:#fef3c7;color:#92400e}
@@ -1966,6 +1970,9 @@ const DEFAULT_STATUS_MAP = {
   'revision level 2':'Waiting For Approval',
   'done':'Completed', 'available':'Completed',
 };
+// Below this many tasks, a completion percentage says more about the
+// denominator than about the person.
+const _WL_MIN_TASKS = 3;
 const REVIEW_STATUSES = new Set(['waiting for approval','revision level 1','revision level 2']);
 const ATTR_LS_KEY = 'fibtmp_attribution_v1';
 
@@ -3316,7 +3323,17 @@ async function copyAnalyticsDashboard(btn) {
 // ── Analytics: donut + top/bottom performer bars ───────────────────────────
 function renderDonut() {
   _updateAnalyticsTime();
-  const rows = REPORT.rows;
+  // Same population as the KPI strip beside it. This used to read REPORT.rows
+  // raw — every row, including Unassigned and hidden people — while the KPIs
+  // filtered both out. The two sat side by side on one card showing different
+  // totals (465 vs 440), which is the fastest way to lose an executive's
+  // trust in every other number on the page.
+  const _excluded = { rows:0, tasks:0 };
+  const rows = (REPORT.rows || []).filter(r => {
+    const keep = r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner);
+    if (!keep && (r.total||0) > 0){ _excluded.rows++; _excluded.tasks += (r.total||0); }
+    return keep;
+  });
   const totals = rows.reduce((acc, r) => {
     acc.open += r.open||0;
     acc.in_progress += r.in_progress||0;
@@ -3371,6 +3388,7 @@ function renderDonut() {
       <span class="donut-row-name">${s.label}</span>
       <span class="donut-row-val">${s.val} <span style="color:#94a3b8;font-weight:500">(${Math.round(s.val/total*100)}%)</span></span>
     </div>`).join('')}
+    ${_excluded.tasks ? `<div class="donut-note">Excludes ${_excluded.tasks} task(s) with no assignee or on hidden people — the KPIs beside this use the same basis.</div>` : ''}
     <div class="donut-row" style="border-top:1px solid #e2e8f0;padding-top:6px;margin-top:4px">
       <span class="donut-row-name" style="color:#0f172a;font-weight:700">Total tasks</span>
       <span class="donut-row-val">${total}</span>
@@ -3433,22 +3451,88 @@ function renderPMOPanel() {
   // ── Escalation watchlist (PMO action items) ──
   // All rows with at least 1 overdue — these always appear in the watchlist.
   // Rows with NO overdue but with other concerns (low %, negative WoW) also appear.
+  // Watchlist ranking. Percentages are meaningless at tiny denominators: an
+  // owner holding one unfinished task reads as "0%" and used to outrank someone
+  // carrying 108 tasks with 20 overdue. So:
+  //   · percentage-based reasons need at least _WL_MIN_TASKS tasks behind them
+  //   · the percentage penalty scales with workload, reaching full weight at 10
+  //   · overdue work always counts, whatever the denominator — it is real
+  //   · anyone below the threshold with nothing overdue drops off entirely
+  // Ranking therefore follows impact (how much late work) rather than ratio.
   const watchlistFull = rows.slice().map(r => {
     const reasons = [];
     const pct = r.this_week||0;
-    const ov = r.overdue||0;
-    const d = r.delta;
+    const ov  = r.overdue||0;
+    const d   = r.delta;
+    const n   = r.total||0;
+    const enoughSample = n >= _WL_MIN_TASKS;
+
     if (ov >= 4) reasons.push({txt:`${ov} overdue`, cls:'esc-chip'});
     else if (ov >= 2) reasons.push({txt:`${ov} overdue`, cls:'esc-chip amber'});
     else if (ov === 1) reasons.push({txt:`1 overdue`, cls:'esc-chip amber'});
-    if (pct < 30) reasons.push({txt:`only ${pct}%`, cls:'esc-chip'});
-    else if (pct < 50) reasons.push({txt:`${pct}%`, cls:'esc-chip amber'});
-    if (d !== null && d !== undefined && d < -5) reasons.push({txt:`${d}% WoW`, cls:'esc-chip'});
-    if (pct === 0 && (r.total||0) > 2) reasons.push({txt:'no progress', cls:'esc-chip'});
-    const score = ov*15 + Math.max(0,50-pct) + (d<0?Math.abs(d)*2:0);
+
+    if (enoughSample){
+      if (pct < 30) reasons.push({txt:`only ${pct}%`, cls:'esc-chip'});
+      else if (pct < 50) reasons.push({txt:`${pct}%`, cls:'esc-chip amber'});
+      if (d !== null && d !== undefined && d < -5) reasons.push({txt:`${d}% WoW`, cls:'esc-chip'});
+      if (pct === 0 && n > 2) reasons.push({txt:'no progress', cls:'esc-chip'});
+    } else if (reasons.length){
+      // Kept because of real overdue work, but flagged so nobody reads the
+      // percentage as comparable to someone carrying a full load.
+      reasons.push({txt:`only ${n} task${n===1?'':'s'}`, cls:'esc-chip muted'});
+    }
+
+    const volume = Math.min(1, n / 10);
+    const score  = ov*15
+                 + (enoughSample ? Math.max(0,50-pct)*volume : 0)
+                 + (enoughSample && d < 0 ? Math.abs(d)*2 : 0);
     return {...r, _reasons: reasons, _score: score};
   }).filter(r => r._reasons.length > 0)
-    .sort((a,b) => b._score - a._score);
+    .sort((a,b) => b._score - a._score || (b.overdue||0) - (a.overdue||0));
+  // ── Direction, ageing and waiting time ────────────────────────────────
+  // A level on its own ("53 overdue") does not tell anyone whether things are
+  // getting better, how late "late" is, or how long approvals have sat. All
+  // three come from data already on the page.
+
+  // Week-over-week movement, from the previous saved snapshot on the series
+  // matching the current attribution mode.
+  const _prevSnap = (REPORT.history || []).slice(-2)[0] || null;
+  const _prevPeople = _prevSnap
+    ? ((typeof _snapshotPeople === 'function' ? _snapshotPeople(_prevSnap, _ATTR.mode) : null) || _prevSnap.people || {})
+    : null;
+  let _prev = null;
+  if (_prevPeople){
+    let pT=0,pD=0,pOv=0;
+    Object.values(_prevPeople).forEach(v => {
+      pT += v.total||0; pD += v.completed||0; pOv += v.overdue||0;
+    });
+    if (pT) _prev = { completion:+(pD/pT*100).toFixed(1), overdueRate:+(pOv/pT*100).toFixed(1) };
+  }
+  // lowerIsBetter flips the colour: a rising overdue rate is not good news.
+  const _delta = (now, before, lowerIsBetter) => {
+    if (before === null || before === undefined) return '';
+    const d = +(now - before).toFixed(1);
+    if (Math.abs(d) < 0.1) return `<span class="kpi-d flat">no change</span>`;
+    const good = lowerIsBetter ? d < 0 : d > 0;
+    const arrow = d > 0 ? '▲' : '▼';
+    return `<span class="kpi-d ${good?'up':'down'}">${arrow} ${Math.abs(d)} pts</span>`;
+  };
+
+  // How late is late. A 2-day slip and a 5-month one are not the same problem,
+  // and the count alone hides which you have.
+  const _recs = REPORT.records || rows.flatMap(r => r.issues || []);
+  const _ovAges = _recs.filter(i => i.overdue).map(i => _overdueDaysNum(i.due)).filter(n => n !== null);
+  const _bucket = { week:0, month:0, older:0 };
+  _ovAges.forEach(n => { if (n <= 7) _bucket.week++; else if (n <= 30) _bucket.month++; else _bucket.older++; });
+  const _oldestOv = _ovAges.length ? Math.max(..._ovAges) : 0;
+
+  // Approvals: the count matters far less than how long they have waited.
+  const _waits = _recs.filter(i => i.in_review).map(i => _overdueDaysNum(i.due)).filter(n => n !== null);
+  const _median = arr => { if (!arr.length) return 0; const a=arr.slice().sort((x,y)=>x-y);
+    const m=Math.floor(a.length/2); return a.length%2 ? a[m] : Math.round((a[m-1]+a[m])/2); };
+  const _waitMax = _waits.length ? Math.max(..._waits) : 0;
+  const _waitMed = _median(_waits);
+
   const watchlist = _pmoWatchlistExpanded ? watchlistFull : watchlistFull.slice(0, 5);
   const hiddenCount = watchlistFull.length - watchlist.length;
 
@@ -3463,8 +3547,8 @@ function renderPMOPanel() {
       </div>
       <div class="rag-legend">
         <span><span class="rag-legend-dot" style="background:#059669"></span><strong>${rag.green.length}</strong> Healthy (≥80%, ≤1 overdue)</span>
-        <span><span class="rag-legend-dot" style="background:#d97706"></span><strong>${rag.amber.length}</strong> Watch</span>
-        <span><span class="rag-legend-dot" style="background:#dc2626"></span><strong>${rag.red.length}</strong> At Risk</span>
+        <span><span class="rag-legend-dot" style="background:#d97706"></span><strong>${rag.amber.length}</strong> Watch (50–79%, or 2–3 overdue)</span>
+        <span><span class="rag-legend-dot" style="background:#dc2626"></span><strong>${rag.red.length}</strong> At Risk (&lt;50%, or 4+ overdue)</span>
       </div>
     </div>
 
@@ -3474,22 +3558,22 @@ function renderPMOPanel() {
         <div class="kpi-tile">
           <div class="kpi-tile-label">Completion</div>
           <div class="kpi-tile-value ${compClass}">${completion}%</div>
-          <div class="kpi-tile-sub">${gDone} / ${gTotal} tasks</div>
+          <div class="kpi-tile-sub">${gDone} / ${gTotal} tasks ${_delta(completion, _prev&&_prev.completion, false)}</div>
         </div>
         <div class="kpi-tile">
           <div class="kpi-tile-label">Overdue Rate</div>
           <div class="kpi-tile-value ${ovClass}">${overdueRate}%</div>
-          <div class="kpi-tile-sub">${gOv} of ${gTotal} past due</div>
+          <div class="kpi-tile-sub">${gOv} of ${gTotal} past due ${_delta(overdueRate, _prev&&_prev.overdueRate, true)}</div>
         </div>
         <div class="kpi-tile">
-          <div class="kpi-tile-label">WIP Ratio</div>
-          <div class="kpi-tile-value ${wipClass}">${wipRatio}%</div>
-          <div class="kpi-tile-sub">${gIP} in progress</div>
+          <div class="kpi-tile-label">Overdue Age</div>
+          <div class="kpi-tile-value ${_bucket.older ? 'kpi-bad' : _bucket.month ? 'kpi-warn' : 'kpi-good'}">${_oldestOv}d</div>
+          <div class="kpi-tile-sub">oldest · ${_bucket.week}/${_bucket.month}/${_bucket.older} in &le;7d / &le;30d / 30d+</div>
         </div>
         <div class="kpi-tile">
           <div class="kpi-tile-label">Approval Queue</div>
           <div class="kpi-tile-value ${wfaClass}">${gWFA}</div>
-          <div class="kpi-tile-sub">waiting for sign-off</div>
+          <div class="kpi-tile-sub">${_waitMax ? `longest ${_waitMax}d · median ${_waitMed}d past due` : 'none past due'}</div>
         </div>
       </div>
     </div>
@@ -7168,20 +7252,30 @@ function _computePMOSummary() {
   const overdueRate = gTotal ? +(gOv/gTotal*100).toFixed(1) : 0;
   const wipRatio     = gTotal ? +(gIP/gTotal*100).toFixed(1) : 0;
 
+  // Same ranking rules as the on-screen watchlist — see the note there. The
+  // deck and the dashboard must not disagree about who the top concern is.
   const watchlistFull = rows.slice().map(r => {
     const reasons = [];
-    const pct = r.this_week||0, ov = r.overdue||0, d = r.delta;
+    const pct = r.this_week||0, ov = r.overdue||0, d = r.delta, n = r.total||0;
+    const enoughSample = n >= _WL_MIN_TASKS;
     if (ov >= 4) reasons.push(`${ov} overdue`);
     else if (ov >= 2) reasons.push(`${ov} overdue`);
     else if (ov === 1) reasons.push(`1 overdue`);
-    if (pct < 30) reasons.push(`only ${pct}%`);
-    else if (pct < 50) reasons.push(`${pct}%`);
-    if (d !== null && d !== undefined && d < -5) reasons.push(`${d}% WoW`);
-    if (pct === 0 && (r.total||0) > 2) reasons.push('no progress');
-    const score = ov*15 + Math.max(0,50-pct) + (d<0?Math.abs(d)*2:0);
+    if (enoughSample){
+      if (pct < 30) reasons.push(`only ${pct}%`);
+      else if (pct < 50) reasons.push(`${pct}%`);
+      if (d !== null && d !== undefined && d < -5) reasons.push(`${d}% WoW`);
+      if (pct === 0 && n > 2) reasons.push('no progress');
+    } else if (reasons.length){
+      reasons.push(`only ${n} task${n===1?'':'s'}`);
+    }
+    const volume = Math.min(1, n / 10);
+    const score  = ov*15
+                 + (enoughSample ? Math.max(0,50-pct)*volume : 0)
+                 + (enoughSample && d < 0 ? Math.abs(d)*2 : 0);
     return {...r, _reasons: reasons, _score: score};
   }).filter(r => r._reasons.length > 0)
-    .sort((a,b) => b._score - a._score);
+    .sort((a,b) => b._score - a._score || (b.overdue||0) - (a.overdue||0));
 
   // Per-owner breakdown sorted best → worst for the team slide
   const teamRows = rows.slice().sort((a,b) => (b.this_week||0) - (a.this_week||0));
@@ -10561,6 +10655,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.9.0  Analytics card: donut and KPIs now count the same population,
+#          watchlist ranks by impact instead of raw percentage, KPIs carry
+#          week-over-week direction, overdue ageing replaces WIP ratio, and
+#          the approval queue shows how long things have waited.
 #   2.8.2  Worker returns real errors instead of dropping the connection, and
 #          the live pull is served from a 15s shared cache so a 10-second
 #          poll no longer re-derives everything per tab.
@@ -10583,7 +10681,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.8.2"
+SITE_VERSION = "2.9.0"
 
 
 def _build_stamp():
