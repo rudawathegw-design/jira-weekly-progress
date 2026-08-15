@@ -1852,7 +1852,7 @@ CC: @cc</textarea>
     <div class="rq-head-row">
       <div>
         <div class="rq-kick">Current Owner</div>
-        <h2 class="rq-title">Review Queue</h2>
+        <h2 class="rq-title">Current Levels</h2>
         <p class="rq-lede">Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
       </div>
       <button class="chip" onclick="setAttrMode('assignee')"
@@ -1864,6 +1864,7 @@ CC: @cc</textarea>
       <input class="rq-search" id="rq-search" type="search"
              placeholder="Filter by name, key or summary…" oninput="_rqRender()">
     </div>
+    <div class="rq-rail" id="rq-rail"></div>
     <div id="rq-list"></div>
   </section>
 
@@ -2484,10 +2485,11 @@ function renderAttrBar(){
 const _RQ_STAGES = [
   {key:'all', label:'All stages',           match:() => true},
   {key:'wfa', label:'Waiting For Approval', match:s => s === 'waiting for approval'},
-  {key:'l1',  label:'Level 1',              match:s => s.includes('level 1')},
-  {key:'l2',  label:'Level 2',              match:s => s.includes('level 2')},
+  {key:'l1',  label:'Revision Level 1',     match:s => s.includes('level 1')},
+  {key:'l2',  label:'Revision Level 2',     match:s => s.includes('level 2')},
 ];
-let _rqStage = 'all';
+let _rqStage  = 'all';
+let _rqLetter = '';   // A–Z rail selection, '' = everyone
 
 // Pull every in-review issue and attribute it to its current holder. Falls back
 // to the row owner when accountability could not be resolved, so a task never
@@ -2538,15 +2540,20 @@ function _rqInitials(name){
 function _rqSyncMode(){
   const on   = _ATTR.mode === 'accountable';
   const view = document.getElementById('rq-view');
-  const tabs = document.getElementById('weekly-tabs');
-  const pane = document.getElementById('weekly-panel');
   if (!view) return;
   view.style.display = on ? 'block' : 'none';
-  if (tabs) tabs.style.display = on ? 'none' : '';
-  if (pane) pane.style.display = on ? 'none' : '';
+  // The weekly tables, the KPI strip and the analytics dashboard are all
+  // counted against the assignee. In Current Owner mode they answer a
+  // different question than the queue below them, so they come off the page
+  // rather than sitting above it saying something subtly inconsistent.
+  ['weekly-tabs','weekly-panel','stats-row','analytics-card'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? 'none' : '';
+  });
   if (on) _rqRender();
 }
 function _rqSetStage(k){ _rqStage = k; _rqRender(); }
+function _rqSetLetter(L){ _rqLetter = (_rqLetter === L) ? '' : L; _rqRender(); }
 function _rqToggle(el){ el.closest('.rq-person').classList.toggle('open'); }
 
 function _rqRender(){
@@ -2566,7 +2573,18 @@ function _rqRender(){
     (i.owner||'').toLowerCase().includes(q) ||
     (i.key||'').toLowerCase().includes(q) ||
     (i.summary||'').toLowerCase().includes(q));
-  const groups = _rqGroup(items);
+  let groups = _rqGroup(items);
+
+  // A–Z rail. Letters with nobody behind them are dimmed rather than hidden,
+  // so the rail keeps a stable position instead of reflowing as you filter.
+  const present = new Set(groups.map(g => (g.name||'?').trim()[0]?.toUpperCase()).filter(Boolean));
+  const railEl = document.getElementById('rq-rail');
+  if (railEl) railEl.innerHTML =
+    `<button class="${_rqLetter===''?'on':''}" onclick="_rqSetLetter('')" title="Everyone">All</button>` +
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(L =>
+      `<button class="${_rqLetter===L?'on':''}${present.has(L)?'':' dim'}"
+               onclick="_rqSetLetter('${L}')">${L}</button>`).join('');
+  if (_rqLetter) groups = groups.filter(g => (g.name||'?').trim()[0]?.toUpperCase() === _rqLetter);
 
   const overdueAll = items.filter(i => i.overdue);
   const worst      = items.reduce((m,i) => Math.max(m, i._days || 0), 0);
@@ -2593,8 +2611,11 @@ function _rqRender(){
     // Stage headings inside a person block, worst task first within each.
     const byStage = {};
     g.list.forEach(i => { (byStage[i.status||'—'] = byStage[i.status||'—'] || []).push(i); });
-    const body = Object.keys(byStage).sort().map(st => `
-      <div class="rq-stage">${esc(st)}</div>
+    const body = Object.keys(byStage).sort().map(st => {
+      const l = st.toLowerCase();
+      const cls = l.includes('waiting') ? 'st-wfa' : l.includes('level 2') ? 'st-l2' : '';
+      return `
+      <div class="rq-stage ${cls}">${esc(st)}</div>
       ${byStage[st].slice().sort((a,b)=>(b._days||0)-(a._days||0)).map(i => `
         <a class="rq-task" href="${esc(base)}/browse/${esc(i.key)}" target="_blank" rel="noopener">
           <span class="rq-key">${esc(i.key)}</span>
@@ -2603,9 +2624,9 @@ function _rqRender(){
           <span class="rq-od">${i.overdue && i._days
             ? `<b>${i._days}d</b><span class="bar"><i style="width:${Math.min(100,Math.round((i._days/(g.worst||1))*100))}%"></i></span>`
             : ''}</span>
-        </a>`).join('')}`).join('');
+        </a>`).join('')}`;}).join('');
     return `
-    <div class="rq-person ${sev} ${gi===0?'open':''}">
+    <div class="rq-person ${sev} open">
       <div class="rq-head" onclick="_rqToggle(this)">
         <div class="rq-av">${esc(_rqInitials(g.name))}</div>
         <div class="rq-id">
@@ -9152,9 +9173,12 @@ document.addEventListener('keydown', function(e){
        every pane and text sat on a moving background, which is tiring to read
        for any length of time. These are still glass — blur and rim intact —
        but opaque enough that a table reads like paper. */
-    --glass:linear-gradient(155deg,rgba(255,255,255,.94),rgba(255,255,255,.86));
-    --glass-2:linear-gradient(155deg,rgba(255,255,255,.90),rgba(255,255,255,.80));
-    --glass-brd:rgba(255,255,255,.95);
+    /* Not pure white — a faint cool porcelain. White panes on a white-ish
+       ground flatten into one another and glare under office lighting; a
+       couple of degrees of blue keeps them distinct and easier to sit with. */
+    --glass:linear-gradient(155deg,rgba(252,253,255,.95),rgba(243,247,252,.90));
+    --glass-2:linear-gradient(155deg,rgba(250,252,255,.92),rgba(240,245,251,.86));
+    --glass-brd:rgba(255,255,255,.92);
     --glass-blur:blur(18px) saturate(1.6);
     --glass-blur-sm:blur(12px) saturate(1.5);
     --glass-shadow:0 1px 2px rgba(15,23,42,.04),
@@ -9258,7 +9282,7 @@ document.addEventListener('keydown', function(e){
      Same material as above, extended to the surfaces the first pass missed:
      the top bar, filter panels, weekly table cards, tab bar, chips, menus and
      the theme popover. Layout is untouched — only fill, rim and shadow. */
-  .topbar,.panel > .filter-bar,.col-block,.ai-card,
+  .topbar,.panel > .filter-bar,.col-block,.ai-card,.attr-bar,
   .ticker-strip,.pmo-section,.risk-card{
     background:var(--glass) !important;
     -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
@@ -9372,6 +9396,20 @@ document.addEventListener('keydown', function(e){
                                                     rgba(254,226,226,.62)) !important;
     border-color:rgba(254,202,202,.9) !important}
 
+  /* Header and attribution bar are one card, not two stacked ones — they are a
+     single band of page chrome and the seam between them read as clutter.
+     Placed after the coverage block above on purpose: that block sets
+     border-radius with !important, so these have to come later to win. */
+  .topbar{margin-bottom:0 !important;padding-bottom:16px;
+    border-bottom-left-radius:0 !important;border-bottom-right-radius:0 !important;
+    border-bottom:none !important;
+    box-shadow:0 1px 2px rgba(15,23,42,.04),var(--glass-rim) !important}
+  .attr-bar{margin-top:0 !important;
+    border-top-left-radius:0 !important;border-top-right-radius:0 !important;
+    border-top:1px solid rgba(15,28,51,.07) !important}
+  /* The gloss belongs to the combined card, so only the top half carries it. */
+  .attr-bar::after{display:none}
+
   /* ══════════════ Review Queue ═════════════════════════════════════════
      The "Current Owner" view: everything parked in review, grouped by the
      person holding it now, worst delay first. Ported from the design mockup
@@ -9445,8 +9483,28 @@ document.addEventListener('keydown', function(e){
   .rq-person.open .rq-chev{transform:rotate(90deg)}
   .rq-list{display:none;padding:0 18px 14px}
   .rq-person.open .rq-list{display:block}
-  .rq-stage{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
-    color:#7b8798;margin:12px 0 6px;padding-top:10px;border-top:1px solid rgba(15,28,51,.07)}
+  /* Stage heading as a highlighted title, not a faint label — it is the thing
+     you scan for when working down a person's queue. */
+  .rq-stage{display:inline-flex;align-items:center;gap:7px;
+    font-size:11px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;
+    color:#0f1c33;margin:14px 0 8px;padding:5px 12px;border-radius:999px;
+    background:linear-gradient(135deg,rgba(226,236,250,.95),rgba(238,244,252,.9));
+    border:1px solid rgba(191,214,240,.9)}
+  .rq-stage::before{content:'';width:6px;height:6px;border-radius:50%;background:#1366cc}
+  .rq-stage.st-wfa{background:linear-gradient(135deg,rgba(254,249,195,.95),rgba(254,243,199,.9));
+    border-color:rgba(253,230,138,.95);color:#78350f}
+  .rq-stage.st-wfa::before{background:#d97706}
+  .rq-stage.st-l2{background:linear-gradient(135deg,rgba(237,233,254,.95),rgba(243,240,255,.9));
+    border-color:rgba(221,214,254,.95);color:#4c1d95}
+  .rq-stage.st-l2::before{background:#7c3aed}
+  /* A–Z rail — jump straight to a name instead of scrolling the whole queue. */
+  .rq-rail{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin-bottom:12px}
+  .rq-rail button{border:none;background:transparent;border-radius:7px;min-width:23px;
+    padding:4px 5px;font:700 11px 'Inter',system-ui,sans-serif;color:#5d6b83;cursor:pointer}
+  .rq-rail button:hover{background:rgba(255,255,255,.85);color:#0f1c33}
+  .rq-rail button.on{background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff}
+  .rq-rail button.dim{opacity:.32;cursor:default}
+  .rq-rail button.dim:hover{background:transparent;color:#5d6b83}
   .rq-task{display:grid;grid-template-columns:104px 1fr 92px 96px;gap:10px;align-items:center;
     padding:7px 8px;border-radius:9px;font-size:12.5px;cursor:pointer;text-decoration:none;
     color:inherit}
