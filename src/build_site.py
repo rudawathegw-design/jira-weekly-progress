@@ -9628,24 +9628,26 @@ document.addEventListener('keydown', function(e){
      without being told. Tagged with data-new="<id>" in the markup; the dot
      clears once that control has been used, per person, and the whole set
      resets when SITE_VERSION changes. */
-  [data-new]{position:relative}
-  [data-new]::after{content:'';position:absolute;top:-3px;right:-3px;
-    width:9px;height:9px;border-radius:50%;
-    background:radial-gradient(circle at 35% 35%,#ff6b6b,#dc2626 70%);
+  [data-new]{position:relative;overflow:visible}
+  [data-new]::after{content:'NEW';position:absolute;top:-7px;right:-8px;
+    font:800 8px/1 'Inter',system-ui,sans-serif;letter-spacing:.08em;
+    color:#fff;padding:3px 5px 2px;border-radius:5px;
+    background:linear-gradient(135deg,#f43f5e,#dc2626 75%);
     border:1.5px solid #fff;
-    box-shadow:0 0 0 1px rgba(220,38,38,.35),0 2px 5px rgba(220,38,38,.5);
-    pointer-events:none;z-index:5;
+    box-shadow:0 2px 6px rgba(220,38,38,.45);
+    pointer-events:none;z-index:5;white-space:nowrap;
     animation:newPulse 2.4s ease-in-out infinite}
-  /* Inside the dropdown the rows are full-width, so the dot rides the left
-     edge next to the icon instead of hanging off the corner. */
-  .menu-item[data-new]::after{top:50%;right:auto;left:2px;margin-top:-11px;
-    width:7px;height:7px}
+  /* Menu rows are full-width, so the badge sits inside the row on the right
+     rather than hanging off a corner that reaches past the dropdown edge. */
+  .menu-item[data-new]::after{top:50%;right:10px;transform:translateY(-50%);
+    border-width:0;box-shadow:0 2px 5px rgba(220,38,38,.35)}
+  .menu-item[data-new]{padding-right:52px}
   @keyframes newPulse{
-    0%,100%{box-shadow:0 0 0 1px rgba(220,38,38,.35),0 2px 5px rgba(220,38,38,.5)}
-    50%    {box-shadow:0 0 0 4px rgba(220,38,38,.16),0 2px 5px rgba(220,38,38,.5)}}
+    0%,100%{box-shadow:0 2px 6px rgba(220,38,38,.45)}
+    50%    {box-shadow:0 2px 6px rgba(220,38,38,.45),0 0 0 4px rgba(220,38,38,.13)}}
   @media (prefers-reduced-motion:reduce){[data-new]::after{animation:none}}
-  /* Seen: attribute removed by script, so no rule needed — kept explicit for
-     anyone reading this and wondering where the dot goes. */
+  /* Seen: the attribute is removed by script, so no rule needed — noted here
+     for anyone wondering where the badge goes. */
 
   /* ══════════════ Review Queue ═════════════════════════════════════════
      The "Current Owner" view: everything parked in review, grouped by the
