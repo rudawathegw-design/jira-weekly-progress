@@ -7234,6 +7234,74 @@ async function exportExecutivePPTX() {
     const WHITE  = 'FFFFFF';
     const DARKGRAY = '1E293B';
 
+    // ── Executive framing ──────────────────────────────────────────────────
+    // An exec deck has to open with a verdict and a direction, not a table.
+    // Everything below is derived from the same numbers the dashboard shows,
+    // so the deck can never disagree with the screen it came from.
+
+    // Week-over-week movement from the saved snapshots.
+    const wow = (() => {
+      const t = S.trend || [];
+      if (t.length < 2) return null;
+      return +(t[t.length-1].pct - t[t.length-2].pct).toFixed(1);
+    })();
+    const arrow = wow === null ? '' : wow > 0 ? '▲' : wow < 0 ? '▼' : '▬';
+    const wowText = wow === null ? 'no prior snapshot'
+                  : wow === 0   ? 'flat on last period'
+                  : `${arrow} ${Math.abs(wow)} pts vs last period`;
+    const wowColor = wow === null ? MUTED : wow > 0 ? GREEN : wow < 0 ? RED : SLATE;
+
+    // One verdict for the whole portfolio, on the same thresholds the RAG
+    // classification uses, so the cover cannot contradict the detail slides.
+    const redShare = S.total ? S.rag.red.length / S.total : 0;
+    const verdict =
+        (S.completion >= 80 && S.overdueRate <= 5  && redShare <= 0.10)
+          ? { label:'ON TRACK', color:GREEN,
+              line:'Delivery is inside agreed thresholds. No executive action required.' }
+      : (S.completion >= 50 && S.overdueRate <= 15 && redShare <= 0.30)
+          ? { label:'NEEDS ATTENTION', color:AMBER,
+              line:'Delivery is holding, but overdue work and the approval queue need management attention.' }
+          : { label:'AT RISK', color:RED,
+              line:'Completion or overdue levels are outside thresholds. Executive intervention is required.' };
+
+    // "What you need to know" — written from the data, so it stays true when
+    // the numbers move. Reads as sentences, not metric names.
+    const headlines = [];
+    headlines.push(`Completion is ${S.completion}% (${S.gDone} of ${S.gTotal} tasks), ${wowText}.`);
+    if (S.gOv > 0) {
+      headlines.push(S.ovReview > 0
+        ? `${S.gOv} tasks are past due — ${S.ovDelivery} are unfinished work, ${S.ovReview} are waiting on an approval decision.`
+        : `${S.gOv} tasks are past due, all of them unfinished delivery work.`);
+    } else {
+      headlines.push('Nothing is past due this period.');
+    }
+    if (S.inReviewTotal > 0) {
+      headlines.push(`${S.inReviewTotal} items sit in the approval queue${S.ovReview ? `, ${S.ovReview} of them already overdue` : ''}.`);
+    }
+    if (S.rag.red.length) {
+      headlines.push(`${S.rag.red.length} of ${S.total} owners are at risk; ${S.rag.green.length} are on track.`);
+    }
+
+    // Decisions this audience can actually take. Only real ones — an empty
+    // list says so rather than inventing filler.
+    const asks = [];
+    if (S.ovReview > 0) {
+      const who = (S.bottlenecks || []).slice(0,3).map(b => b.owner).filter(Boolean).join(', ');
+      asks.push({ t:'Clear the approval backlog',
+                  d:`${S.ovReview} overdue item(s) are waiting on a decision${who ? ` — held by ${who}` : ''}.` });
+    }
+    if (S.rag.red.length) {
+      asks.push({ t:'Rebalance at-risk workloads',
+                  d:`${S.rag.red.length} owner(s) below threshold: ${S.rag.red.slice(0,4).map(m=>m.owner).join(', ')}.` });
+    }
+    if (S.ovDelivery > 0) {
+      asks.push({ t:'Confirm recovery dates for late delivery',
+                  d:`${S.ovDelivery} task(s) past due and still unfinished.` });
+    }
+    if (risks.length) {
+      asks.push({ t:'Accept or mitigate the top risk', d:risks[0].name });
+    }
+
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name:'WIDE', width:13.33, height:7.5 });
     pptx.layout = 'WIDE';
@@ -7295,7 +7363,13 @@ async function exportExecutivePPTX() {
     slide.addText(reportDate, { x:0.6, y:4.1, w:5, h:0.45, fontSize:15, color:MUTED, fontFace:'Arial' });
     // Stats summary box
     slide.addShape('roundRect', { x:7.8, y:1.8, w:5.0, h:4.0, rectRadius:0.12, fill:{color:'FFFFFF'}, line:{color:'DCE3EA',width:0}, transparency:10 });
-    slide.addText('AT A GLANCE', { x:8.1, y:2.05, w:4.4, h:0.35, fontSize:11, bold:true, color:ACCENT, fontFace:'Arial' });
+    // Verdict first: the one thing this audience needs off the cover.
+    slide.addShape('roundRect', { x:8.1, y:2.0, w:4.4, h:0.5, rectRadius:0.1, fill:{color:verdict.color} });
+    slide.addText(verdict.label, { x:8.1, y:2.0, w:4.4, h:0.5, fontSize:15, bold:true, color:WHITE,
+                                   align:'center', valign:'middle', fontFace:'Arial' });
+    slide.addText(`${S.completion}%  ${wowText}`, { x:8.1, y:2.55, w:4.4, h:0.4, fontSize:12, color:'B0C4DE',
+                                   align:'center', fontFace:'Arial' });
+    slide.addText('AT A GLANCE', { x:8.1, y:3.0, w:4.4, h:0.3, fontSize:10, bold:true, color:ACCENT, fontFace:'Arial' });
     const quickStats = [
       { lbl:'Team Members',   val:`${S.total}` },
       { lbl:'Total Tasks',    val:`${S.gTotal}` },
@@ -7304,11 +7378,60 @@ async function exportExecutivePPTX() {
       { lbl:'Overdue Tasks',  val:`${S.gOv}` },
     ];
     quickStats.forEach((qs,i) => {
-      slide.addText(qs.lbl, { x:8.1, y:2.5+i*0.54, w:2.5, h:0.4, fontSize:11, color:MUTED, fontFace:'Arial', valign:'middle' });
-      slide.addText(qs.val, { x:10.6, y:2.5+i*0.54, w:2, h:0.4, fontSize:14, bold:true, color:DARKGRAY, fontFace:'Arial', align:'right', valign:'middle' });
-      if (i<quickStats.length-1) slide.addShape('rect', { x:8.1, y:2.88+i*0.54, w:4.5, h:0.01, fill:{color:'E2E8F0'} });
+      slide.addText(qs.lbl, { x:8.1, y:3.35+i*0.48, w:2.5, h:0.4, fontSize:11, color:MUTED, fontFace:'Arial', valign:'middle' });
+      slide.addText(qs.val, { x:10.6, y:3.35+i*0.48, w:2, h:0.4, fontSize:14, bold:true, color:DARKGRAY, fontFace:'Arial', align:'right', valign:'middle' });
+      if (i<quickStats.length-1) slide.addShape('rect', { x:8.1, y:3.72+i*0.48, w:4.5, h:0.01, fill:{color:'E2E8F0'} });
     });
     slide.addText(`Generated ${generatedAt}`, { x:0.6, y:6.9, w:9, h:0.28, fontSize:9, color:MUTED, fontFace:'Arial' });
+
+    // ── SLIDE 2: What you need to know ──────────────────────────────────
+    // The only slide a CEO/CRO may read. Verdict, movement, and the decisions
+    // being asked of them — everything else in the deck supports this one.
+    slide = pptx.addSlide();
+    addHeader(slide, 'What You Need To Know', `${projectName} · ${reportDate}`, verdict.color);
+
+    // Verdict banner
+    slide.addShape('roundRect', { x:0.5, y:1.1, w:12.3, h:0.95, rectRadius:0.1,
+                                  fill:{color:LIGHT}, line:{color:verdict.color, width:1.2} });
+    slide.addShape('rect', { x:0.5, y:1.1, w:0.14, h:0.95, fill:{color:verdict.color} });
+    slide.addText(verdict.label, { x:0.8, y:1.2, w:3.2, h:0.4, fontSize:17, bold:true,
+                                   color:verdict.color, fontFace:'Arial' });
+    slide.addText(verdict.line, { x:0.8, y:1.56, w:8.6, h:0.42, fontSize:11.5, color:SLATE, fontFace:'Arial' });
+    slide.addText(`${S.completion}%`, { x:10.0, y:1.15, w:1.5, h:0.85, fontSize:34, bold:true,
+                                   color:verdict.color, align:'right', valign:'middle', fontFace:'Arial' });
+    slide.addText(wowText, { x:11.5, y:1.15, w:1.2, h:0.85, fontSize:10.5, color:wowColor,
+                                   align:'left', valign:'middle', fontFace:'Arial' });
+
+    // Headlines — sentences, not metric names.
+    slide.addText('THE PICTURE', { x:0.5, y:2.35, w:7.4, h:0.3, fontSize:10.5, bold:true, color:ACCENT, fontFace:'Arial' });
+    slide.addText(headlines.map(t => ({ text:t, options:{ bullet:{ code:'2022' }, breakLine:true } })),
+      { x:0.5, y:2.7, w:7.4, h:3.2, fontSize:13, color:DARKGRAY, fontFace:'Arial',
+        lineSpacingMultiple:1.35, paraSpaceAfter:8, valign:'top' });
+
+    // Decisions requested — the reason the meeting exists.
+    slide.addShape('roundRect', { x:8.2, y:2.35, w:4.6, h:3.55, rectRadius:0.1,
+                                  fill:{color:'FFF7ED'}, line:{color:'FED7AA', width:1} });
+    slide.addText('DECISIONS REQUESTED', { x:8.45, y:2.5, w:4.1, h:0.3, fontSize:10.5, bold:true,
+                                  color:ORANGE, fontFace:'Arial' });
+    if (asks.length) {
+      asks.slice(0,4).forEach((a,i) => {
+        const ay = 2.9 + i*0.75;
+        slide.addText(`${i+1}. ${a.t}`, { x:8.45, y:ay, w:4.1, h:0.3, fontSize:12, bold:true,
+                                  color:DARKGRAY, fontFace:'Arial' });
+        slide.addText(a.d, { x:8.65, y:ay+0.28, w:3.9, h:0.44, fontSize:9.5, color:SLATE, fontFace:'Arial' });
+      });
+    } else {
+      slide.addText('None this period — delivery is inside thresholds.',
+        { x:8.45, y:3.4, w:4.1, h:0.6, fontSize:12, color:GREEN, fontFace:'Arial', align:'center' });
+    }
+
+    // The AI narrative, when there is one, sits under the picture as context.
+    if (summaryText) {
+      slide.addShape('rect', { x:0.5, y:6.0, w:12.3, h:0.02, fill:{color:'E2E8F0'} });
+      slide.addText(summaryText.slice(0,400), { x:0.5, y:6.1, w:12.3, h:0.95, fontSize:10.5,
+        color:SLATE, italic:true, fontFace:'Arial', valign:'top' });
+    }
+    addFooter(slide, nextPage());
 
     // ── SLIDE 2: RAG Status Overview ────────────────────────────────────
     slide = pptx.addSlide();
@@ -7419,6 +7542,45 @@ async function exportExecutivePPTX() {
       slide.addText('No escalations this period', { x:1.5, y:2.8, w:10.3, h:0.6, fontSize:22, bold:true, color:GREEN, align:'center', fontFace:'Arial' });
       slide.addText('All members are operating within the agreed thresholds.', { x:1.5, y:3.4, w:10.3, h:0.4, fontSize:13, color:SLATE, align:'center', fontFace:'Arial' });
     }
+    addFooter(slide, nextPage());
+
+    // ── Closing: Recommended Actions ───────────────────────────────────────
+    slide = pptx.addSlide();
+    slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
+    slide.addShape('rect', { x:0, y:0, w:0.35, h:7.5, fill:{color:ACCENT} });
+    slide.addShape('ellipse', { x:9.5, y:-1.5, w:5, h:5, fill:{color:ACCENT}, line:{color:ACCENT,width:0}, transparency:80 });
+    slide.addShape('ellipse', { x:10.5, y:3.5, w:4, h:4, fill:{color:TEAL}, line:{color:TEAL,width:0}, transparency:85 });
+
+    slide.addText('Recommended Actions', { x:0.6, y:1.0, w:10, h:0.7, fontSize:34, bold:true, color:WHITE, fontFace:'Arial' });
+    slide.addShape('rect', { x:0.6, y:1.72, w:4.5, h:0.04, fill:{color:ACCENT} });
+
+    const actions = [
+      S.watchlist.length > 0 ? `Follow up with ${S.watchlist.slice(0,3).map(w=>w.owner).join(', ')} on overdue items` : 'No immediate escalations required',
+      S.gWFA > 0 ? `Clear ${S.gWFA} approval queue item${S.gWFA>1?'s':''} to unblock progress` : 'Approval queue is clear ✓',
+      S.overdueRate > 10 ? `Address high overdue rate (${S.overdueRate}%) — review task distribution` : `Maintain low overdue rate (${S.overdueRate}%) with current approach`,
+      S.rag.red.length > 0 ? `${S.rag.red.length} member${S.rag.red.length>1?'s':''} at risk — schedule 1:1 check-ins` : 'All at-risk members have been addressed ✓',
+      risks.length > 0 ? `Monitor ${risks.length} identified risk${risks.length>1?'s':''} — see risk slide for mitigations` : 'No major risks flagged this week',
+    ];
+    actions.forEach((action, i) => {
+      slide.addShape('ellipse', { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fill:{color:ACCENT} });
+      slide.addText(String(i+1), { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fontSize:11, bold:true, color:WHITE, align:'center', valign:'middle', fontFace:'Arial' });
+      slide.addText(action, { x:1.05, y:2.0+i*0.75, w:10.5, h:0.4, fontSize:13, color:'CBD5E1', fontFace:'Arial', valign:'middle' });
+    });
+
+    slide.addText(`${projectName}  ·  ${reportDate}  ·  ${generatedAt}`, { x:0.6, y:6.9, w:11, h:0.25, fontSize:9, color:MUTED, fontFace:'Arial' });
+
+    // ── APPENDIX DIVIDER ─────────────────────────────────────────────────
+    // Everything past this point is per-person operational detail. It belongs
+    // in the pack for the PMO to defend the numbers, not in the executive
+    // narrative — so it is fenced off rather than interleaved.
+    slide = pptx.addSlide();
+    slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
+    slide.addShape('rect', { x:0, y:0, w:0.35, h:7.5, fill:{color:ACCENT} });
+    slide.addShape('rect', { x:1.0, y:3.62, w:2.4, h:0.045, fill:{color:ACCENT} });
+    slide.addText('Appendix', { x:1.0, y:2.7, w:10, h:0.9, fontSize:40, bold:true, color:WHITE, fontFace:'Arial' });
+    slide.addText('Supporting detail — per-owner performance, full watchlist, risks and bottlenecks',
+      { x:1.0, y:3.8, w:10.5, h:0.5, fontSize:14, color:'93C5FD', fontFace:'Arial' });
+    slide.addText(`${projectName} · ${reportDate}`, { x:1.0, y:4.35, w:8, h:0.4, fontSize:11, color:MUTED, fontFace:'Arial' });
     addFooter(slide, nextPage());
 
     // ── SLIDE 5: Team Performance Breakdown ──────────────────────────────
@@ -7598,31 +7760,6 @@ async function exportExecutivePPTX() {
         { x:0.45, y:6.9, w:12.5, h:0.3, fontSize:9.5, color:MUTED, italic:true, fontFace:'Arial' });
       addFooter(slide, nextPage());
     }
-
-    // ── SLIDE 8: Closing / Actions ───────────────────────────────────────
-    slide = pptx.addSlide();
-    slide.addShape('rect', { x:0, y:0, w:13.33, h:7.5, fill:{color:NAVY} });
-    slide.addShape('rect', { x:0, y:0, w:0.35, h:7.5, fill:{color:ACCENT} });
-    slide.addShape('ellipse', { x:9.5, y:-1.5, w:5, h:5, fill:{color:ACCENT}, line:{color:ACCENT,width:0}, transparency:80 });
-    slide.addShape('ellipse', { x:10.5, y:3.5, w:4, h:4, fill:{color:TEAL}, line:{color:TEAL,width:0}, transparency:85 });
-
-    slide.addText('Recommended Actions', { x:0.6, y:1.0, w:10, h:0.7, fontSize:34, bold:true, color:WHITE, fontFace:'Arial' });
-    slide.addShape('rect', { x:0.6, y:1.72, w:4.5, h:0.04, fill:{color:ACCENT} });
-
-    const actions = [
-      S.watchlist.length > 0 ? `Follow up with ${S.watchlist.slice(0,3).map(w=>w.owner).join(', ')} on overdue items` : 'No immediate escalations required',
-      S.gWFA > 0 ? `Clear ${S.gWFA} approval queue item${S.gWFA>1?'s':''} to unblock progress` : 'Approval queue is clear ✓',
-      S.overdueRate > 10 ? `Address high overdue rate (${S.overdueRate}%) — review task distribution` : `Maintain low overdue rate (${S.overdueRate}%) with current approach`,
-      S.rag.red.length > 0 ? `${S.rag.red.length} member${S.rag.red.length>1?'s':''} at risk — schedule 1:1 check-ins` : 'All at-risk members have been addressed ✓',
-      risks.length > 0 ? `Monitor ${risks.length} identified risk${risks.length>1?'s':''} — see risk slide for mitigations` : 'No major risks flagged this week',
-    ];
-    actions.forEach((action, i) => {
-      slide.addShape('ellipse', { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fill:{color:ACCENT} });
-      slide.addText(String(i+1), { x:0.6, y:2.05+i*0.75, w:0.3, h:0.3, fontSize:11, bold:true, color:WHITE, align:'center', valign:'middle', fontFace:'Arial' });
-      slide.addText(action, { x:1.05, y:2.0+i*0.75, w:10.5, h:0.4, fontSize:13, color:'CBD5E1', fontFace:'Arial', valign:'middle' });
-    });
-
-    slide.addText(`${projectName}  ·  ${reportDate}  ·  ${generatedAt}`, { x:0.6, y:6.9, w:11, h:0.25, fontSize:9, color:MUTED, fontFace:'Arial' });
 
     await pptx.writeFile({ fileName: `executive-summary-${reportDate || 'report'}.pptx` });
     toast('✓ Executive Summary downloaded.');
@@ -10348,6 +10485,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.8.0  Executive Summary deck rebuilt for a C-level audience: verdict on
+#          the cover, a "What You Need To Know" slide with decisions
+#          requested, and all per-person detail moved behind an appendix.
 #   2.7.0  Daily Status export for any epic you paste (link or key), and red
 #          "new" markers on controls added or fixed this release — they clear
 #          per person once used, and re-arm on the next version.
@@ -10361,7 +10501,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.7.0"
+SITE_VERSION = "2.8.0"
 
 
 def _build_stamp():
