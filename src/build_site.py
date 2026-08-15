@@ -4849,12 +4849,31 @@ function _overdueDaysNum(due) {
   if (isNaN(d.getTime())) return null;
   return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
 }
+// Heat scale for "days overdue" — a four-step ramp so severity is readable at a
+// glance without the whole sheet turning red. Paired text colours in
+// _overdueDaysText keep every step above contrast minimums.
 function _overdueDaysFill(days) {
-  if (days === null)  return 'E7E6E6'; // unknown due date — grey
-  if (days >= 30)      return 'F4B7B7'; // long overdue — deep red
-  if (days >= 7)       return 'FFCFCF'; // overdue a while — red
-  return 'FFE699';                      // just tipped over — amber
+  if (days === null) return 'F1F5F9'; // unknown due date — neutral slate
+  if (days >= 90)    return 'FCA5A5'; // critical
+  if (days >= 30)    return 'FDBA74'; // long overdue
+  if (days >= 7)     return 'FDE68A'; // overdue a while
+  return 'FEF3C7';                    // just tipped over
 }
+function _overdueDaysText(days) {
+  if (days === null) return '94A3B8';
+  if (days >= 90)    return '7F1D1D';
+  if (days >= 30)    return '7C2D12';
+  return '854D0E';
+}
+// Soft owner tints. Deliberately pastel — the previous solid saturated fills
+// made every row shout, which buried the cells that actually carry meaning
+// (status, days overdue, a handed-off owner). Amber is reserved for
+// "Current Owner differs", so it is absent here.
+const _OWNER_TINTS = [
+  ['DBEAFE','1E40AF'], ['DCFCE7','166534'], ['EDE9FE','5B21B6'],
+  ['FFE4E6','9F1239'], ['CFFAFE','155E75'], ['FCE7F3','9D174D'],
+  ['E2E8F0','334155'],
+];
 
 async function exportOverdueExcel() {
   if (!REPORT) return;
@@ -4877,9 +4896,8 @@ async function exportOverdueExcel() {
     const bDue = groups[b][0]?.due || '';
     return aDue < bDue ? -1 : 1;
   });
-  const accents = ['DC2626','EA580C','D97706','0891B2','7C3AED','DB2777','0F766E','4F46E5'];
   const ownerAccent = {};
-  owners.forEach((o,i) => ownerAccent[o] = accents[i % accents.length]);
+  owners.forEach((o,i) => ownerAccent[o] = _OWNER_TINTS[i % _OWNER_TINTS.length]);
 
   const loadXlsxStyle = () => new Promise((resolve, reject) => {
     if (window.XLSX && XLSX.utils && XLSX.writeFile) return resolve();
@@ -4897,6 +4915,12 @@ async function exportOverdueExcel() {
     // now. For a task at "Revision Level 1" those are different people, and
     // chasing the assignee for a decision that is sitting with a reviewer is
     // exactly the mistake this export is meant to stop.
+    //
+    // Current Owner lists EVERY pending reviewer. Jira's rule is "Everyone from
+    // 'Level 1 Reviewers' must approve", so a task with two reviewers is blocked
+    // by both — naming only the first would quietly drop someone who is equally
+    // holding it up. The count still lands on one person (see accountability.py)
+    // so per-person totals stay exact; this is a display-only expansion.
     const header = ['#','Key','Summary','Assigned To','Current Owner','Role','Status','Due Date','Days Overdue','Link'];
     let n = 0;
     const rows = [];
@@ -4904,13 +4928,23 @@ async function exportOverdueExcel() {
       groups[owner].forEach(i => {
         n++;
         const assigned = i.assignee_name || owner;
-        const current  = i.accountable || assigned;
+        const co       = i.co_reviewers || [];
+        const everyone = [i.accountable || assigned, ...co].filter(Boolean);
+        const current  = everyone.join(', ');
+        const role     = (i.acc_role_label || 'Assignee') +
+                         (co.length ? ` · all ${everyone.length} must approve` : '');
         rows.push({
           n, key: i.key, summary: i.summary || '(no summary)',
           owner,                       // grouping key (kept for the colour band)
-          assigned, current,
-          role: i.acc_role_label || 'Assignee',
-          status: _statusLabel(i.status || '', i.rev1_name || i.rev1 || '', i.rev2_name || i.rev2 || '', assigned),
+          assigned, current, role,
+          moved: current !== assigned,
+          multi: co.length > 0,
+          // Built from the same resolved list as Current Owner rather than from
+          // rev1_name (which holds only the first reviewer), so the two columns
+          // can never disagree about who is holding the task.
+          status: (i.in_review && everyone.length)
+                    ? `${i.status || ''} — ${current}`
+                    : (i.status || ''),
           rawStatus: i.status || '',
           due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
@@ -4920,27 +4954,37 @@ async function exportOverdueExcel() {
 
     const now = new Date();
     const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    const titleText = `⚠ Overdue Tasks — ${projectName}  ·  ${reportDate}  ·  ${items.length} task(s) across ${owners.length} owner(s)  ·  Generated ${generatedAt}`;
-    const HEADER_ROW = 1, DATA_START = 2;
+    const handedOff = rows.filter(r => r.moved).length;
+    const titleText = `⚠  OVERDUE TASKS — ${projectName}   ·   ${reportDate}   ·   ${items.length} task(s), ${owners.length} owner(s)   ·   Generated ${generatedAt}`;
+    // Second line earns its space: it explains the one column people misread.
+    const subText = `Current Owner = who must act NOW. ${handedOff} of ${items.length} task(s) are waiting on a reviewer, not the assignee (highlighted amber). Where several reviewers are listed, ALL of them must approve.`;
+    const HEADER_ROW = 2, DATA_START = 3;
     const lastCol = header.length - 1;
     const lastColLetter = XLSX.utils.encode_col(lastCol);
 
     const aoa = [
       [titleText],
+      [subText],
       header,
       ...rows.map(r => [r.n, r.key, r.summary, r.assigned, r.current, r.role, r.status, r.due, r.days===null?'—':r.days, r.link])
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:5},{wch:14},{wch:52},{wch:20},{wch:20},{wch:17},{wch:34},{wch:12},{wch:13},{wch:40}];
-    ws['!rows'] = [{hpx:22},{hpx:30}, ...rows.map(()=>({hpx:36}))];  // taller rows for 2-line status
-    ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:lastCol} }];
+    ws['!cols'] = [{wch:5},{wch:13},{wch:50},{wch:22},{wch:30},{wch:26},{wch:40},{wch:12},{wch:9},{wch:34}];
+    ws['!rows'] = [{hpx:26},{hpx:30},{hpx:28}, ...rows.map(r=>({hpx:r.multi?42:32}))];
+    ws['!merges'] = [
+      { s:{r:0,c:0}, e:{r:0,c:lastCol} },
+      { s:{r:1,c:0}, e:{r:1,c:lastCol} },
+    ];
     ws['!freeze'] = {xSplit:0, ySplit:DATA_START};
     ws['!autofilter'] = {ref:`A${HEADER_ROW+1}:${lastColLetter}${rows.length+DATA_START}`};
 
     const titleAddr = XLSX.utils.encode_cell({r:0,c:0});
-    if (ws[titleAddr]) ws[titleAddr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'991B1B'}}, alignment:{horizontal:'left',vertical:'center'} };
+    if (ws[titleAddr]) ws[titleAddr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:13}, fill:{fgColor:{rgb:'0F172A'}}, alignment:{horizontal:'left',vertical:'center',indent:1} };
 
-    const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:11}, fill:{fgColor:{rgb:'DC2626'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'7F1D1D'}}} };
+    const subAddr = XLSX.utils.encode_cell({r:1,c:0});
+    if (ws[subAddr]) ws[subAddr].s = { font:{color:{rgb:'CBD5E1'},sz:10}, fill:{fgColor:{rgb:'1E293B'}}, alignment:{horizontal:'left',vertical:'center',indent:1} };
+
+    const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10.5}, fill:{fgColor:{rgb:'334155'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'medium',color:{rgb:'0F172A'}}} };
     for (let c=0;c<header.length;c++){
       const addr = XLSX.utils.encode_cell({r:HEADER_ROW,c});
       if (ws[addr]) ws[addr].s = headStyle;
@@ -4948,49 +4992,51 @@ async function exportOverdueExcel() {
 
     rows.forEach((r,i) => {
       const rr = i + DATA_START;
-      const bandFill = i % 2 === 0 ? 'FFFFFF' : 'FEF2F2';
-      const border = {bottom:{style:'thin',color:{rgb:'FCA5A5'}}};
+      // Neutral zebra, not a red wash: colour is spent only where it means
+      // something (status, overdue severity, a handed-off owner).
+      const bandFill = i % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+      const border = {bottom:{style:'thin',color:{rgb:'E2E8F0'}}};
+      const [ownerBg, ownerFg] = ownerAccent[r.owner] || ['F1F5F9','334155'];
 
       let addr = XLSX.utils.encode_cell({r:rr,c:0});
-      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'7F1D1D'},sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+      if (ws[addr]) ws[addr].s = { font:{color:{rgb:'94A3B8'},sz:9.5}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:1}); // Key — clickable
       if (ws[addr]) {
-        ws[addr].s = { font:{bold:true,color:{rgb:'1155CC'},underline:true,sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
+        ws[addr].s = { font:{bold:true,color:{rgb:'1D4ED8'},underline:true,sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'left',vertical:'center',indent:1}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
       }
 
       addr = XLSX.utils.encode_cell({r:rr,c:2}); // Summary
-      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true}, border };
+      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'0F172A'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true, indent:1}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Assigned To — owner badge
-      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:'FFFFFF'},sz:10}, fill:{fgColor:{rgb:ownerAccent[r.owner]}}, alignment:{horizontal:'center',vertical:'center'}, border };
+      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Assigned To — soft owner tint
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:ownerFg},sz:10}, fill:{fgColor:{rgb:ownerBg}}, alignment:{horizontal:'left',vertical:'center',indent:1}, border };
 
-      // Current Owner — highlighted amber when it differs from the assignee, so
-      // the handed-off tasks are the ones that catch the eye.
+      // Current Owner — amber whenever it differs from the assignee, so the
+      // handed-off rows are the ones that catch the eye. Lists every reviewer
+      // who must approve, not just the first.
       addr = XLSX.utils.encode_cell({r:rr,c:4});
-      if (ws[addr]) {
-        const moved = r.current && r.current !== r.assigned;
-        ws[addr].s = { font:{bold:true,color:{rgb:moved?'7C2D12':'334155'},sz:10},
-                       fill:{fgColor:{rgb:moved?'FEF3C7':bandFill}},
-                       alignment:{horizontal:'center',vertical:'center'}, border };
-      }
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:r.moved?'92400E':'334155'},sz:10},
+                     fill:{fgColor:{rgb:r.moved?'FEF3C7':bandFill}},
+                     alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1},
+                     border: r.moved ? {bottom:{style:'thin',color:{rgb:'FCD34D'}}} : border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:5}); // Role
-      if (ws[addr]) ws[addr].s = { font:{sz:9,color:{rgb:'64748B'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+      if (ws[addr]) ws[addr].s = { font:{sz:9,color:{rgb:r.multi?'B45309':'64748B'},italic:true}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Status (carries the reviewer name)
-      if (ws[addr]) ws[addr].s = { font:{sz:10}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border };
+      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Status (carries the reviewer names)
+      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'1E293B'}}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}}, alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1}, border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:7}); // Due date
-      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'7F1D1D'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
+      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'475569'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:8}); // Days overdue
-      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:(r.days!==null && r.days>=30)?'C00000':'7F1D1D'},sz:10}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
+      addr = XLSX.utils.encode_cell({r:rr,c:8}); // Days overdue — heat scale
+      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:_overdueDaysText(r.days)},sz:10.5}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
       addr = XLSX.utils.encode_cell({r:rr,c:9}); // Link
       if (ws[addr]) {
-        ws[addr].s = { font:{color:{rgb:'1155CC'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center'}, border };
+        ws[addr].s = { font:{color:{rgb:'94A3B8'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center',indent:1}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
       }
     });
@@ -7191,7 +7237,10 @@ function _epicStatusFill(status){
   if (s.includes('done') || s.includes('closed') || s.includes('resolved') || s === 'available') return 'C6EFCE';
   if (s.includes('progress')) return 'BDD7EE';
   if (s.includes('block'))    return 'F4B7B7';
-  if (s.includes('wait') || s.includes('approv') || s.includes('review')) return 'FFE699';
+  // "revision" is NOT caught by "review" (revisiON vs revieW), so Revision
+  // Level 1/2 fell through to the neutral grey and looked like an unknown
+  // status instead of work waiting on an approval.
+  if (s.includes('wait') || s.includes('approv') || s.includes('review') || s.includes('revision')) return 'FFE699';
   return 'E7E6E6';
 }
 
@@ -7324,28 +7373,33 @@ async function exportEpicExcel(historyStart){
     }
 
     // ── helper: append the responsible person's name beside the status ────────
+    // ALL reviewers at a level, not just the first: Jira's rule is "Everyone
+    // from 'Level 1 Reviewers' must approve", so naming one of two hides a
+    // person who is equally blocking the task.
     function getStatusWithOwner(issue, rawStatus){
       const f    = (issue && issue.fields) || {};
-      let l1   = (_fieldNames(f.customfield_10784)[0]) || '';
-      let l2   = (_fieldNames(f.customfield_10785)[0]) || '';
-      
+      let l1   = _fieldNames(f.customfield_10784).join(', ');
+      let l2   = _fieldNames(f.customfield_10785).join(', ');
+
+      // Fall back to the approval stages when the reviewer fields are empty.
+      // Collect EVERY approver in the stage, not the first one.
       const approvals = f.customfield_10092 || [];
       if (Array.isArray(approvals)) {
+        const got = {1:[], 2:[]};
         approvals.forEach((stage, idx) => {
           const sname = (stage.name || '').toLowerCase();
+          const lvl = sname.includes('level 2') ? 2
+                    : sname.includes('level 1') ? 1
+                    : (idx === 0 ? 1 : idx === 1 ? 2 : 0);
+          if (!lvl) return;
           (stage.approvers || []).forEach(a => {
             const u = a.approver;
             const n = u && (u.displayName || u.name);
-            if (!n) return;
-            if (sname.includes('level 2')) { l2 = l2 || n; }
-            else if (sname.includes('level 1')) { l1 = l1 || n; }
-            else {
-              // If stage name doesn't contain "level 1/2", use array index
-              if (idx === 0) l1 = l1 || n;
-              else if (idx === 1) l2 = l2 || n;
-            }
+            if (n && !got[lvl].includes(n)) got[lvl].push(n);
           });
         });
+        if (!l1) l1 = got[1].join(', ');
+        if (!l2) l2 = got[2].join(', ');
       }
 
       const asgn = (f.assignee && (f.assignee.displayName || f.assignee.name)) || '';
@@ -9167,7 +9221,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.2.0"
+SITE_VERSION = "2.3.0"
 
 
 def _build_stamp():
