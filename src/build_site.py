@@ -313,6 +313,10 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 .attr-seg-btn .attr-count{font-family:'JetBrains Mono',monospace;font-size:10.5px;
   opacity:.6;margin-left:5px;font-weight:600}
 .attr-seg-btn .attr-short{display:none}
+/* Chevron on the active "Current Owner" segment — the tell that it now leads
+   somewhere rather than just being selected. */
+.attr-seg-btn .attr-dive{margin-left:6px;font-weight:800;opacity:.65}
+.attr-seg-btn.on:hover .attr-dive{opacity:1}
 /* buttons */
 .attr-btn{display:inline-flex;align-items:center;gap:5px;border:1.5px solid #e2e8f0;
   background:#f8fafc;border-radius:8px;padding:6px 11px;font-size:12px;
@@ -1352,6 +1356,27 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       </button>
     </div>
     <div id="ov-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ Review Queue (Current Owner view) ══════════════════════ -->
+<div class="rq-view" id="rq-view">
+  <div class="rq-wrap">
+    <div class="rq-top">
+      <button class="rq-back" onclick="closeReviewQueue()">&larr; Dashboard</button>
+      <div>
+        <div class="rq-kick">Current Owner</div>
+        <h1>Review Queue</h1>
+        <p>Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
+      </div>
+    </div>
+    <div class="rq-tiles" id="rq-tiles"></div>
+    <div class="rq-bar">
+      <div class="rq-seg" id="rq-stages"></div>
+      <input class="rq-search" id="rq-search" type="search"
+             placeholder="Filter by name, key or summary…" oninput="_rqRender()">
+    </div>
+    <div id="rq-list"></div>
   </div>
 </div>
 
@@ -2431,16 +2456,183 @@ function renderAttrBar(){
 
   // Both labels are emitted; CSS shows the short one on narrow screens, where
   // the full names would run into each other.
-  seg.innerHTML = Object.entries(ATTR_MODES).map(([k,m]) => `
-    <button class="attr-seg-btn ${_ATTR.mode===k?'on':''}" role="tab"
-            aria-selected="${_ATTR.mode===k}" onclick="setAttrMode('${k}')"
-            title="${esc(m.desc)}"><span class="attr-full">${esc(m.label)}</span><span
-            class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span></button>
-  `).join('');
+  // "Current Owner" does double duty: it selects the attribution mode, and —
+  // once selected — a second click opens the Review Queue, the drill-down that
+  // answers "who is actually holding this right now". Switching modes on the
+  // first click keeps the segmented control behaving like a segmented control;
+  // only the already-active button navigates.
+  seg.innerHTML = Object.entries(ATTR_MODES).map(([k,m]) => {
+    const on   = _ATTR.mode === k;
+    const dive = k === 'accountable';
+    const act  = (dive && on) ? 'openReviewQueue()' : `setAttrMode('${k}')`;
+    const hint = dive
+      ? (on ? 'Open the Review Queue — every task in review, grouped by who holds it now'
+            : m.desc + ' — click again once selected to open the Review Queue')
+      : m.desc;
+    return `
+    <button class="attr-seg-btn ${on?'on':''}" role="tab"
+            aria-selected="${on}" onclick="${act}"
+            title="${esc(hint)}"><span class="attr-full">${esc(m.label)}</span><span
+            class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span>${
+            dive && on ? '<span class="attr-dive" aria-hidden="true">&rsaquo;</span>' : ''}</button>`;
+  }).join('');
 
   const dot = document.getElementById('attr-map-dot');
   if (dot) dot.style.display = _ATTR.isDefaultMap() ? 'none' : 'inline-block';
 }
+
+// ── Review Queue (Current Owner view) ───────────────────────────────────────
+// Everything sitting in a review status, grouped by whoever is holding it now
+// rather than by assignee. This is the "Current Owner" question asked properly:
+// the dashboard can tell you a person has 9 open tasks, but not that 4 of them
+// are parked on someone else's desk waiting for approval.
+const _RQ_STAGES = [
+  {key:'all', label:'All stages',           match:() => true},
+  {key:'wfa', label:'Waiting For Approval', match:s => s === 'waiting for approval'},
+  {key:'l1',  label:'Level 1',              match:s => s.includes('level 1')},
+  {key:'l2',  label:'Level 2',              match:s => s.includes('level 2')},
+];
+let _rqStage = 'all';
+
+// Pull every in-review issue and attribute it to its current holder. Falls back
+// to the row owner when accountability could not be resolved, so a task never
+// silently disappears from the queue.
+function _rqCollect(){
+  const hide = (hiddenPeople && hiddenPeople.size) ? hiddenPeople : null;
+  const out = [];
+  (REPORT.rows || []).forEach(r => {
+    (r.issues || []).forEach(i => {
+      const st = String(i.status || '').toLowerCase();
+      if (!(i.in_review || REVIEW_STATUSES.has(st))) return;
+      const owner = i.accountable || r.owner;
+      if (hide && hide.has(owner)) return;
+      out.push({...i, owner, _stage: st, _days: _overdueDaysNum(i.due)});
+    });
+  });
+  return out;
+}
+
+function _rqGroup(items){
+  const groups = {};
+  items.forEach(i => { (groups[i.owner] = groups[i.owner] || []).push(i); });
+  return Object.keys(groups).map(name => {
+    const list = groups[name];
+    const overdue = list.filter(i => i.overdue);
+    // "Longest overdue" is the ordering the mockup calls for — the person
+    // holding the single worst task comes first, not the one holding the most.
+    const worst = list.reduce((m,i) => Math.max(m, i._days || 0), 0);
+    return {
+      name, list, worst,
+      overdue: overdue.length,
+      role: list.find(i => i.acc_role_label)?.acc_role_label || '',
+      wfa: list.filter(i => i._stage === 'waiting for approval').length,
+      l1:  list.filter(i => i._stage.includes('level 1')).length,
+      l2:  list.filter(i => i._stage.includes('level 2')).length,
+    };
+  }).sort((a,b) => b.worst - a.worst || b.overdue - a.overdue);
+}
+
+function _rqInitials(name){
+  return String(name||'?').trim().split(/\s+/).slice(0,2)
+    .map(w => w[0] ? w[0].toUpperCase() : '').join('') || '?';
+}
+
+function openReviewQueue(){
+  _rqStage = 'all';
+  const s = document.getElementById('rq-search'); if (s) s.value = '';
+  _rqRender();
+  document.getElementById('rq-view').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeReviewQueue(){
+  document.getElementById('rq-view').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function _rqSetStage(k){ _rqStage = k; _rqRender(); }
+function _rqToggle(el){ el.closest('.rq-person').classList.toggle('open'); }
+
+function _rqRender(){
+  const all    = _rqCollect();
+  const stage  = _RQ_STAGES.find(s => s.key === _rqStage) || _RQ_STAGES[0];
+  const q      = (document.getElementById('rq-search')?.value || '').trim().toLowerCase();
+  const base   = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
+
+  // Stage counts always reflect the whole queue, not the current filter —
+  // otherwise selecting a stage rewrites the very numbers you filtered on.
+  const segEl = document.getElementById('rq-stages');
+  if (segEl) segEl.innerHTML = _RQ_STAGES.map(s => `
+    <button class="${s.key===_rqStage?'on':''}" onclick="_rqSetStage('${s.key}')">${esc(s.label)}
+      <span class="sn">${all.filter(i => s.match(i._stage)).length}</span></button>`).join('');
+
+  const items = all.filter(i => stage.match(i._stage)).filter(i => !q ||
+    (i.owner||'').toLowerCase().includes(q) ||
+    (i.key||'').toLowerCase().includes(q) ||
+    (i.summary||'').toLowerCase().includes(q));
+  const groups = _rqGroup(items);
+
+  const overdueAll = items.filter(i => i.overdue);
+  const worst      = items.reduce((m,i) => Math.max(m, i._days || 0), 0);
+  const worstKey   = items.find(i => (i._days||0) === worst)?.key || '—';
+  const pct        = items.length ? Math.round(overdueAll.length/items.length*100) : 0;
+  const tiles = [
+    ['In review',  items.length,        `across ${groups.length} owner${groups.length===1?'':'s'}`, false],
+    ['Overdue',    overdueAll.length,   `${pct}% of the queue`,                                     true],
+    ['Worst delay',worst ? worst+'d':'—', worstKey,                                                 true],
+    ['Owners',     groups.length,       'holding work now',                                         false],
+  ];
+  document.getElementById('rq-tiles').innerHTML = tiles.map(([l,v,s,w]) => `
+    <div class="rq-tile"><div class="lab">${esc(l)}</div>
+      <div class="val ${w&&v?'warn':''}">${esc(String(v))}</div>
+      <div class="sub">${esc(s)}</div></div>`).join('');
+
+  const listEl = document.getElementById('rq-list');
+  if (!groups.length){
+    listEl.innerHTML = `<div class="rq-empty">Nothing sitting in review${q?' for that search':''}.</div>`;
+    return;
+  }
+  listEl.innerHTML = groups.map((g,gi) => {
+    const sev = g.worst >= 14 ? 'sev-hi' : g.worst >= 5 ? '' : 'sev-lo';
+    // Stage headings inside a person block, worst task first within each.
+    const byStage = {};
+    g.list.forEach(i => { (byStage[i.status||'—'] = byStage[i.status||'—'] || []).push(i); });
+    const body = Object.keys(byStage).sort().map(st => `
+      <div class="rq-stage">${esc(st)}</div>
+      ${byStage[st].slice().sort((a,b)=>(b._days||0)-(a._days||0)).map(i => `
+        <a class="rq-task" href="${esc(base)}/browse/${esc(i.key)}" target="_blank" rel="noopener">
+          <span class="rq-key">${esc(i.key)}</span>
+          <span class="rq-sum" title="${esc(i.summary||'')}">${esc(i.summary||'')}</span>
+          <span class="rq-age">${i.due ? 'due '+esc(i.due) : 'no due date'}</span>
+          <span class="rq-od">${i.overdue && i._days
+            ? `<b>${i._days}d</b><span class="bar"><i style="width:${Math.min(100,Math.round((i._days/(g.worst||1))*100))}%"></i></span>`
+            : ''}</span>
+        </a>`).join('')}`).join('');
+    return `
+    <div class="rq-person ${sev} ${gi===0?'open':''}">
+      <div class="rq-head" onclick="_rqToggle(this)">
+        <div class="rq-av">${esc(_rqInitials(g.name))}</div>
+        <div class="rq-id">
+          <div class="rq-name">${esc(g.name)}</div>
+          ${g.role ? `<div class="rq-role">${esc(g.role)}</div>` : ''}
+        </div>
+        <div class="rq-meta">
+          ${g.wfa ? `<span class="rq-pill wfa">Waiting For Approval <span class="n">${g.wfa}</span></span>` : ''}
+          ${g.l1  ? `<span class="rq-pill l1">Revision Level 1 <span class="n">${g.l1}</span></span>` : ''}
+          ${g.l2  ? `<span class="rq-pill l2">Revision Level 2 <span class="n">${g.l2}</span></span>` : ''}
+          ${g.overdue ? `<span class="rq-pill od">${g.overdue} overdue · max ${g.worst}d</span>` : ''}
+          <span class="rq-chev">&#9656;</span>
+        </div>
+      </div>
+      <div class="rq-list">${body}</div>
+    </div>`;
+  }).join('');
+}
+
+// Esc closes the queue, matching every other overlay on the page.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('rq-view')?.classList.contains('open')) {
+    closeReviewQueue();
+  }
+});
 
 // ── Status mapping modal ────────────────────────────────────────────────────
 function openStatusMapModal(){
@@ -8974,15 +9166,27 @@ document.addEventListener('keydown', function(e){
     --glass-gloss:linear-gradient(180deg,rgba(255,255,255,.55),
                                          rgba(255,255,255,.12) 46%,transparent);
   }
-  /* Ground. Deep enough that translucent panes have something to refract, light
-     enough to still read as a white page. */
-  body{
+  /* Ground: white with a two-tier drafting grid and a soft colour pool, the
+     same field as the sign-in page and the Review Queue, so the whole product
+     reads as one surface. The grid is what gives the translucent panes
+     something to refract — on flat white they would read as plain boxes. */
+  body{background:#fff !important;background-attachment:fixed !important}
+  body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
+      linear-gradient(rgba(15,28,51,.045) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.045) 1px,transparent 1px);
+    background-size:120px 120px,120px 120px,24px 24px,24px 24px;
+    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%);
+            mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%)}
+  body::after{content:'';position:fixed;left:50%;top:-10%;width:1100px;height:800px;
+    z-index:0;transform:translateX(-50%);pointer-events:none;
     background:
-      radial-gradient(ellipse 70% 50% at 12% -8%, rgba(120,163,222,.20),transparent 62%),
-      radial-gradient(ellipse 60% 45% at 92% 4%,  rgba(129,196,190,.16),transparent 64%),
-      linear-gradient(180deg,#eef2f8 0%,#e9eef6 52%,#e4ebf4 100%) !important;
-    background-attachment:fixed !important;
-  }
+      radial-gradient(ellipse 45% 45% at 30% 30%,rgba(19,102,204,.13),transparent 70%),
+      radial-gradient(ellipse 42% 45% at 72% 60%,rgba(14,159,143,.12),transparent 72%)}
+  /* Page content rides above the two fixed backdrop layers. */
+  body > .wrap,body > #app{position:relative;z-index:1}
   .stat,.card,.analytics-card,.attr-bar,.kpi-tile,.esc-row,.modal{
     background:var(--glass) !important;
     -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
@@ -9068,6 +9272,13 @@ document.addEventListener('keydown', function(e){
      rather than a flat white box. Non-interactive, clipped to the radius. */
   .stat,.card,.analytics-card,.attr-bar,.kpi-tile,.topbar,
   .panel > .filter-bar,.col-block,.ai-card{position:relative}
+  /* The gloss needs position:relative, which moves these into the positioned
+     layer — so panes further down the DOM started painting over the top bar's
+     open dropdown. Give the bars that contain menus a stacking level above the
+     content they sit on top of. */
+  .topbar{z-index:60}
+  .panel > .filter-bar,.attr-bar{z-index:40}
+  .menu-items{z-index:300}
   .stat::after,.card::after,.analytics-card::after,.attr-bar::after,
   .kpi-tile::after,.topbar::after,.panel > .filter-bar::after,
   .col-block::after,.ai-card::after{
@@ -9103,8 +9314,12 @@ document.addEventListener('keydown', function(e){
      Buttons, inputs and pills get the same translucency at a lighter weight.
      Coloured variants (.chip.blue/.green/.primary) are left alone — they are
      the page's accents and should stay solid. */
+  /* `.col-hdr .col-hdr-btn`, not `.col-hdr-btn` — the same class is reused for
+     the overdue-modal toolbar, where three buttons carry an inline gradient
+     plus `color:#fff`. Repainting their background (even via !important) left
+     the inline white text intact and the labels vanished into the glass. */
   .chip:not(.blue):not(.green):not(.primary),
-  .col-hdr-btn,.tab-btn.active,.search-inp,.baseline-sel,.week-sel,
+  .col-hdr .col-hdr-btn,.tab-btn.active,.search-inp,.baseline-sel,.week-sel,
   .attr-btn,.rbtn,.check-item,.act-filter-input,.act-filter-sel{
     background:var(--glass-2) !important;
     -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
@@ -9112,7 +9327,7 @@ document.addEventListener('keydown', function(e){
     box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.85);
   }
   .chip:not(.blue):not(.green):not(.primary):hover,
-  .col-hdr-btn:hover,.attr-btn:hover,.rbtn:hover,.check-item:hover{
+  .col-hdr .col-hdr-btn:hover,.attr-btn:hover,.rbtn:hover,.check-item:hover{
     background:linear-gradient(155deg,rgba(255,255,255,.9),
                                rgba(255,255,255,.68)) !important;
     box-shadow:0 6px 16px -8px rgba(15,23,42,.35),
@@ -9141,6 +9356,121 @@ document.addEventListener('keydown', function(e){
   .vis-btn.hidden-person{background:linear-gradient(155deg,rgba(255,245,245,.9),
                                                     rgba(254,226,226,.62)) !important;
     border-color:rgba(254,202,202,.9) !important}
+
+  /* ══════════════ Review Queue ═════════════════════════════════════════
+     The "Current Owner" view: everything parked in review, grouped by the
+     person holding it now, worst delay first. Ported from the design mockup
+     (_preview_owners.html) onto the shared glass tokens, so it is the same
+     material as the dashboard rather than a second visual language. */
+  .rq-view{position:fixed;inset:0;z-index:700;display:none;overflow-y:auto;
+    background:#fff}
+  .rq-view.open{display:block}
+  /* White + drafting grid + a soft colour pool, same ground as the sign-in
+     page — the look you asked to carry over. */
+  .rq-view::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
+      linear-gradient(rgba(15,28,51,.045) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.045) 1px,transparent 1px);
+    background-size:120px 120px,120px 120px,24px 24px,24px 24px;
+    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%);
+            mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%)}
+  .rq-view::after{content:'';position:fixed;left:50%;top:-10%;width:1100px;height:800px;
+    z-index:0;transform:translateX(-50%);pointer-events:none;
+    background:
+      radial-gradient(ellipse 45% 45% at 30% 30%,rgba(19,102,204,.13),transparent 70%),
+      radial-gradient(ellipse 42% 45% at 72% 60%,rgba(14,159,143,.12),transparent 72%)}
+  .rq-wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:26px 22px 60px}
+  .rq-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
+  .rq-back{flex:none;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);
+    border-radius:10px;padding:8px 14px;font:700 12.5px 'Inter',system-ui,sans-serif;
+    color:#0a3b7c;cursor:pointer;box-shadow:0 8px 18px -12px rgba(12,34,74,.45)}
+  .rq-back:hover{background:#fff}
+  .rq-kick{font-size:9.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+    color:#0e9f8f;margin-bottom:4px}
+  .rq-top h1{font-size:24px;font-weight:800;letter-spacing:-.02em;color:#0f1c33}
+  .rq-top p{color:#5d6b83;font-size:12.5px;margin-top:3px}
+  .rq-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .rq-tile{position:relative;background:var(--glass);
+    -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+    border:1px solid var(--glass-brd);border-radius:16px;padding:14px 16px;
+    box-shadow:var(--glass-shadow),var(--glass-rim)}
+  .rq-tile .lab{font-size:9.5px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:#7b8798}
+  .rq-tile .val{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:4px;
+    font-variant-numeric:tabular-nums}
+  .rq-tile .val.warn{color:#c2410c}
+  .rq-tile .sub{font-size:11px;color:#7b8798;margin-top:2px}
+  .rq-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .rq-seg{display:inline-flex;background:rgba(255,255,255,.55);
+    border:1px solid rgba(255,255,255,.9);border-radius:11px;padding:3px;gap:2px;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
+  .rq-seg button{border:none;background:transparent;border-radius:8px;padding:7px 13px;
+    font:600 12.5px 'Inter',system-ui,sans-serif;color:#5d6b83;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px}
+  .rq-seg button:hover{color:#0f1c33;background:rgba(255,255,255,.6)}
+  .rq-seg button.on{background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;
+    font-weight:700;box-shadow:0 8px 18px -10px rgba(10,59,124,.6)}
+  .rq-seg .sn{font-family:'JetBrains Mono',monospace;font-size:10.5px;opacity:.75}
+  .rq-search{flex:1;min-width:200px;max-width:340px;border:1px solid rgba(255,255,255,.9);
+    border-radius:10px;background:rgba(255,255,255,.6);padding:9px 13px;font-size:12.5px;
+    font-family:inherit;color:#0f1c33;outline:none;
+    -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
+  .rq-search:focus{background:rgba(255,255,255,.95);
+    box-shadow:0 0 0 3px rgba(14,159,143,.18)}
+  /* One person = one glass card. Severity rides the left edge so the pane
+     itself stays glass instead of turning into a coloured block. */
+  .rq-person{position:relative;background:var(--glass);
+    -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
+    border:1px solid var(--glass-brd);border-radius:18px;margin-bottom:12px;
+    overflow:hidden;box-shadow:var(--glass-shadow),var(--glass-rim)}
+  .rq-person::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,#f97316,#ea580c)}
+  .rq-person.sev-hi::before{background:linear-gradient(180deg,#ef4444,#b91c1c)}
+  .rq-person.sev-lo::before{background:linear-gradient(180deg,#14b8a6,#0e9f8f)}
+  .rq-head{display:flex;align-items:center;gap:13px;padding:14px 18px;cursor:pointer;
+    user-select:none}
+  .rq-head:hover{background:rgba(255,255,255,.35)}
+  .rq-av{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+    font-weight:800;font-size:13px;color:#0a3b7c;background:rgba(255,255,255,.85);
+    border:1px solid rgba(255,255,255,.95);box-shadow:0 8px 18px -12px rgba(12,34,74,.5)}
+  .rq-id{flex:1;min-width:186px}
+  .rq-name{font-weight:800;font-size:14.5px;letter-spacing:-.01em;white-space:nowrap}
+  .rq-role{font-size:11px;color:#7b8798;margin-top:2px}
+  .rq-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .rq-pill{font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:999px;
+    white-space:nowrap;border:1px solid transparent}
+  .rq-pill .n{font-family:'JetBrains Mono',monospace;margin-left:3px}
+  .rq-pill.wfa{background:rgba(254,249,195,.75);color:#854d0e;border-color:rgba(253,230,138,.9)}
+  .rq-pill.l1{background:rgba(219,234,254,.75);color:#1e40af;border-color:rgba(191,219,254,.9)}
+  .rq-pill.l2{background:rgba(237,233,254,.75);color:#5b21b6;border-color:rgba(221,214,254,.9)}
+  .rq-pill.od{background:rgba(254,226,226,.8);color:#991b1b;border-color:rgba(254,202,202,.95)}
+  .rq-chev{color:#94a3b8;font-size:12px;transition:transform .18s}
+  .rq-person.open .rq-chev{transform:rotate(90deg)}
+  .rq-list{display:none;padding:0 18px 14px}
+  .rq-person.open .rq-list{display:block}
+  .rq-stage{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:#7b8798;margin:12px 0 6px;padding-top:10px;border-top:1px solid rgba(15,28,51,.07)}
+  .rq-task{display:grid;grid-template-columns:104px 1fr 92px 96px;gap:10px;align-items:center;
+    padding:7px 8px;border-radius:9px;font-size:12.5px;cursor:pointer;text-decoration:none;
+    color:inherit}
+  .rq-task:hover{background:rgba(255,255,255,.55)}
+  .rq-key{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#1366cc}
+  .rq-sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rq-age{font-size:11px;color:#7b8798;text-align:right}
+  .rq-od{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+  .rq-od b{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#b91c1c}
+  .rq-od .bar{flex:1;max-width:44px;height:5px;border-radius:999px;
+    background:rgba(15,28,51,.08);overflow:hidden}
+  .rq-od .bar i{display:block;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,#f97316,#dc2626)}
+  .rq-empty{text-align:center;color:#7b8798;padding:50px 20px;font-size:13px}
+  @media (max-width:760px){
+    .rq-tiles{grid-template-columns:repeat(2,1fr)}
+    .rq-task{grid-template-columns:88px 1fr;row-gap:2px}
+    .rq-age,.rq-od{grid-column:2;justify-content:flex-start;text-align:left}
+  }
 
   /* Image export: html2canvas cannot rasterise backdrop-filter, so freeze the
      glass to a solid pane for the duration of the capture. */
