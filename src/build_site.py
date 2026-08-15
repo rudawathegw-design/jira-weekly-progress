@@ -83,35 +83,88 @@ body{
 @media (min-width:2100px){ :root{ --page-max:1840px } }
 
 /* ── password overlay ────────────────────────────────────────── */
-#pw-overlay{position:fixed;inset:0;
+/* Palette: white card on a soft light field, cool blue/teal wash, deep navy
+   as the single accent. One accent only — the button owns it. */
+#pw-overlay{position:fixed;inset:0;overflow:hidden;
+  --pw-ink:#0f1c33; --pw-accent:#0a3b7c; --pw-teal:#0e9f8f;
   background:
-    radial-gradient(ellipse 70% 50% at 50% -10%, hsla(213,55%,92%,.9), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 88% 108%, hsla(155,50%,90%,.7), transparent 65%),
-    linear-gradient(180deg,#fbfaf7,#f3f1ea);
-  display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
-.pw-card{background:#fff;border:1px solid #e8e4da;border-radius:26px;
-  box-shadow:0 30px 70px -25px rgba(15,42,86,.25),0 6px 20px rgba(0,0,0,.05);
-  padding:44px 48px 34px;width:min(420px,94vw);text-align:center}
-.pw-brand{width:64px;height:64px;margin:0 auto 16px;border-radius:18px;display:grid;place-items:center;
-  background:linear-gradient(135deg,#0a3b7c,#1366cc);color:#fff;font-weight:800;font-size:22px;
-  letter-spacing:.02em;box-shadow:0 12px 28px -10px rgba(10,59,124,.55)}
-.pw-kicker{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  color:#a39e8f;margin-bottom:8px}
-.pw-card h2{font-size:23px;font-weight:800;letter-spacing:-.03em;margin-bottom:6px;color:#1b2a44}
-.pw-card p{color:#6b7280;font-size:13px;margin-bottom:24px;line-height:1.5}
-.pw-card .inp{text-align:center;letter-spacing:.08em;font-size:15px;padding:13px 46px 13px 46px;border-radius:12px}
-.pw-card .inp:focus{border-color:#1366cc;box-shadow:0 0 0 3px rgba(19,102,204,.13)}
+    radial-gradient(ellipse 65% 55% at 8% 0%,   hsla(205,90%,72%,.30), transparent 62%),
+    radial-gradient(ellipse 60% 50% at 96% 6%,  hsla(240,85%,78%,.26), transparent 62%),
+    radial-gradient(ellipse 75% 60% at 72% 112%,hsla(172,70%,70%,.28), transparent 64%),
+    radial-gradient(ellipse 50% 42% at 20% 98%, hsla(262,75%,80%,.20), transparent 66%),
+    linear-gradient(160deg,#ffffff 0%,#f4f7fc 55%,#eef3fa 100%);
+  display:flex;align-items:center;justify-content:center;z-index:500;padding:24px}
+/* Slow aurora drift keeps the field alive without pulling focus. */
+#pw-overlay::before{content:'';position:absolute;inset:-25%;pointer-events:none;
+  background:conic-gradient(from 200deg at 50% 50%,
+    hsla(205,95%,70%,.20),hsla(240,90%,78%,.18),hsla(172,75%,65%,.18),hsla(205,95%,70%,.20));
+  filter:blur(90px);animation:pwDrift 26s linear infinite}
+@keyframes pwDrift{to{transform:rotate(1turn)}}
+/* Hairline grid, masked to the centre, gives the field scale. */
+#pw-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(15,28,51,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(15,28,51,.05) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(ellipse 60% 55% at 50% 50%,#000,transparent 75%);
+          mask-image:radial-gradient(ellipse 60% 55% at 50% 50%,#000,transparent 75%)}
+.pw-card{position:relative;z-index:1;background:rgba(255,255,255,.92);
+  -webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4);
+  border:1px solid rgba(15,28,51,.07);border-radius:20px;
+  box-shadow:0 40px 90px -34px rgba(12,34,74,.34),0 2px 8px rgba(12,34,74,.05),
+             inset 0 1px 0 #fff;
+  padding:34px 34px 24px;width:min(430px,94vw);text-align:left;
+  animation:pwIn .5s cubic-bezier(.22,1,.36,1) both}
+/* Accent hairline along the top edge — the card's only decoration. */
+.pw-card::before{content:'';position:absolute;left:26px;right:26px;top:0;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,var(--pw-teal),var(--pw-accent),transparent);opacity:.75}
+@keyframes pwIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pw-card{animation:none}#pw-overlay::before{animation:none}}
+/* Header: mark left, identity stacked right. */
+.pw-head{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.pw-brand{flex:none;width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
+  background:linear-gradient(140deg,#1e88e5,#0a3b7c 72%);color:#fff;font-weight:800;font-size:18px;
+  letter-spacing:.02em;box-shadow:0 12px 26px -12px rgba(10,59,124,.6),
+  inset 0 1px 0 rgba(255,255,255,.35)}
+.pw-id{min-width:0}
+.pw-kicker{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--pw-teal);margin-bottom:5px}
+.pw-card h2{font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0;color:var(--pw-ink);line-height:1.2}
+.pw-card p{color:#5d6b83;font-size:12.5px;margin:0 0 22px;line-height:1.55}
+.pw-label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:#7b8798;margin-bottom:8px}
 .pw-field{position:relative}
-.pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:none;background:transparent;
-  color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:.05em;cursor:pointer;
-  padding:7px 9px;border-radius:8px;font-family:inherit;text-transform:uppercase}
-.pw-eye:hover{background:#f1f5f9;color:#334155}
-.pw-card .btn-primary{background:linear-gradient(135deg,#0a3b7c,#1366cc);border-radius:12px;padding:13px;
-  margin-top:12px;box-shadow:0 10px 24px -10px rgba(10,59,124,.5);
-  transition:transform .15s,box-shadow .15s,opacity .2s}
-.pw-card .btn-primary:hover{opacity:1;transform:translateY(-1px);
-  box-shadow:0 14px 30px -10px rgba(10,59,124,.6)}
-.pw-foot{margin-top:18px;font-size:11px;color:#a8a294;line-height:1.6}
+.pw-lock{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.45;
+  pointer-events:none;filter:grayscale(1)}
+.pw-card .inp{width:100%;text-align:left;letter-spacing:.14em;font-size:15px;
+  padding:13px 66px 13px 38px;border-radius:11px;background:#f7f9fc;
+  border:1px solid #dde4ee;color:var(--pw-ink);
+  transition:border-color .18s,box-shadow .18s,background .18s}
+.pw-card .inp::placeholder{color:#aab4c4;letter-spacing:.14em}
+.pw-card .inp:hover{border-color:#c6d0de}
+.pw-card .inp:focus{outline:none;background:#fff;border-color:var(--pw-teal);
+  box-shadow:0 0 0 3px rgba(14,159,143,.16)}
+.pw-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);border:none;
+  background:#eef2f8;color:#6b7a90;font-size:10px;font-weight:700;letter-spacing:.08em;
+  cursor:pointer;padding:6px 10px;border-radius:8px;font-family:inherit;text-transform:uppercase;
+  transition:background .15s,color .15s}
+.pw-eye:hover{background:#e3eaf5;color:var(--pw-accent)}
+.pw-eye:focus-visible{outline:2px solid var(--pw-teal);outline-offset:2px}
+/* Deep navy pill button — the strongest value on a white card. */
+.pw-card .btn-primary{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;
+  border-radius:999px;padding:14px;margin-top:16px;font-weight:800;font-size:14px;letter-spacing:.01em;
+  box-shadow:0 14px 30px -12px rgba(10,59,124,.55),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .15s,box-shadow .15s,filter .2s}
+.pw-card .btn-primary i{font-style:normal;transition:transform .2s}
+.pw-card .btn-primary:hover{opacity:1;transform:translateY(-1px);filter:brightness(1.1);
+  box-shadow:0 20px 38px -12px rgba(10,59,124,.65),inset 0 1px 0 rgba(255,255,255,.25)}
+.pw-card .btn-primary:hover i{transform:translateX(4px)}
+.pw-card .btn-primary:active{transform:translateY(0);filter:brightness(.95)}
+.pw-card .btn-primary:focus-visible{outline:2px solid var(--pw-accent);outline-offset:3px}
+.pw-foot{display:flex;align-items:flex-start;gap:8px;margin-top:20px;padding-top:14px;
+  border-top:1px solid rgba(15,28,51,.08);font-size:10.5px;color:#8b95a6;line-height:1.6}
+.pw-dot{flex:none;width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--pw-teal);
+  box-shadow:0 0 0 3px rgba(14,159,143,.16)}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1015,19 +1068,27 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- ═══════════════ Password Gate ══════════════════════════════════════════ -->
 <div id="pw-overlay">
   <div class="pw-card">
-    <div class="pw-brand">FIB</div>
-    <div class="pw-kicker">First Iraq Bank · PMO</div>
-    <h2>FIBTMP Progress Report</h2>
+    <!-- Header row: mark on the left, identity stacked beside it. Reads as a
+         document header rather than a centred splash. -->
+    <div class="pw-head">
+      <div class="pw-brand">FIB</div>
+      <div class="pw-id">
+        <div class="pw-kicker">First Iraq Bank · PMO</div>
+        <h2>FIBTMP Progress Report</h2>
+      </div>
+    </div>
     <p>Enter the site password to open the live report.</p>
+    <label class="pw-label" for="pw-inp">Site password</label>
     <div class="pw-field">
-      <input id="pw-inp" class="inp" type="password" placeholder="Site password"
+      <span class="pw-lock" aria-hidden="true">&#128274;</span>
+      <input id="pw-inp" class="inp" type="password" placeholder="••••••••••••"
              autocomplete="current-password" onkeydown="if(event.key==='Enter')checkPw()">
       <button type="button" class="pw-eye"
               onclick="var i=document.getElementById('pw-inp');var s=i.type==='password';i.type=s?'text':'password';this.textContent=s?'Hide':'Show';i.focus()">Show</button>
     </div>
-    <button class="btn-primary" onclick="checkPw()">Unlock report →</button>
+    <button class="btn-primary" onclick="checkPw()"><span>Unlock report</span><i>&rarr;</i></button>
     <div class="err-msg" id="pw-err"></div>
-    <div class="pw-foot">Encrypted end-to-end — nothing is readable without the password.<br>Authorized staff only.</div>
+    <div class="pw-foot"><span class="pw-dot"></span>Encrypted end-to-end — nothing is readable without the password. Authorized staff only.</div>
   </div>
 </div>
 
@@ -8751,13 +8812,26 @@ document.addEventListener('keydown', function(e){
   html.theme-dark #app .no-invert{filter:invert(1) hue-rotate(180deg)}
   html.theme-dark .theme-pop{filter:invert(1) hue-rotate(180deg)}
   /* Chrome that lives OUTSIDE #app gets real dark styles (no filter) */
-  html.theme-dark #pw-overlay{background:
-    radial-gradient(ellipse 70% 50% at 50% -10%,rgba(87,80,70,.45),transparent 60%),
-    linear-gradient(180deg,#1f1e1d,#262624)}
-  html.theme-dark .pw-card{background:#30302e;border-color:#3e3d39;box-shadow:0 20px 60px rgba(0,0,0,.55)}
-  html.theme-dark .pw-card h2{color:#f5f4ee}
+  /* The gate is white by default; theme-dark flips the field and card only —
+     layout, accent line and button shape stay identical. */
+  html.theme-dark #pw-overlay{--pw-ink:#f5f4ee;--pw-teal:#2dd4bf;
+    background:
+      radial-gradient(ellipse 65% 55% at 8% 0%,  hsla(190,70%,40%,.24),transparent 60%),
+      radial-gradient(ellipse 60% 50% at 96% 8%, hsla(248,60%,55%,.24),transparent 62%),
+      linear-gradient(160deg,#151412 0%,#1b1a19 55%,#211f1d 100%)}
+  html.theme-dark #pw-overlay::after{
+    background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px)}
+  html.theme-dark .pw-card{background:rgba(48,48,46,.9);border-color:rgba(255,255,255,.10);
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
   html.theme-dark .pw-card p{color:#b8b5ad}
-  html.theme-dark .pw-card .inp{background:#262624;border-color:#4a4844;color:#f5f4ee}
+  html.theme-dark .pw-label{color:#9a968c}
+  html.theme-dark .pw-card .inp{background:rgba(38,38,36,.9);border-color:#4a4844;color:#f5f4ee}
+  html.theme-dark .pw-card .inp::placeholder{color:#7d7a72}
+  html.theme-dark .pw-card .inp:focus{background:#262624}
+  html.theme-dark .pw-eye{background:rgba(255,255,255,.08);color:#b8b5ad}
+  html.theme-dark .pw-eye:hover{background:rgba(255,255,255,.14);color:#fff}
+  html.theme-dark .pw-foot{border-top-color:rgba(255,255,255,.09);color:#8f8b82}
   html.theme-dark .fab{border-color:rgba(255,255,255,.18);
     box-shadow:0 8px 24px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.16)}
   html.theme-dark .fab-label{background:rgba(48,48,46,.72);color:#f5f4ee;border-color:rgba(255,255,255,.14)}
