@@ -2785,11 +2785,29 @@ async function fetchLiveIssues(){
   const pw = sessionStorage.getItem('pw_cache') || '';
   // Call the Worker directly — the global fetch wrapper only rewrites
   // api.github.com URLs, so this passes straight through.
-  const r = await window.fetch(GH_PROXY, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
-    body: JSON.stringify({action:'jira'})
-  });
+  // One quiet retry on a connection-level failure. "Failed to fetch" means the
+  // request died without a response — a Worker over its limit, a sleeping tab,
+  // a Wi-Fi blip — and on a 10-second loop a single dropped tick is not worth
+  // interrupting anyone over. A real HTTP error still surfaces immediately.
+  let r;
+  try {
+    r = await window.fetch(GH_PROXY, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
+      body: JSON.stringify({action:'jira'})
+    });
+  } catch(netErr){
+    await new Promise(res => setTimeout(res, 1500));
+    try {
+      r = await window.fetch(GH_PROXY, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
+        body: JSON.stringify({action:'jira'})
+      });
+    } catch(netErr2){
+      throw new Error('connection to the Worker dropped twice — it may be over its CPU limit, or the network blipped');
+    }
+  }
   if (!r.ok){
     let msg = 'HTTP '+r.status;
     try { const j = await r.json(); if (j.message) msg = j.message + (j.detail?(' — '+j.detail):''); } catch(e){}
@@ -2848,10 +2866,20 @@ async function refreshLive(btn){
 // Live auto-refresh is ALWAYS ON and cannot be turned off — it pulls fresh
 // Jira data every 10s. Skips a tick while the tab is hidden
 // or a modal is open so it never yanks data out from under the user.
+// Raised while an export is running. The exports pull hard from Jira through
+// the same Worker, and a 10-second live tick landing on top of one is what
+// pushes the Worker over its CPU budget — the request dies with no HTTP status
+// and the page reports "Failed to fetch". The tick is skipped, not queued:
+// the next one is only 10 seconds away.
+let _HEAVY_BUSY = false;
+function _beginHeavyJob(){ _HEAVY_BUSY = true; }
+function _endHeavyJob(){ _HEAVY_BUSY = false; }
+
 function startLiveAuto(){
   if (_LIVE_AUTO_TIMER) return;
   refreshLive();
   _LIVE_AUTO_TIMER = setInterval(()=>{
+    if (_HEAVY_BUSY) return;
     if (document.visibilityState==='visible' && !document.querySelector('.modal-overlay:not(.hidden)'))
       refreshLive();
   }, 10000);
@@ -7212,6 +7240,7 @@ function _computePMOSummary() {
 async function exportExecutivePPTX() {
   if (!REPORT) return;
   toast('Building executive summary…');
+  _beginHeavyJob();
 
   const loadPptxGen = () => new Promise((resolve, reject) => {
     if (window.PptxGenJS) return resolve();
@@ -7781,6 +7810,8 @@ async function exportExecutivePPTX() {
   } catch (e) {
     console.error('[export-executive-pptx]', e);
     toast('Export failed: '+e.message);
+  } finally {
+    _endHeavyJob();
   }
 }
 
@@ -8070,10 +8101,29 @@ function openEpicExcelModal(scope){
 
 // Reads the chosen date out of the modal, remembers it for next time, and
 // kicks off the actual export.
-function confirmEpicExcelExport(){
+// The whole-project pull is the heaviest thing this page can ask Jira for:
+// every issue, with changelog, across several pages. Running it repeatedly is
+// what spends the Jira budget and starves the 10-second live refresh, so it is
+// capped at one run per calendar day. The epic-scoped exports are small and
+// stay uncapped.
+const _WPX_LS_KEY = 'wholeProjectExportDay';
+function _wholeProjectRanToday(){
+  try { return localStorage.getItem(_WPX_LS_KEY) === new Date().toISOString().slice(0,10); }
+  catch(e){ return false; }
+}
+function _markWholeProjectRun(){
+  try { localStorage.setItem(_WPX_LS_KEY, new Date().toISOString().slice(0,10)); } catch(e){}
+}
+
+async function confirmEpicExcelExport(){
   const inp = document.getElementById('epic-excel-start');
   const val = inp && inp.value;
   if (!val){ toast('Pick a start date first.'); return; }
+
+  if (_DAILY_SCOPE === 'project' && _wholeProjectRanToday()){
+    toast('Whole-project export already run today — it is limited to once a day. Use "Daily Status — Any Epic" for a smaller pull.');
+    return;
+  }
 
   // "Any epic" needs a valid key before we go anywhere near Jira.
   let key = '';
@@ -8102,6 +8152,7 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
     ? ((REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'Project')
     : epicKey;
   toast(`Pulling ${wholeProject ? 'the whole project' : epicKey} from Jira…`);
+  _beginHeavyJob();
   try {
     // The whole-project pull is paged, so report progress instead of leaving a
     // spinner up for what can be half a minute.
@@ -8127,6 +8178,11 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
     }
     // Say what was left out rather than quietly shipping a shorter sheet.
     if (_dropped) toast(`${_dropped} task(s) from hidden people excluded.`);
+
+    // The daily allowance is spent here, not when the file lands: this is the
+    // part that costs Jira and the Worker, and the workbook is assembled later
+    // from a CDN-loaded library.
+    if (wholeProject) _markWholeProjectRun();
 
     const startLabel = historyStart || EPIC_HISTORY_START;
     const days = _epicDayList(startLabel);
@@ -8293,6 +8349,8 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
   } catch(e){
     console.error('[export-epic]', e);
     toast('Export failed: '+e.message);
+  } finally {
+    _endHeavyJob();
   }
 }
 
@@ -10500,6 +10558,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.8.1  Whole-project export capped at once a day; the 10-second live
+#          refresh now stands down while an export runs, and retries once
+#          when a request is dropped rather than reporting failure.
 #   2.8.0  Executive Summary deck rebuilt for a C-level audience: verdict on
 #          the cover, a "What You Need To Know" slide with decisions
 #          requested, and all per-person detail moved behind an appendix.
@@ -10516,7 +10577,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.8.0"
+SITE_VERSION = "2.8.1"
 
 
 def _build_stamp():
