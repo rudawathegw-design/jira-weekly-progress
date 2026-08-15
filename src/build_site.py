@@ -9400,13 +9400,33 @@ document.addEventListener('keydown', function(e){
      single band of page chrome and the seam between them read as clutter.
      Placed after the coverage block above on purpose: that block sets
      border-radius with !important, so these have to come later to win. */
-  .topbar{margin-bottom:0 !important;padding-bottom:16px;
+  /* The header became a card in the glass pass but kept its old zero padding,
+     so the title sat flush against the pane edge and read as cramped. Give the
+     band real internal margins and let the two blocks breathe apart. */
+  .topbar{margin-bottom:0 !important;padding:18px 22px 16px;gap:20px;
+    align-items:flex-start;
     border-bottom-left-radius:0 !important;border-bottom-right-radius:0 !important;
     border-bottom:none !important;
     box-shadow:0 1px 2px rgba(15,23,42,.04),var(--glass-rim) !important}
-  .attr-bar{margin-top:0 !important;
+  /* Title block holds a sensible width instead of being squeezed by the
+     button stack; -.04em tracking was pulling the letters into each other at
+     display size, which is the "compressed" look. */
+  .topbar > :first-child{flex:1 1 300px;min-width:0}
+  .brand-title{letter-spacing:-.015em !important;line-height:1.18;
+    padding-right:8px}
+  .brand-sub{margin-top:5px}
+  .attr-bar{margin-top:0 !important;padding:14px 22px 15px;
     border-top-left-radius:0 !important;border-top-right-radius:0 !important;
     border-top:1px solid rgba(15,28,51,.07) !important}
+  /* Buttons get a little more room to sit in, and more space between rows. */
+  .topbar-right{gap:10px !important}
+  .chip{padding:8px 13px}
+  .chip.chip-lg{padding:10px 17px}
+  .topbar-actions{gap:8px !important}
+  @media (max-width:820px){
+    .topbar{padding:16px 16px 14px;gap:14px}
+    .attr-bar{padding:13px 16px}
+  }
   /* The gloss belongs to the combined card, so only the top half carries it. */
   .attr-bar::after{display:none}
 
