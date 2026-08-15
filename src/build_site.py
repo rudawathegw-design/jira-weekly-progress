@@ -515,9 +515,16 @@ body.capturing .topbar-right{display:none !important}
 /* ── PMO Health Dashboard ────────────────────────────────────── */
 .pmo-section{margin-bottom:16px}
 .pmo-section:last-child{margin-bottom:0}
-.pmo-section-title{font-size:10.5px;font-weight:800;color:#475569;
-  text-transform:uppercase;letter-spacing:.12em;margin-bottom:7px;
-  display:flex;align-items:center;gap:6px}
+/* The icon lives in its own span: it used to share a text node with the label,
+   so the flex `gap` never applied and the glyph sat on top of the first
+   letters. Tracking eased from .12em too — at 10.5px uppercase it was tight
+   enough to read as one long word. */
+.pmo-section-title{font-size:11px;font-weight:800;color:#475569;
+  text-transform:uppercase;letter-spacing:.07em;line-height:1.45;
+  margin:2px 0 10px;
+  display:flex;align-items:center;gap:9px}
+.pmo-ico{flex:none;display:inline-flex;align-items:center;justify-content:center;
+  font-size:13px;line-height:1;letter-spacing:0;width:16px}
 
 /* RAG stacked bar */
 .rag-bar{display:flex;height:36px;border-radius:8px;overflow:hidden;
@@ -1603,7 +1610,7 @@ CC: @cc</textarea>
       <!-- Row 2: action buttons -->
       <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
         <!-- Quick-look buttons first (red Overdue is highest-priority alert) -->
-        <button class="chip chip-lg ac-red" id="overdue-btn" onclick="openOverdueModal()" style="display:none" title="Show all overdue tasks with Jira links">
+        <button class="chip chip-lg ac-red" data-new="overdue-btn" id="overdue-btn" onclick="openOverdueModal()" style="display:none" title="Show all overdue tasks with Jira links">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           Overdue <span id="overdue-count" style="background:#dc2626;color:#fff;padding:1px 7px;border-radius:999px;margin-left:2px;font-family:'JetBrains Mono',monospace">0</span>
         </button>
@@ -3398,7 +3405,7 @@ function renderPMOPanel() {
   // ── Render ──
   wrap.innerHTML = `
     <div class="pmo-section">
-      <div class="pmo-section-title">🚦 RAG Status Distribution</div>
+      <div class="pmo-section-title"><span class="pmo-ico">🚦</span><span>RAG Status Distribution</span></div>
       <div class="rag-bar">
         ${rag.green.length ? `<div class="rag-seg rag-seg-g" style="flex:${rag.green.length}" title="Green: ${rag.green.length} healthy">${pctG}%</div>`:''}
         ${rag.amber.length ? `<div class="rag-seg rag-seg-a" style="flex:${rag.amber.length}" title="Amber: ${rag.amber.length} watch">${pctA}%</div>`:''}
@@ -3412,7 +3419,7 @@ function renderPMOPanel() {
     </div>
 
     <div class="pmo-section">
-      <div class="pmo-section-title">📊 Key Performance Indicators</div>
+      <div class="pmo-section-title"><span class="pmo-ico">📊</span><span>Key Performance Indicators</span></div>
       <div class="kpi-grid">
         <div class="kpi-tile">
           <div class="kpi-tile-label">Completion</div>
@@ -3439,7 +3446,7 @@ function renderPMOPanel() {
 
     ${watchlist.length ? `
     <div class="pmo-section">
-      <div class="pmo-section-title">⚠ Escalation Watchlist (PM Action Required)</div>
+      <div class="pmo-section-title"><span class="pmo-ico">⚠</span><span>Escalation Watchlist (PM Action Required)</span></div>
       <div class="esc-list">
         ${watchlist.map((r,i) => {
           const amber = r._reasons.every(x => x.cls.includes('amber'));
@@ -3463,7 +3470,7 @@ function renderPMOPanel() {
       </button>` : ''}
     </div>` : `
     <div class="pmo-section">
-      <div class="pmo-section-title">✓ No Escalations</div>
+      <div class="pmo-section-title"><span class="pmo-ico">✓</span><span>No Escalations</span></div>
       <div style="font-size:12.5px;color:#059669;padding:6px 2px">All members operating within tolerance.</div>
     </div>`}
   `;
