@@ -7827,10 +7827,28 @@ async function exportEpicExcel(historyStart, scope){
   try {
     // The whole-project pull is paged, so report progress instead of leaving a
     // spinner up for what can be half a minute.
-    const issues = wholeProject
+    const fetched = wholeProject
       ? await fetchProjectIssues((n,p) => toast(`Pulling from Jira — ${n} issues (page ${p})…`))
       : await fetchEpicIssues();
-    if (!issues.length){ toast(`No tasks/subtasks found for ${scopeName}.`); return; }
+
+    // Honour "Hide people from export". Every other export and on-screen table
+    // filters on hiddenPeople; this one was pulling straight from Jira and
+    // never checked, so hidden names came back in the daily-status sheet.
+    const _hide = (typeof hiddenPeople !== 'undefined' && hiddenPeople && hiddenPeople.size)
+      ? hiddenPeople : null;
+    const _asgn = i => ((i.fields && i.fields.assignee &&
+                        (i.fields.assignee.displayName || i.fields.assignee.name)) || 'Unassigned');
+    const issues = _hide ? fetched.filter(i => !_hide.has(_asgn(i))) : fetched;
+    const _dropped = fetched.length - issues.length;
+
+    if (!issues.length){
+      toast(_dropped
+        ? `Every task found belongs to a hidden person (${_dropped}) — nothing to export.`
+        : `No tasks/subtasks found for ${scopeName}.`);
+      return;
+    }
+    // Say what was left out rather than quietly shipping a shorter sheet.
+    if (_dropped) toast(`${_dropped} task(s) from hidden people excluded.`);
 
     const startLabel = historyStart || EPIC_HISTORY_START;
     const days = _epicDayList(startLabel);
