@@ -3328,11 +3328,10 @@ function renderDonut() {
   // filtered both out. The two sat side by side on one card showing different
   // totals (465 vs 440), which is the fastest way to lose an executive's
   // trust in every other number on the page.
+  const rows = _countedRows();
   const _excluded = { rows:0, tasks:0 };
-  const rows = (REPORT.rows || []).filter(r => {
-    const keep = r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner);
-    if (!keep && (r.total||0) > 0){ _excluded.rows++; _excluded.tasks += (r.total||0); }
-    return keep;
+  (REPORT.rows || []).forEach(r => {
+    if ((r.total||0) > 0 && !rows.includes(r)){ _excluded.rows++; _excluded.tasks += (r.total||0); }
   });
   const totals = rows.reduce((acc, r) => {
     acc.open += r.open||0;
@@ -3404,9 +3403,34 @@ function _togglePmoWatchlist() {
   _pmoWatchlistExpanded = !_pmoWatchlistExpanded;
   renderPMOPanel();
 }
+// ── What counts toward the project ──────────────────────────────────────────
+// One definition, used by every headline number on the page. A row counts if
+// it belongs to a real person, carries work, and that person is not hidden.
+//
+// This filter existed in three places and the top-of-page tiles used none of
+// them, so "Team completion" and "Total tasks" quietly counted Unassigned work
+// and, in some paths, hidden people — while the analytics card below did not.
+// Two totals on one screen is how a dashboard loses its reader.
+function _countedRows(src){
+  const rows = src || (typeof REPORT !== 'undefined' && REPORT ? REPORT.rows : []) || [];
+  const hid = (typeof hiddenPeople !== 'undefined' && hiddenPeople) ? hiddenPeople : new Set();
+  return rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hid.has(r.owner));
+}
+// Completion over a snapshot's people map, on the same basis, so this period
+// and last period are comparable rather than merely adjacent.
+function _pctFromPeople(people){
+  const hid = (typeof hiddenPeople !== 'undefined' && hiddenPeople) ? hiddenPeople : new Set();
+  let t=0, d=0;
+  Object.entries(people || {}).forEach(([name, v]) => {
+    if (name === 'Unassigned' || hid.has(name)) return;
+    t += v.total||0; d += (v.completed !== undefined ? v.completed : v.done)||0;
+  });
+  return t ? Math.round(1000*d/t)/10 : null;
+}
+
 function renderPMOPanel() {
   const wrap = document.getElementById('pmo-wrap');
-  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
+  const rows = _countedRows();
   if (!rows.length) { wrap.innerHTML = '<div class="empty">No data.</div>'; return; }
 
   // ── RAG Classification (industry-standard PMO thresholds) ──
@@ -4097,7 +4121,7 @@ function exportDashboard(mobile) {
 }
 
 function _drawDashboardCanvas(returnCanvas) {
-  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
+  const rows = _countedRows();
   if (!rows.length) { toast('No data to export.'); return; }
 
   // RAG
@@ -6226,10 +6250,25 @@ function init() {
   renderAttrBar();
 
   // stats
-  const tw=REPORT.team_total, lw=REPORT.team_last_week, d=REPORT.team_delta;
-  const totalOv = REPORT.rows.reduce((s,r)=>s+(r.overdue||0),0);
-  const ovReview   = REPORT.rows.reduce((s,r)=>s+(r.overdue_review||0),0);
-  const ovDelivery = REPORT.rows.reduce((s,r)=>s+(r.overdue_delivery||0),0);
+  // Every tile below is computed from the counted set, not from REPORT.rows
+  // and not from the snapshot's stored team_total — those include Unassigned
+  // work and disagree with the analytics card further down the page.
+  const _cnt = _countedRows();
+  const _cntTotal = _cnt.reduce((s,r)=>s+(r.total||0),0);
+  const _cntDone  = _cnt.reduce((s,r)=>s+(r.completed||0),0);
+  const tw = _cntTotal ? Math.round(1000*_cntDone/_cntTotal)/10 : 0;
+  // Last period on the same basis, recomputed from the baseline snapshot's own
+  // people map. Using its stored team_total would compare a filtered figure
+  // against an unfiltered one and call the difference a trend.
+  const _prevSnapForPct = (REPORT.history||[]).filter(x => (x.date||'') === REPORT.last_snap_date)[0] || null;
+  const _prevPeopleForPct = _prevSnapForPct
+    ? ((typeof _snapshotPeople === 'function' ? _snapshotPeople(_prevSnapForPct, _ATTR.mode) : null) || _prevSnapForPct.people)
+    : null;
+  const lw = _prevPeopleForPct ? _pctFromPeople(_prevPeopleForPct) : null;
+  const d  = (lw === null || lw === undefined) ? null : Math.round((tw - lw)*10)/10;
+  const totalOv = _cnt.reduce((s,r)=>s+(r.overdue||0),0);
+  const ovReview   = _cnt.reduce((s,r)=>s+(r.overdue_review||0),0);
+  const ovDelivery = _cnt.reduce((s,r)=>s+(r.overdue_delivery||0),0);
   const isNew = d===null||d===undefined;
   const ds = pStyle(d,tw,isNew);
 
@@ -6251,14 +6290,14 @@ function init() {
     </div>
     <div class="stat">
       <div class="lbl">Members</div>
-      <div class="val val-blue">${REPORT.rows.length}</div>
+      <div class="val val-blue">${_cnt.length}</div>
       <div class="sub">${_ATTR.mode==='reviewer' ? 'Reviewers with a queue'
                         : _ATTR.mode==='accountable' ? 'Currently accountable' : 'Assigned'}</div>
     </div>
     <div class="stat">
       <div class="lbl">Total Tasks</div>
-      <div class="val val-muted">${REPORT.grand_total||0}</div>
-      <div class="sub">${REPORT.grand_done||0} done</div>
+      <div class="val val-muted">${_cntTotal}</div>
+      <div class="sub">${_cntDone} done</div>
     </div>
     ${totalOv>0?`<div class="stat">
       <div class="lbl">Overdue</div>
@@ -7233,7 +7272,7 @@ function exportExcel() {
 // Data pulled from the same computed values as the on-screen PMO panel
 // so the deck always matches what's on the dashboard.
 function _computePMOSummary() {
-  const rows = REPORT.rows.filter(r => r.owner !== 'Unassigned' && (r.total||0) > 0 && !hiddenPeople.has(r.owner));
+  const rows = _countedRows();
   const rag = {green:[], amber:[], red:[]};
   rows.forEach(r => {
     const pct = r.this_week || 0;
@@ -10655,6 +10694,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.9.1  One definition of what counts toward the project: hidden people and
+#          unassigned work are excluded from every headline number, not just
+#          the analytics card. Totals drop accordingly and now agree.
 #   2.9.0  Analytics card: donut and KPIs now count the same population,
 #          watchlist ranks by impact instead of raw percentage, KPIs carry
 #          week-over-week direction, overdue ageing replaces WIP ratio, and
@@ -10681,7 +10723,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.9.0"
+SITE_VERSION = "2.9.1"
 
 
 def _build_stamp():
