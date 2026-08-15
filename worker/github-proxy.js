@@ -446,8 +446,22 @@ export default {
         return { histories: out };
       };
 
-      let issues = [], token = null;
-      for (let i = 0; i < 40; i++) {           // safety cap (~4000 issues)
+      // ── One page per invocation ──────────────────────────────────────────
+      // Paging used to happen inside this handler: up to 40 sequential Jira
+      // fetches, each expanded with changelog, parsed and slimmed in a single
+      // Worker invocation. On this project that is ~10 MB of JSON per run and
+      // it exceeded the CPU limit (Cloudflare 1102), which reaches the browser
+      // as a bare "Failed to fetch" because the connection dies mid-response.
+      //
+      // The client now drives the loop: it calls with `paged:true` and feeds
+      // back the nextPageToken until done. Each invocation handles at most 100
+      // issues, which keeps CPU well inside budget and spreads the Jira calls
+      // out instead of firing them back-to-back.
+      const paged = body.paged === true;
+      const maxPages = paged ? 1 : 40;         // legacy path keeps the old cap
+
+      let issues = [], token = body.pageToken || null, isLast = false;
+      for (let i = 0; i < maxPages; i++) {
         const qs = new URLSearchParams({
           jql, maxResults: "100", fields: JIRA_LIVE_FIELDS, expand: "changelog",
         });
@@ -455,7 +469,14 @@ export default {
         const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, { headers: jhdr });
         if (!jr.ok) {
           const t = await jr.text();
-          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
+          // Surface Jira's own throttling verbatim: a 429 here means the token
+          // budget is spent, and the client needs to back off rather than retry.
+          return json(502, {
+            message: jr.status === 429 ? "Jira rate limit" : "Jira API error",
+            status: jr.status,
+            retryAfter: jr.headers.get("Retry-After") || "",
+            detail: t.slice(0, 300),
+          });
         }
         const d = await jr.json();
         // Slim per page so the accumulator never holds the fat payload.
@@ -464,10 +485,15 @@ export default {
           s.changelog = slimChangelog(raw.changelog);
           issues.push(s);
         }
-        token = d.nextPageToken;
-        if (!token || d.isLast) break;
+        token = d.nextPageToken || null;
+        isLast = !token || d.isLast === true;
+        if (isLast) break;
       }
-      return json(200, { issues, project: project || "" });
+      return json(200, {
+        issues, project: project || "",
+        nextPageToken: isLast ? null : token,
+        isLast: paged ? isLast : true,
+      });
     }
 
     // ── Epic export: all direct children of an epic + their subtasks ──
@@ -489,6 +515,8 @@ export default {
       // saving a snapshot file anywhere. Safe here (unlike the whole-project
       // "jira" action above) because an epic's issue count is small.
 
+      // Page cap is lower than the whole-project handler because an epic is
+      // small; the client still drives the outer loop for the project export.
       async function runJql(jql) {
         let out = [], token = null;
         for (let i = 0; i < 20; i++) {          // safety cap (~2000 issues)
@@ -497,7 +525,8 @@ export default {
           const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, { headers: jhdr });
           if (!jr.ok) {
             const t = await jr.text();
-            return { error: true, status: jr.status, detail: t.slice(0, 300) };
+            return { error: true, status: jr.status, detail: t.slice(0, 300),
+                     retryAfter: jr.headers.get("Retry-After") || "" };
           }
           const d = await jr.json();
           out = out.concat(d.issues || []);

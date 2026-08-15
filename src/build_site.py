@@ -7586,25 +7586,81 @@ async function fetchEpicIssues(){
 
 // Whole project, not one epic. Same shape (fields + status-only changelog), so
 // the daily-status export renders it with the identical code path.
-async function fetchProjectIssues(){
-  return _fetchIssuesFor({action:'project_issues'});
+// Whole-project export. The Worker returns ONE page per call and hands back a
+// nextPageToken; we drive the loop from here.
+//
+// It used to page inside the Worker — up to 40 changelog-expanded Jira fetches
+// parsed in a single invocation, ~10 MB of JSON, which blew the Cloudflare CPU
+// limit and surfaced as a bare "Failed to fetch" (the connection dies, so there
+// is no HTTP status to report). Worse, the burst spent the Jira token budget,
+// which took the live refresh down with it for a few minutes afterwards.
+//
+// One page per call keeps each invocation small, and the pause between pages
+// keeps us inside Jira's budget so live refresh survives the export.
+async function fetchProjectIssues(onProgress){
+  const all = [];
+  let token = null, page = 0;
+  for (;;) {
+    const payload = {action:'project_issues', paged:true};
+    if (token) payload.pageToken = token;
+    const j = await _fetchIssuesFor(payload, {raw:true});
+    (j.issues || []).forEach(i => all.push(i));
+    page++;
+    if (onProgress) onProgress(all.length, page);
+    token = j.nextPageToken || null;
+    if (j.isLast || !token) break;
+    if (page >= 60){                 // backstop; 60 × 100 = 6000 issues
+      toast('Stopped at 6000 issues — export may be incomplete.');
+      break;
+    }
+    // Breathe between pages. Jira Cloud bills by request cost, and a
+    // changelog-expanded search is expensive; back-to-back pages are what
+    // spend the budget and start returning 429s.
+    await new Promise(r => setTimeout(r, 350));
+  }
+  return all;
 }
 
-async function _fetchIssuesFor(payload){
+async function _fetchIssuesFor(payload, opts){
   if (!GH_PROXY) throw new Error('No Worker proxy configured (meta gh-proxy).');
   const pw = sessionStorage.getItem('pw_cache') || '';
-  const r = await window.fetch(GH_PROXY, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
-    body: JSON.stringify(payload)
-  });
-  if (!r.ok){
-    let msg = 'HTTP '+r.status;
-    try { const j = await r.json(); if (j.message) msg = j.message + (j.detail?(' — '+j.detail):''); } catch(e){}
+
+  // One retry on a Jira 429, honouring Retry-After. Anything else fails fast —
+  // retrying a CPU blow-up or a bad token just doubles the damage.
+  for (let attempt = 0; attempt < 2; attempt++){
+    let r;
+    try {
+      r = await window.fetch(GH_PROXY, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
+        body: JSON.stringify(payload)
+      });
+    } catch(netErr){
+      // "Failed to fetch" — the connection died rather than returning a status.
+      // Nearly always the Worker exceeding its CPU/memory limit on this path.
+      throw new Error('Connection to the Worker dropped (it may have exceeded '
+        + 'its CPU limit on this request). Nothing was changed in Jira.');
+    }
+    if (r.ok) {
+      const j = await r.json();
+      return (opts && opts.raw) ? j : (j.issues || []);
+    }
+    let msg = 'HTTP '+r.status, retryAfter = 0, rateLimited = false;
+    try {
+      const j = await r.json();
+      if (j.message) msg = j.message + (j.detail ? (' — '+j.detail) : '');
+      rateLimited = j.status === 429 || /rate limit/i.test(j.message||'');
+      retryAfter  = parseInt(j.retryAfter||'0', 10) || 0;
+    } catch(e){}
+    if (rateLimited && attempt === 0){
+      const waitMs = Math.min(Math.max(retryAfter*1000, 3000), 30000);
+      toast(`Jira is rate-limiting — waiting ${Math.round(waitMs/1000)}s…`);
+      await new Promise(r2 => setTimeout(r2, waitMs));
+      continue;
+    }
     throw new Error(msg);
   }
-  const j = await r.json();
-  return j.issues || [];
+  throw new Error('Jira rate limit — try again in a minute.');
 }
 
 // Walks an issue's changelog for "status" field changes and returns the
@@ -7769,7 +7825,11 @@ async function exportEpicExcel(historyStart, scope){
     : EPIC_KEY;
   toast(`Pulling ${wholeProject ? 'the whole project' : EPIC_KEY} from Jira…`);
   try {
-    const issues = wholeProject ? await fetchProjectIssues() : await fetchEpicIssues();
+    // The whole-project pull is paged, so report progress instead of leaving a
+    // spinner up for what can be half a minute.
+    const issues = wholeProject
+      ? await fetchProjectIssues((n,p) => toast(`Pulling from Jira — ${n} issues (page ${p})…`))
+      : await fetchEpicIssues();
     if (!issues.length){ toast(`No tasks/subtasks found for ${scopeName}.`); return; }
 
     const startLabel = historyStart || EPIC_HISTORY_START;
