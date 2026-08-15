@@ -1970,7 +1970,10 @@ const REVIEW_STATUSES = new Set(['waiting for approval','revision level 1','revi
 const ATTR_LS_KEY = 'fibtmp_attribution_v1';
 
 const _ATTR = {
-  mode: 'accountable',
+  // Opens on "Assigned To": the weekly tables are what most people come here
+  // for, and Current Owner swaps the whole body over to the Review Queue.
+  // A saved choice still wins — this is only the first-visit default.
+  mode: 'assignee',
   statusMap: {...DEFAULT_STATUS_MAP},
   load(){
     try {
@@ -1997,7 +2000,7 @@ const _ATTR = {
     } catch(e){ console.warn('[attr] could not save config', e); }
   },
   reset(){
-    _ATTR.mode = 'accountable';
+    _ATTR.mode = 'assignee';
     _ATTR.statusMap = {...DEFAULT_STATUS_MAP};
     _ATTR.save();
   },
@@ -2677,6 +2680,9 @@ function _rqRender(){
     // Stage headings inside a person block, worst task first within each.
     const byStage = {};
     g.list.forEach(i => { (byStage[i.status||'—'] = byStage[i.status||'—'] || []).push(i); });
+    // One running number per person, continuing across their stage groups, so
+    // "third one down" means the same thing when talking to someone about it.
+    let _n = 0;
     const body = Object.keys(byStage).sort().map(st => {
       const l = st.toLowerCase();
       const cls = l.includes('waiting') ? 'st-wfa' : l.includes('level 2') ? 'st-l2' : '';
@@ -2684,6 +2690,7 @@ function _rqRender(){
       <div class="rq-stage ${cls}">${esc(st)}</div>
       ${byStage[st].slice().sort((a,b)=>(b._days||0)-(a._days||0)).map(i => `
         <a class="rq-task" href="${esc(base)}/browse/${esc(i.key)}" target="_blank" rel="noopener">
+          <span class="rq-seq">${++_n}-</span>
           <span class="rq-key">${esc(i.key)}</span>
           <span class="rq-sum" title="${esc(i.summary||'')}">${esc(i.summary||'')}</span>
           <span class="rq-age">${i.due ? 'due '+esc(i.due) : 'no due date'}</span>
@@ -2700,9 +2707,6 @@ function _rqRender(){
           ${g.role ? `<div class="rq-role">${esc(g.role)}</div>` : ''}
         </div>
         <div class="rq-meta">
-          ${g.wfa ? `<span class="rq-pill wfa">Waiting For Approval <span class="n">${g.wfa}</span></span>` : ''}
-          ${g.l1  ? `<span class="rq-pill l1">Revision Level 1 <span class="n">${g.l1}</span></span>` : ''}
-          ${g.l2  ? `<span class="rq-pill l2">Revision Level 2 <span class="n">${g.l2}</span></span>` : ''}
           ${g.overdue ? `<span class="rq-pill od">${g.overdue} overdue · max ${g.worst}d</span>` : ''}
           <span class="rq-chev">&#9656;</span>
         </div>
@@ -9751,9 +9755,12 @@ document.addEventListener('keydown', function(e){
   .rq-rail button.on{background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff}
   .rq-rail button.dim{opacity:.32;cursor:default}
   .rq-rail button.dim:hover{background:transparent;color:#5d6b83}
-  .rq-task{display:grid;grid-template-columns:104px 1fr 92px 96px;gap:10px;align-items:center;
+  .rq-task{display:grid;grid-template-columns:26px 104px 1fr 92px 96px;gap:10px;align-items:center;
     padding:7px 8px;border-radius:9px;font-size:12.5px;cursor:pointer;text-decoration:none;
     color:inherit}
+  /* Running number per person. Tabular figures so 9- and 10- line up. */
+  .rq-seq{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+    color:#94a3b8;text-align:right;font-variant-numeric:tabular-nums}
   .rq-task:hover{background:rgba(255,255,255,.55)}
   .rq-key{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#1366cc}
   .rq-sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -9767,8 +9774,8 @@ document.addEventListener('keydown', function(e){
   .rq-empty{text-align:center;color:#7b8798;padding:50px 20px;font-size:13px}
   @media (max-width:760px){
     .rq-tiles{grid-template-columns:repeat(2,1fr)}
-    .rq-task{grid-template-columns:88px 1fr;row-gap:2px}
-    .rq-age,.rq-od{grid-column:2;justify-content:flex-start;text-align:left}
+    .rq-task{grid-template-columns:24px 84px 1fr;row-gap:2px}
+    .rq-age,.rq-od{grid-column:2/-1;justify-content:flex-start;text-align:left}
   }
 
   /* Image export: html2canvas cannot rasterise backdrop-filter, so freeze the
