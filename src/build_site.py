@@ -1980,6 +1980,20 @@ const _ATTR = {
       const raw = localStorage.getItem(ATTR_LS_KEY);
       if (!raw) return;
       const c = JSON.parse(raw);
+      // One-time migration. Everyone who used the page before "Assigned To"
+      // became the default has "accountable" saved, and a saved choice beats a
+      // default — so changing the default alone left every existing browser
+      // still opening on Current Owner. Drop the stale mode once, keep the
+      // status map, and stamp the config so this never runs again. Anything
+      // chosen after this point is honoured normally.
+      if (!c.defaultsV2){
+        _ATTR.mode = 'assignee';
+        if (c.statusMap && typeof c.statusMap === 'object'){
+          _ATTR.statusMap = {...DEFAULT_STATUS_MAP, ...c.statusMap};
+        }
+        _ATTR.save();
+        return;
+      }
       if (c.mode && ATTR_MODES[c.mode]) _ATTR.mode = c.mode;
       // c.types is deliberately ignored: the issue-type scope filter was
       // removed, and honouring a saved filter with no UI to see or clear it
@@ -1996,6 +2010,7 @@ const _ATTR = {
       localStorage.setItem(ATTR_LS_KEY, JSON.stringify({
         mode: _ATTR.mode,
         statusMap: _ATTR.statusMap,
+        defaultsV2: true,   // marks the "Assigned To" default migration as done
       }));
     } catch(e){ console.warn('[attr] could not save config', e); }
   },
