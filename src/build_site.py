@@ -1489,7 +1489,11 @@ CC: @cc</textarea>
 
   <!-- Typewriter brand text (motion graphic) — above the Breaking bar -->
   <div class="fib-type" aria-label="First Iraqi Bank" style="margin-bottom:10px">
-    <span id="fib-type-out"></span><span class="fib-caret">&nbsp;</span>
+    <!-- Ghost holds the full string so the box keeps its width and height while
+         the visible text types in and out — otherwise the line collapses at the
+         empty frame and the whole dashboard jumps. -->
+    <span class="fib-ghost" aria-hidden="true">First Iraqi Bank</span>
+    <span class="fib-live"><span id="fib-type-out"></span><span class="fib-caret">&nbsp;</span></span>
   </div>
 
   <!-- Breaking-news ticker (recent task changes) — pinned to the very top -->
@@ -1512,11 +1516,16 @@ CC: @cc</textarea>
       </div>
     </div>
     <style>
-      .fib-type{display:inline-flex;align-items:center;font-weight:800;
-        font-size:clamp(15px,2.2vw,20px);letter-spacing:.02em;white-space:nowrap;
+      /* Ghost and live text are stacked in the same grid cell, so the box is
+         always sized by the full string — no reflow as the text types. */
+      .fib-type{display:inline-grid;font-weight:800;
+        font-size:clamp(15px,2.2vw,20px);line-height:1.5;letter-spacing:.02em;white-space:nowrap;
         background:linear-gradient(90deg,#0e9488,#14b8a6,#0e7c74);
         -webkit-background-clip:text;background-clip:text;color:transparent;
         font-family:'Inter',system-ui,sans-serif}
+      .fib-type > *{grid-area:1/1;display:inline-flex;align-items:center}
+      /* Reserves space only; never painted. */
+      .fib-ghost{visibility:hidden;padding-right:4px}
       .fib-caret{display:inline-block;width:2px;height:1.05em;margin-left:2px;
         background:#14b8a6;-webkit-text-fill-color:#14b8a6;border-radius:1px;
         animation:fibBlink 1s steps(1) infinite}
