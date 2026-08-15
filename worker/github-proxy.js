@@ -188,7 +188,32 @@ export default {
     }
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    // Everything below runs inside a guard. Without it, any thrown error kills
+    // the isolate: the connection drops with no HTTP status and the dashboard
+    // can only report "Failed to fetch", which says nothing about the cause.
+    // Wrapped, a thrown error comes back as a readable 500 instead.
+    //
+    // Note what this deliberately cannot catch: exceeding the CPU limit is not
+    // an exception, it terminates the isolate. So a dropped connection that
+    // survives this guard is itself the diagnosis — it means CPU, not a bug.
+    try {
+      return await handleRequest(request, env, ctx);
+    } catch (err) {
+      const msg = (err && (err.stack || err.message)) || String(err);
+      console.error("[worker] unhandled", msg);
+      const allow = (env.ALLOWED_ORIGIN || "").split(",").map(s => s.trim()).filter(Boolean);
+      const origin = request.headers.get("Origin");
+      const corsOrigin = (origin && (allow.length === 0 || allow.includes(origin))) ? origin : (allow[0] || "*");
+      return new Response(JSON.stringify({
+        message: "Worker error",
+        detail: String(msg).slice(0, 500),
+      }), { status: 500, headers: { ...cors(corsOrigin), "Content-Type": "application/json" } });
+    }
+  },
+};
+
+async function handleRequest(request, env, ctx) {
     // ALLOWED_ORIGIN may be a comma-separated list (e.g. the custom domain plus
     // the github.io fallback). Echo back the caller's origin when it's allowed.
     const allowList = (env.ALLOWED_ORIGIN || "")
@@ -373,6 +398,29 @@ export default {
     // ── Live Jira fetch (powers the dynamic dashboard) ──
     // Read-only: pulls the project's issues with the Jira token (Worker secret).
     if (body.action === "jira") {
+      // The dashboard polls this every 10 seconds, per open tab. Each miss
+      // means several Jira pages fetched, parsed and slimmed — the most
+      // expensive thing this Worker does on a routine basis, and the reason a
+      // tick landing on top of an export could exhaust the CPU budget.
+      //
+      // A short shared cache collapses all of that: whoever arrives first pays
+      // for the pull, everyone within the window gets the already-serialised
+      // bytes back with almost no CPU spent. 15s is under the 10s poll by
+      // design — the data is still live, the Worker just stops re-deriving it
+      // for every viewer.
+      const _liveCache = caches.default;
+      const _liveKey = new Request(
+        `https://live-cache.invalid/jira?p=${encodeURIComponent(String(env.JIRA_PROJECT || ""))}`,
+        { method: "GET" });
+      if (!body.fresh) {
+        const hit = await _liveCache.match(_liveKey);
+        if (hit) {
+          return new Response(await hit.text(), {
+            status: 200,
+            headers: { ...baseHeaders, "Content-Type": "application/json", "X-Cache": "HIT" },
+          });
+        }
+      }
       if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
         return json(501, { message: "Jira not configured in Worker" });
       }
@@ -412,7 +460,18 @@ export default {
         token = d.nextPageToken;
         if (!token || d.isLast) break;
       }
-      return json(200, { issues });
+      const _liveBody = JSON.stringify({ issues });
+      // Cache-Control is what gives the entry its lifetime; waitUntil keeps the
+      // write off the response path.
+      const _toCache = new Response(_liveBody, {
+        headers: { "Content-Type": "application/json", "Cache-Control": "max-age=15" },
+      });
+      if (ctx && ctx.waitUntil) ctx.waitUntil(_liveCache.put(_liveKey, _toCache));
+      else await _liveCache.put(_liveKey, _toCache);
+      return new Response(_liveBody, {
+        status: 200,
+        headers: { ...baseHeaders, "Content-Type": "application/json", "X-Cache": "MISS" },
+      });
     }
 
     // ── Whole-project daily-status export ──
@@ -679,5 +738,4 @@ export default {
       status: ghResp.status,
       headers: { ...baseHeaders, "Content-Type": ghResp.headers.get("Content-Type") || "application/json" },
     });
-  },
-};
+  }

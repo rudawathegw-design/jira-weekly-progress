@@ -2780,7 +2780,10 @@ function resetStatusMap(){
 }
 
 // Pull fresh issues from the Worker (read-only Jira proxy). Returns issues[].
-async function fetchLiveIssues(){
+// `fresh` skips the Worker's 15s live cache. The automatic 10s tick is happy
+// with cached bytes; a person clicking Refresh Live expects to have actually
+// asked Jira something.
+async function fetchLiveIssues(fresh){
   if (!GH_PROXY) throw new Error('No Worker proxy configured (meta gh-proxy).');
   const pw = sessionStorage.getItem('pw_cache') || '';
   // Call the Worker directly — the global fetch wrapper only rewrites
@@ -2794,7 +2797,7 @@ async function fetchLiveIssues(){
     r = await window.fetch(GH_PROXY, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
-      body: JSON.stringify({action:'jira'})
+      body: JSON.stringify({action:'jira', fresh: !!fresh})
     });
   } catch(netErr){
     await new Promise(res => setTimeout(res, 1500));
@@ -2802,7 +2805,7 @@ async function fetchLiveIssues(){
       r = await window.fetch(GH_PROXY, {
         method:'POST',
         headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
-        body: JSON.stringify({action:'jira'})
+        body: JSON.stringify({action:'jira', fresh: !!fresh})
       });
     } catch(netErr2){
       throw new Error('connection to the Worker dropped twice — it may be over its CPU limit, or the network blipped');
@@ -2835,7 +2838,7 @@ async function refreshLive(btn){
   if (label) label.textContent = 'Fetching…';
   if (btn) btn.disabled = true;
   try {
-    const issues  = await fetchLiveIssues();
+    const issues  = await fetchLiveIssues(!!btn);   // manual click = bypass cache
     const hidden  = (hiddenPeople && hiddenPeople.size) ? hiddenPeople : new Set();
     const history = (typeof REPORT!=='undefined' && REPORT && REPORT.history) ? REPORT.history : [];
     const base    = (typeof REPORT!=='undefined' && REPORT && REPORT.jira_base_url) || '';
@@ -10558,6 +10561,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.8.2  Worker returns real errors instead of dropping the connection, and
+#          the live pull is served from a 15s shared cache so a 10-second
+#          poll no longer re-derives everything per tab.
 #   2.8.1  Whole-project export capped at once a day; the 10-second live
 #          refresh now stands down while an export runs, and retries once
 #          when a request is dropped rather than reporting failure.
@@ -10577,7 +10583,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.8.1"
+SITE_VERSION = "2.8.2"
 
 
 def _build_stamp():
