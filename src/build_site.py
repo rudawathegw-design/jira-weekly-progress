@@ -1359,27 +1359,6 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   </div>
 </div>
 
-<!-- ═══════════════ Review Queue (Current Owner view) ══════════════════════ -->
-<div class="rq-view" id="rq-view">
-  <div class="rq-wrap">
-    <div class="rq-top">
-      <button class="rq-back" onclick="closeReviewQueue()">&larr; Dashboard</button>
-      <div>
-        <div class="rq-kick">Current Owner</div>
-        <h1>Review Queue</h1>
-        <p>Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
-      </div>
-    </div>
-    <div class="rq-tiles" id="rq-tiles"></div>
-    <div class="rq-bar">
-      <div class="rq-seg" id="rq-stages"></div>
-      <input class="rq-search" id="rq-search" type="search"
-             placeholder="Filter by name, key or summary…" oninput="_rqRender()">
-    </div>
-    <div id="rq-list"></div>
-  </div>
-</div>
-
 <!-- ═══════════════ Comment-on-Overdue Modal ═══════════════════════════════ -->
 <div class="modal-overlay hidden" id="comment-modal" onclick="if(event.target===this)closeModal('comment-modal')">
   <div class="modal m-md">
@@ -1762,13 +1741,14 @@ CC: @cc</textarea>
     <div class="risk-grid" id="risk-grid"></div>
   </div>
 
-  <!-- Tab bar -->
-  <div class="tab-bar">
+  <!-- Tab bar. Hidden in Current Owner mode, where the Review Queue replaces
+       the weekly/history tables entirely. -->
+  <div class="tab-bar" id="weekly-tabs">
     <button class="tab-btn active" onclick="showTab('weekly',this)">📋 Weekly</button>
     <button class="tab-btn" onclick="showTab('hist',this)">📅 History</button>
   </div>
 
-  <div class="panel">
+  <div class="panel" id="weekly-panel">
 
     <!-- Filter bar -->
     <div class="filter-bar">
@@ -1864,6 +1844,28 @@ CC: @cc</textarea>
     </div>
 
   </div>
+
+  <!-- Review Queue — the Current Owner view. Sits where the weekly/history
+       tables would be: in that mode the tables answer the wrong question, so
+       they are hidden rather than stacked on top of each other. -->
+  <section class="rq-inline" id="rq-view" style="display:none">
+    <div class="rq-head-row">
+      <div>
+        <div class="rq-kick">Current Owner</div>
+        <h2 class="rq-title">Review Queue</h2>
+        <p class="rq-lede">Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
+      </div>
+      <button class="chip" onclick="setAttrMode('assignee')"
+              title="Back to the weekly tables, counted against the assignee">&larr; Weekly tables</button>
+    </div>
+    <div class="rq-tiles" id="rq-tiles"></div>
+    <div class="rq-bar">
+      <div class="rq-seg" id="rq-stages"></div>
+      <input class="rq-search" id="rq-search" type="search"
+             placeholder="Filter by name, key or summary…" oninput="_rqRender()">
+    </div>
+    <div id="rq-list"></div>
+  </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
     &nbsp;·&nbsp; <span class="ver-inline" title="Built __BUILD_TIME__ · commit __COMMIT__"><span class="ver-num">v__VERSION__</span> · __BUILD_DATE__ · __COMMIT__</span>
@@ -2456,25 +2458,18 @@ function renderAttrBar(){
 
   // Both labels are emitted; CSS shows the short one on narrow screens, where
   // the full names would run into each other.
-  // "Current Owner" does double duty: it selects the attribution mode, and —
-  // once selected — a second click opens the Review Queue, the drill-down that
-  // answers "who is actually holding this right now". Switching modes on the
-  // first click keeps the segmented control behaving like a segmented control;
-  // only the already-active button navigates.
+  // Selecting "Current Owner" swaps the whole body over to the Review Queue;
+  // "Assigned To" brings back the weekly tables and history.
   seg.innerHTML = Object.entries(ATTR_MODES).map(([k,m]) => {
     const on   = _ATTR.mode === k;
-    const dive = k === 'accountable';
-    const act  = (dive && on) ? 'openReviewQueue()' : `setAttrMode('${k}')`;
-    const hint = dive
-      ? (on ? 'Open the Review Queue — every task in review, grouped by who holds it now'
-            : m.desc + ' — click again once selected to open the Review Queue')
+    const hint = k === 'accountable'
+      ? m.desc + ' — shows the Review Queue: every task in review, grouped by who holds it now'
       : m.desc;
     return `
     <button class="attr-seg-btn ${on?'on':''}" role="tab"
-            aria-selected="${on}" onclick="${act}"
+            aria-selected="${on}" onclick="setAttrMode('${k}')"
             title="${esc(hint)}"><span class="attr-full">${esc(m.label)}</span><span
-            class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span>${
-            dive && on ? '<span class="attr-dive" aria-hidden="true">&rsaquo;</span>' : ''}</button>`;
+            class="attr-short">${esc(m.short)}</span><span class="attr-count">${c.people[k]}</span></button>`;
   }).join('');
 
   const dot = document.getElementById('attr-map-dot');
@@ -2537,16 +2532,19 @@ function _rqInitials(name){
     .map(w => w[0] ? w[0].toUpperCase() : '').join('') || '?';
 }
 
-function openReviewQueue(){
-  _rqStage = 'all';
-  const s = document.getElementById('rq-search'); if (s) s.value = '';
-  _rqRender();
-  document.getElementById('rq-view').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeReviewQueue(){
-  document.getElementById('rq-view').classList.remove('open');
-  document.body.style.overflow = '';
+// The queue and the weekly tables are two answers to different questions, so
+// they swap rather than stack: Current Owner shows the queue, Assigned To shows
+// the tables and history. Called from applyAttribution on every mode change.
+function _rqSyncMode(){
+  const on   = _ATTR.mode === 'accountable';
+  const view = document.getElementById('rq-view');
+  const tabs = document.getElementById('weekly-tabs');
+  const pane = document.getElementById('weekly-panel');
+  if (!view) return;
+  view.style.display = on ? 'block' : 'none';
+  if (tabs) tabs.style.display = on ? 'none' : '';
+  if (pane) pane.style.display = on ? 'none' : '';
+  if (on) _rqRender();
 }
 function _rqSetStage(k){ _rqStage = k; _rqRender(); }
 function _rqToggle(el){ el.closest('.rq-person').classList.toggle('open'); }
@@ -2626,13 +2624,6 @@ function _rqRender(){
     </div>`;
   }).join('');
 }
-
-// Esc closes the queue, matching every other overlay on the page.
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('rq-view')?.classList.contains('open')) {
-    closeReviewQueue();
-  }
-});
 
 // ── Status mapping modal ────────────────────────────────────────────────────
 function openStatusMapModal(){
@@ -6124,6 +6115,10 @@ function init() {
   document.getElementById('tbl-ch').innerHTML = renderChanges(REPORT.rows, hide);
   buildHistTable();
   applyFilter('');
+  // Last: decide whether the body shows the tables or the Review Queue. Doing
+  // it here rather than only in applyAttribution covers every render path —
+  // first load, live refresh, hiding a person — not just a mode change.
+  if (typeof _rqSyncMode === 'function') _rqSyncMode();
 }
 // init() is called from checkPw() after successful decrypt (not auto on DOMContentLoaded)
 
@@ -9153,9 +9148,13 @@ document.addEventListener('keydown', function(e){
     /* Panes sit a couple of steps below pure white so a large screen full of
        them is not glare; the ground behind is deepened to match, which is what
        makes the glass read as glass instead of as flat white boxes. */
-    --glass:linear-gradient(155deg,rgba(255,255,255,.78),rgba(255,255,255,.58));
-    --glass-2:linear-gradient(155deg,rgba(255,255,255,.68),rgba(255,255,255,.48));
-    --glass-brd:rgba(255,255,255,.82);
+    /* Denser than the first pass. At ~60% white the ground showed through
+       every pane and text sat on a moving background, which is tiring to read
+       for any length of time. These are still glass — blur and rim intact —
+       but opaque enough that a table reads like paper. */
+    --glass:linear-gradient(155deg,rgba(255,255,255,.94),rgba(255,255,255,.86));
+    --glass-2:linear-gradient(155deg,rgba(255,255,255,.90),rgba(255,255,255,.80));
+    --glass-brd:rgba(255,255,255,.95);
     --glass-blur:blur(18px) saturate(1.6);
     --glass-blur-sm:blur(12px) saturate(1.5);
     --glass-shadow:0 1px 2px rgba(15,23,42,.04),
@@ -9166,25 +9165,29 @@ document.addEventListener('keydown', function(e){
     --glass-gloss:linear-gradient(180deg,rgba(255,255,255,.55),
                                          rgba(255,255,255,.12) 46%,transparent);
   }
-  /* Ground: white with a two-tier drafting grid and a soft colour pool, the
-     same field as the sign-in page and the Review Queue, so the whole product
-     reads as one surface. The grid is what gives the translucent panes
-     something to refract — on flat white they would read as plain boxes. */
-  body{background:#fff !important;background-attachment:fixed !important}
+  /* Ground. Pure white at full-screen size is glare — the eye has no darker
+     reference to rest against, so the panes stop reading as separate objects.
+     This is a soft desaturated blue-grey a few steps down from white, which
+     keeps contrast against the (now denser) panes without being a colour cast.
+     The grid stays but at roughly half its previous strength: enough texture
+     to place the glass, not enough to read as ruled paper behind the text. */
+  body{background:
+      linear-gradient(180deg,#eaeff6 0%,#e6ecf4 55%,#e2e9f3 100%) !important;
+    background-attachment:fixed !important}
   body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     background-image:
-      linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
-      linear-gradient(rgba(15,28,51,.045) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(15,28,51,.045) 1px,transparent 1px);
+      linear-gradient(rgba(15,28,51,.055) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.055) 1px,transparent 1px),
+      linear-gradient(rgba(15,28,51,.025) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(15,28,51,.025) 1px,transparent 1px);
     background-size:120px 120px,120px 120px,24px 24px,24px 24px;
     -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%);
             mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%)}
   body::after{content:'';position:fixed;left:50%;top:-10%;width:1100px;height:800px;
     z-index:0;transform:translateX(-50%);pointer-events:none;
     background:
-      radial-gradient(ellipse 45% 45% at 30% 30%,rgba(19,102,204,.13),transparent 70%),
-      radial-gradient(ellipse 42% 45% at 72% 60%,rgba(14,159,143,.12),transparent 72%)}
+      radial-gradient(ellipse 45% 45% at 30% 30%,rgba(19,102,204,.09),transparent 70%),
+      radial-gradient(ellipse 42% 45% at 72% 60%,rgba(14,159,143,.08),transparent 72%)}
   /* Page content rides above the two fixed backdrop layers. */
   body > .wrap,body > #app{position:relative;z-index:1}
   .stat,.card,.analytics-card,.attr-bar,.kpi-tile,.esc-row,.modal{
@@ -9255,7 +9258,7 @@ document.addEventListener('keydown', function(e){
      Same material as above, extended to the surfaces the first pass missed:
      the top bar, filter panels, weekly table cards, tab bar, chips, menus and
      the theme popover. Layout is untouched — only fill, rim and shadow. */
-  .topbar,.panel > .filter-bar,.col-block,.ai-card,.theme-pop,.menu-items,
+  .topbar,.panel > .filter-bar,.col-block,.ai-card,
   .ticker-strip,.pmo-section,.risk-card{
     background:var(--glass) !important;
     -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
@@ -9278,7 +9281,19 @@ document.addEventListener('keydown', function(e){
      content they sit on top of. */
   .topbar{z-index:60}
   .panel > .filter-bar,.attr-bar{z-index:40}
-  .menu-items{z-index:300}
+  /* Menus and popovers are deliberately NOT glass. Anything that opens over
+     the page has to be readable against whatever it lands on, and translucent
+     menu text fighting a table underneath is the one place the material
+     actively hurts. Solid surface, full-strength text. */
+  .menu-items,.theme-pop{z-index:300;
+    background:#fff !important;
+    -webkit-backdrop-filter:none !important;backdrop-filter:none !important;
+    border:1px solid #dbe2ec !important;
+    box-shadow:0 18px 44px -16px rgba(15,23,42,.45),0 2px 8px rgba(15,23,42,.08) !important}
+  .menu-item{color:var(--ink)}
+  .menu-item-sub{color:var(--ink-3)}
+  .menu-item:hover{background:#eef2f8}
+  html.theme-dark .menu-items,html.theme-dark .theme-pop{background:#fff !important}
   .stat::after,.card::after,.analytics-card::after,.attr-bar::after,
   .kpi-tile::after,.topbar::after,.panel > .filter-bar::after,
   .col-block::after,.ai-card::after{
@@ -9362,35 +9377,15 @@ document.addEventListener('keydown', function(e){
      person holding it now, worst delay first. Ported from the design mockup
      (_preview_owners.html) onto the shared glass tokens, so it is the same
      material as the dashboard rather than a second visual language. */
-  .rq-view{position:fixed;inset:0;z-index:700;display:none;overflow-y:auto;
-    background:#fff}
-  .rq-view.open{display:block}
-  /* White + drafting grid + a soft colour pool, same ground as the sign-in
-     page — the look you asked to carry over. */
-  .rq-view::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-    background-image:
-      linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
-      linear-gradient(rgba(15,28,51,.045) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(15,28,51,.045) 1px,transparent 1px);
-    background-size:120px 120px,120px 120px,24px 24px,24px 24px;
-    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%);
-            mask-image:radial-gradient(ellipse 80% 60% at 50% 30%,#000 30%,transparent 100%)}
-  .rq-view::after{content:'';position:fixed;left:50%;top:-10%;width:1100px;height:800px;
-    z-index:0;transform:translateX(-50%);pointer-events:none;
-    background:
-      radial-gradient(ellipse 45% 45% at 30% 30%,rgba(19,102,204,.13),transparent 70%),
-      radial-gradient(ellipse 42% 45% at 72% 60%,rgba(14,159,143,.12),transparent 72%)}
-  .rq-wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:26px 22px 60px}
-  .rq-top{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
-  .rq-back{flex:none;background:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.9);
-    border-radius:10px;padding:8px 14px;font:700 12.5px 'Inter',system-ui,sans-serif;
-    color:#0a3b7c;cursor:pointer;box-shadow:0 8px 18px -12px rgba(12,34,74,.45)}
-  .rq-back:hover{background:#fff}
+  /* Inline section, not an overlay — it takes the place of the weekly tables
+     in Current Owner mode rather than floating above them. */
+  .rq-inline{margin-top:4px}
+  .rq-head-row{display:flex;align-items:flex-start;justify-content:space-between;
+    gap:16px;flex-wrap:wrap;margin-bottom:14px}
   .rq-kick{font-size:9.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
     color:#0e9f8f;margin-bottom:4px}
-  .rq-top h1{font-size:24px;font-weight:800;letter-spacing:-.02em;color:#0f1c33}
-  .rq-top p{color:#5d6b83;font-size:12.5px;margin-top:3px}
+  .rq-title{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+  .rq-lede{color:var(--ink-3);font-size:12.5px;margin-top:3px}
   .rq-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
   .rq-tile{position:relative;background:var(--glass);
     -webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
