@@ -415,6 +415,61 @@ export default {
       return json(200, { issues });
     }
 
+    // ── Whole-project daily-status export ──
+    // Same shape as epic_issues but for EVERY issue in the project. The plain
+    // "jira" action deliberately skips changelog because the full payload blows
+    // the Worker CPU budget (Cloudflare 1102 → 503). The daily-status matrix
+    // only needs STATUS transitions, so we keep changelog but strip each history
+    // down to its status items and drop every other field. On this project that
+    // takes the response from ~10 MB to a few hundred KB.
+    if (body.action === "project_issues") {
+      if (!env.JIRA_EMAIL || !env.JIRA_API_TOKEN) {
+        return json(501, { message: "Jira not configured in Worker" });
+      }
+      const baseUrl = String(env.JIRA_BASE_URL || "https://fibtask.atlassian.net").replace(/\/+$/, "");
+      const project = String(env.JIRA_PROJECT || "").trim();
+      const jauth = btoa(`${env.JIRA_EMAIL}:${env.JIRA_API_TOKEN}`);
+      const jhdr = { Accept: "application/json", Authorization: `Basic ${jauth}` };
+      const jql = project
+        ? `project = "${project}" ORDER BY created DESC`
+        : `ORDER BY created DESC`;
+
+      // Keep only status changes, and only the three parts _statusAsOf reads.
+      const slimChangelog = (cl) => {
+        const out = [];
+        for (const h of ((cl && cl.histories) || [])) {
+          const items = (h.items || [])
+            .filter((it) => (it.field || "").toLowerCase() === "status")
+            .map((it) => ({ field: "status", fromString: it.fromString || "", toString: it.toString || "" }));
+          if (items.length) out.push({ created: h.created, items });
+        }
+        return { histories: out };
+      };
+
+      let issues = [], token = null;
+      for (let i = 0; i < 40; i++) {           // safety cap (~4000 issues)
+        const qs = new URLSearchParams({
+          jql, maxResults: "100", fields: JIRA_LIVE_FIELDS, expand: "changelog",
+        });
+        if (token) qs.set("nextPageToken", token);
+        const jr = await fetch(`${baseUrl}/rest/api/3/search/jql?${qs}`, { headers: jhdr });
+        if (!jr.ok) {
+          const t = await jr.text();
+          return json(502, { message: "Jira API error", status: jr.status, detail: t.slice(0, 300) });
+        }
+        const d = await jr.json();
+        // Slim per page so the accumulator never holds the fat payload.
+        for (const raw of (d.issues || [])) {
+          const s = slimIssue(raw);
+          s.changelog = slimChangelog(raw.changelog);
+          issues.push(s);
+        }
+        token = d.nextPageToken;
+        if (!token || d.isLast) break;
+      }
+      return json(200, { issues, project: project || "" });
+    }
+
     // ── Epic export: all direct children of an epic + their subtasks ──
     // Powers the "Export Epic Excel" button. Two JQL passes: (1) the epic's
     // direct children (tries the modern "parent" link first, falls back to

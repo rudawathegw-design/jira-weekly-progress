@@ -126,7 +126,19 @@ def bucket_for(issue, status_map=None) -> str:
 
 
 def is_review_status(issue, status_map=None) -> bool:
-    """True when the issue is parked on someone else's desk for a decision."""
+    """True when the issue's STATUS is one that can involve an approval.
+
+    Note the difference from ``resolve_accountable(...)["in_review"]``:
+
+      * this function is about the status label — it decides which reporting
+        bucket the issue lands in;
+      * ``in_review`` is about whether a named person actually owes a decision.
+
+    They deliberately disagree for "Waiting For Approval" with no approver set:
+    the status belongs in the approval bucket, but nobody has been asked to
+    approve, so the assignee still owns the work. Always use ``in_review`` when
+    the question is "who do I chase?".
+    """
     if is_done(issue):
         return False
     name = status_norm(issue)
@@ -247,20 +259,21 @@ def resolve_accountable(issue, status_map=None) -> dict:
         people = _users(fields, LEVEL_FIELDS[status_level])
         level  = status_level
 
-    # 3) "Waiting For Approval" carries no level of its own — try Level 1, then
-    #    Level 2. Deliberately gated on status_level being absent: if the status
-    #    explicitly says "Revision Level 1" and that field is empty, borrowing
-    #    the Level 2 reviewer would report the wrong person under the wrong
-    #    label. An unrouted Level 1 review must read as unresolved, not as a
-    #    confident but incorrect name.
-    if not people and status_level is None:
-        for lvl in (1, 2):
-            found = _users(fields, LEVEL_FIELDS[lvl])
-            if found:
-                people, level = found, lvl
-                break
-
+    # NOTE: there is deliberately no "borrow the other level" fallback.
+    #
+    # "Waiting For Approval" is its own stage in this workflow — it carries no
+    # Approvals record and names no level — so falling back to the Level 1
+    # Reviewers field invented an approver nobody had asked to approve. Such an
+    # issue now resolves to the assignee below, like any other working status.
+    #
+    # Likewise, a "Revision Level 1" status with an empty Level 1 field must NOT
+    # borrow the Level 2 reviewer: that reported a real person under the wrong
+    # label. It reads as unresolved instead.
     if not people:
+        if status_level is None:
+            # Awaiting approval, but Jira names no approver — the assignee still
+            # owns it. Not "in review": nobody has been asked for a decision.
+            return base
         # In review, but Jira has no reviewer configured. Keep the assignee so
         # the task is never orphaned, and flag it — an unrouted review is a real
         # governance gap worth showing, not hiding.

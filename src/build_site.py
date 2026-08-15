@@ -51,19 +51,36 @@ _INDEX = r"""<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:14px;-webkit-text-size-adjust:100%}
-body{
-  font-family:'Inter',system-ui,sans-serif;color:#0f172a;line-height:1.5;
-  min-height:100vh;
-  /* Softer, calmer cloud-AI palette — Anthropic-cream meets soft sky */
-  background:
-    radial-gradient(ellipse 70% 50% at 10% -5%, hsla(210,100%,94%,.7), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 100% 10%, hsla(40,100%,93%,.6), transparent 65%),
-    radial-gradient(ellipse 60% 45% at 50% 110%, hsla(155,80%,93%,.55), transparent 65%),
-    linear-gradient(180deg, #fbfaf7 0%, #f7f6f1 100%);
-  background-attachment:fixed;
-  padding:clamp(12px,3vw,36px);
+/* One place to change the look. Everything below reads from these, so the
+   palette stays consistent instead of drifting per-component. */
+:root{
+  --ink:#0f172a; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+  --line:#e4e7ec; --line-soft:#eef1f5;
+  --surface:#ffffff; --surface-2:#f8fafc;
+  --brand:#1f5fbf; --brand-dark:#16478f;
+  --ok:#047857; --warn:#b45309; --bad:#b91c1c;
+  --radius:14px; --radius-lg:18px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.05);
+  --shadow:0 1px 3px rgba(15,23,42,.06),0 8px 24px -12px rgba(15,23,42,.12);
+  --page-max:1440px;
 }
-.wrap{max-width:1400px;margin:0 auto}
+body{
+  font-family:'Inter',system-ui,sans-serif;color:var(--ink);line-height:1.5;
+  min-height:100vh;
+  /* A quiet, even ground. The old triple-radial wash tinted every card a
+     different shade depending on where it sat on the page, which made the
+     status colours harder to read against it. */
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -10%, #eef3fb 0%, transparent 62%),
+    linear-gradient(180deg,#fbfcfe 0%,#f6f8fb 100%);
+  background-attachment:fixed;
+  padding:clamp(14px,2.2vw,32px);
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--page-max);margin:0 auto}
+/* Wider screens get more table, not more empty gutter. */
+@media (min-width:1700px){ :root{ --page-max:1600px } }
+@media (min-width:2100px){ :root{ --page-max:1840px } }
 
 /* ── password overlay ────────────────────────────────────────── */
 #pw-overlay{position:fixed;inset:0;
@@ -926,12 +943,12 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 #intro-splash .sp-half{position:absolute;left:0;width:100%;height:50.5%;background:linear-gradient(180deg,#FAF9F5,#F3F0E8)}
 #intro-splash .sp-top{top:0}
 #intro-splash .sp-bot{bottom:0}
-#intro-splash.on .sp-top{animation:spTop .7s 2.75s cubic-bezier(.65,0,.35,1) forwards}
-#intro-splash.on .sp-bot{animation:spBot .7s 2.75s cubic-bezier(.65,0,.35,1) forwards}
+#intro-splash.on .sp-top{animation:spTop .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
+#intro-splash.on .sp-bot{animation:spBot .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
 @keyframes spTop{to{transform:translateY(-102%)}}
 @keyframes spBot{to{transform:translateY(102%)}}
 #intro-splash .sp-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
-#intro-splash.on .sp-center{animation:spFade .45s 2.5s ease forwards}
+#intro-splash.on .sp-center{animation:spFade .3s 1.1s ease forwards}
 @keyframes spFade{to{opacity:0;transform:scale(.96)}}
 #intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:26px;position:relative}
 #intro-splash .sp-fib,#intro-splash .sp-cbi{opacity:0;position:relative;overflow:hidden}
@@ -939,35 +956,35 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 #intro-splash .sp-cbi{width:96px;height:96px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#23695A,#143E34);display:grid;place-items:center;color:#E8C766;box-shadow:0 18px 40px -14px rgba(20,62,52,.6);border:3px solid #C9A227}
 #intro-splash .sp-cbi b{font:800 26px/1 Georgia,serif;letter-spacing:1px;display:block}
 #intro-splash .sp-cbi i{display:block;font:600 6.5px/1.4 system-ui,sans-serif;letter-spacing:.12em;font-style:normal;opacity:.9;margin-top:3px}
-#intro-splash.on .sp-fib{animation:spFromL .85s .15s cubic-bezier(.18,1.2,.3,1) forwards}
-#intro-splash.on .sp-cbi{animation:spFromR .85s .15s cubic-bezier(.18,1.2,.3,1) forwards}
+#intro-splash.on .sp-fib{animation:spFromL .55s .05s cubic-bezier(.18,1.2,.3,1) forwards}
+#intro-splash.on .sp-cbi{animation:spFromR .55s .05s cubic-bezier(.18,1.2,.3,1) forwards}
 @keyframes spFromL{from{opacity:0;transform:translateX(-46vw) rotate(-28deg) scale(.7)}60%{opacity:1}to{opacity:1;transform:none}}
 @keyframes spFromR{from{opacity:0;transform:translateX(46vw) rotate(28deg) scale(.7)}60%{opacity:1}to{opacity:1;transform:none}}
 #intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
-#intro-splash.on .sp-fib::after{animation:spShine .8s 1.15s ease forwards}
-#intro-splash.on .sp-cbi::after{animation:spShine .8s 1.3s ease forwards}
+#intro-splash.on .sp-fib::after{animation:spShine .5s .5s ease forwards}
+#intro-splash.on .sp-cbi::after{animation:spShine .5s .6s ease forwards}
 @keyframes spShine{to{transform:translateX(130%) skewX(-18deg)}}
 #intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4)}
-#intro-splash.on .sp-link{animation:spPop .5s 1s cubic-bezier(.18,1.5,.4,1) forwards}
+#intro-splash.on .sp-link{animation:spPop .35s .45s cubic-bezier(.18,1.5,.4,1) forwards}
 @keyframes spPop{to{opacity:1;transform:scale(1)}}
 #intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid rgba(79,157,139,.5);opacity:0}
-#intro-splash.on .sp-ring{animation:spRing 1s 1.05s ease-out forwards}
+#intro-splash.on .sp-ring{animation:spRing .7s .5s ease-out forwards}
 @keyframes spRing{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(2.6)}}
 #intro-splash .sp-title{margin-top:30px;opacity:0}
 #intro-splash .sp-title h1{margin:0;font:800 clamp(26px,4vw,40px)/1.15 system-ui,'Segoe UI',sans-serif;color:#3D3929}
 #intro-splash .sp-title h1 span{color:#3A7D6E}
 #intro-splash .sp-title p{margin:8px 0 0;font:600 13px/1 system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#8a8676}
-#intro-splash.on .sp-title{animation:spUp .7s 1.45s cubic-bezier(.22,1,.36,1) forwards}
+#intro-splash.on .sp-title{animation:spUp .45s .62s cubic-bezier(.22,1,.36,1) forwards}
 @keyframes spUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
 #intro-splash .sp-line{height:3px;width:0;margin:14px auto 0;border-radius:3px;background:linear-gradient(90deg,#C9A227,#4F9D8B)}
-#intro-splash.on .sp-line{animation:spLine .7s 1.85s cubic-bezier(.22,1,.36,1) forwards}
+#intro-splash.on .sp-line{animation:spLine .45s .8s cubic-bezier(.22,1,.36,1) forwards}
 @keyframes spLine{to{width:180px}}
 #intro-splash .sp-f{position:absolute;font:700 13px/1 system-ui,sans-serif;color:#3A7D6E;background:#fff;border:1.5px solid #C3E0D8;border-radius:12px;padding:8px 12px;box-shadow:0 12px 26px -12px rgba(58,125,110,.5);opacity:0}
-#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .4s 2.25s ease forwards}
-#intro-splash .sp-f1{left:12%;top:24%;animation-delay:1.55s,2.25s!important}
-#intro-splash .sp-f2{right:13%;top:28%;animation-delay:1.65s,2.25s!important}
-#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:1.75s,2.25s!important}
-#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:1.85s,2.25s!important}
+#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s 1.0s ease forwards}
+#intro-splash .sp-f1{left:12%;top:24%;animation-delay:.68s,1.0s!important}
+#intro-splash .sp-f2{right:13%;top:28%;animation-delay:.74s,1.0s!important}
+#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:.80s,1.0s!important}
+#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:.86s,1.0s!important}
 @keyframes spF{from{opacity:0;transform:translateY(18px) scale(.85)}to{opacity:1;transform:none}}
 @keyframes spFOut{to{opacity:0;transform:translateY(-10px) scale(.9)}}
 @media (max-width:760px){#intro-splash .sp-f{display:none}}
@@ -1085,7 +1102,12 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- ═══════════════ Epic Excel Modal (choose start date) ════════════════════ -->
 <div class="modal-overlay hidden" id="epic-excel-modal" onclick="if(event.target===this)closeModal('epic-excel-modal')">
   <div class="modal" style="max-width:420px">
-    <h3>📊 Export Epic Excel</h3>
+    <h3>Daily status export</h3>
+    <div class="modal-section">
+      <div class="modal-section-label">Scope</div>
+      <div id="epic-excel-scope-label" style="font-size:13px;font-weight:600;color:#1e293b;
+           background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px"></div>
+    </div>
     <div class="modal-section">
       <div class="modal-section-label">From date</div>
       <input type="date" id="epic-excel-start" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:14px">
@@ -1486,9 +1508,13 @@ CC: @cc</textarea>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
             <div class="menu-item-text"><div>Export Excel</div><div class="menu-item-sub">Multi-sheet .xlsx download</div></div>
           </button>
-          <button class="menu-item" onclick="openEpicExcelModal();closeMoreMenu()">
+          <button class="menu-item" onclick="openEpicExcelModal('epic');closeMoreMenu()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
-            <div class="menu-item-text"><div>Export Epic Excel</div><div class="menu-item-sub">FIBTMP-489 · pick a start date, one column per day to today</div></div>
+            <div class="menu-item-text"><div>Daily Status — Epic</div><div class="menu-item-sub">FIBTMP-489 · one status column per day</div></div>
+          </button>
+          <button class="menu-item" onclick="openEpicExcelModal('project');closeMoreMenu()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#1D6F42"/><path d="M8 7l2.5 5L8 17h2l1.5-3.5L13 17h2l-2.5-5L15 7h-2l-1.5 3.5L10 7H8z" fill="white"/><rect x="15" y="7" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="10.5" width="4" height="1.5" fill="white" rx="0.3"/><rect x="15" y="14" width="4" height="1.5" fill="white" rx="0.3"/></svg>
+            <div class="menu-item-text"><div>Daily Status — Whole Project</div><div class="menu-item-sub">Every task &amp; sub-task · one status column per day</div></div>
           </button>
           <button class="menu-item" onclick="exportExecutivePPTX();closeMoreMenu()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" fill="#C43E1C"/><rect x="5" y="6" width="9" height="1.5" fill="white" rx="0.4"/><rect x="5" y="9.5" width="7" height="1.5" fill="white" rx="0.4"/><rect x="5" y="13" width="6" height="1.5" fill="white" rx="0.4"/><circle cx="17" cy="16" r="4" fill="white" opacity="0.15"/><path d="M14.5 14.5l5 3-5 3V14.5z" fill="white"/></svg>
@@ -1914,17 +1940,17 @@ const _ACC = {
       people = _ACC.users(fields, LEVEL_FIELDS[statusLevel]);
       level = statusLevel;
     }
-    // 3) "Waiting For Approval" carries no level — try L1 then L2. Gated on the
-    //    status having no level of its own: naming the Level 2 reviewer as the
-    //    "Level 1 Reviewer" would be worse than reporting it unrouted.
-    if (!people.length && statusLevel === null){
-      for (const lvl of [1,2]){
-        const found = _ACC.users(fields, LEVEL_FIELDS[lvl]);
-        if (found.length){ people = found; level = lvl; break; }
-      }
-    }
+    // No "borrow the other level" fallback, deliberately. "Waiting For Approval"
+    // is its own stage — no Approvals record, no level — so using the Level 1
+    // Reviewers field invented an approver nobody had asked. It resolves to the
+    // assignee instead. And a "Revision Level 1" with an empty Level 1 field
+    // must not borrow the Level 2 reviewer: that names a real person under the
+    // wrong label; it reads as unresolved.
     if (!people.length){
-      const role = statusLevel === 2 ? 'level2' : statusLevel === 1 ? 'level1' : 'approver';
+      // Awaiting approval with no approver named: the assignee still owns it,
+      // and it is NOT in review — nobody has been asked for a decision.
+      if (statusLevel === null) return base;
+      const role = statusLevel === 2 ? 'level2' : 'level1';
       return {...base, in_review:true, unresolved:true, level:statusLevel,
               role, role_label:ROLE_LABELS[role]};
     }
@@ -2722,8 +2748,16 @@ async function checkPw(){
 function playIntro(){
   var s = document.getElementById('intro-splash');
   if (!s) return;
+  // Skip the animation entirely for anyone who has asked the OS for reduced
+  // motion — it is decoration, and it sits between them and the report.
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      s.style.display = 'none';
+      return;
+    }
+  } catch(e){}
   s.classList.add('on');
-  setTimeout(function(){ s.style.display = 'none'; }, 3600);
+  setTimeout(function(){ s.style.display = 'none'; }, 1850);
 }
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
@@ -4737,15 +4771,25 @@ async function exportOverduePNG(mobile) {
 // the Level 1 reviewer, Level 2 gets the Level 2 reviewer, a plain approval
 // falls back to L1 then L2. Everything else stays bare — the Owner column
 // already names the assignee, so repeating it would just add noise.
+// Every status names the person to chase, so no row is a dead end.
+//
+//   Revision Level 1  -> the Level 1 Reviewers
+//   Revision Level 2  -> the Level 2 Reviewers
+//   anything else     -> the assignee
+//
+// "Waiting For Approval" deliberately falls in the LAST bucket. In Jira it is
+// its own stage: it carries no Approvals record and names no level, so
+// borrowing the Level 1 reviewer invented an approver who had never been asked
+// to approve anything. It now reports against the assignee, like any other
+// working status.
 function _statusLabel(rawStatus, rev1Name, rev2Name, assigneeName) {
   const st = (rawStatus || '').trim();
   const n  = st.toLowerCase();
   let who = '';
   if (n.includes('level 2'))      who = rev2Name || '';
   else if (n.includes('level 1')) who = rev1Name || '';
-  else if (n.includes('wait') || n.includes('approv')) who = rev1Name || rev2Name || '';
-  if (!who) return st;
-  return `${st} — ${who}`;
+  if (!who) who = assigneeName || '';
+  return who ? `${st} — ${who}` : st;
 }
 // Raw integer days-overdue (unlike _overdueDaysAgo's human string) so the
 // Excel column can be coloured on a scale and still sorted/filtered as a number.
@@ -4817,17 +4861,16 @@ async function exportOverdueExcel() {
   try {
     await loadXlsxStyle();
 
-    // Two owner columns: who it is assigned to, and who is actually holding it
-    // now. For a task at "Revision Level 1" those are different people, and
-    // chasing the assignee for a decision that is sitting with a reviewer is
-    // exactly the mistake this export is meant to stop.
+    // Owner + Status only. A separate "Current Owner" column was redundant once
+    // Status carries the responsible names, so this keeps the sheet narrow
+    // enough to read without scrolling.
     //
-    // Current Owner lists EVERY pending reviewer. Jira's rule is "Everyone from
+    // Status lists EVERY pending reviewer. Jira's rule is "Everyone from
     // 'Level 1 Reviewers' must approve", so a task with two reviewers is blocked
-    // by both — naming only the first would quietly drop someone who is equally
-    // holding it up. The count still lands on one person (see accountability.py)
-    // so per-person totals stay exact; this is a display-only expansion.
-    const header = ['#','Key','Summary','Assigned To','Current Owner','Role','Status','Due Date','Days Overdue','Link'];
+    // by both — naming only the first quietly drops someone equally holding it
+    // up. The COUNT still lands on one person (see accountability.py) so
+    // per-person totals stay exact; this is a display-only expansion.
+    const header = ['#','Key','Summary','Owner','Status','Due Date','Days Overdue','Link'];
     let n = 0;
     const rows = [];
     owners.forEach(owner => {
@@ -4836,21 +4879,16 @@ async function exportOverdueExcel() {
         const assigned = i.assignee_name || owner;
         const co       = i.co_reviewers || [];
         const everyone = [i.accountable || assigned, ...co].filter(Boolean);
-        const current  = everyone.join(', ');
-        const role     = (i.acc_role_label || 'Assignee') +
-                         (co.length ? ` · all ${everyone.length} must approve` : '');
+        const handled  = i.in_review && everyone.length;
         rows.push({
           n, key: i.key, summary: i.summary || '(no summary)',
-          owner,                       // grouping key (kept for the colour band)
-          assigned, current, role,
-          moved: current !== assigned,
+          owner: assigned,
+          moved: handled && everyone.join(', ') !== assigned,
           multi: co.length > 0,
-          // Built from the same resolved list as Current Owner rather than from
-          // rev1_name (which holds only the first reviewer), so the two columns
-          // can never disagree about who is holding the task.
-          status: (i.in_review && everyone.length)
-                    ? `${i.status || ''} — ${current}`
-                    : (i.status || ''),
+          // Built from the resolved reviewer list, not rev1_name (which holds
+          // only the first reviewer), so the name shown is always complete.
+          status: handled ? `${i.status || ''} — ${everyone.join(', ')}`
+                          : `${i.status || ''} — ${assigned}`,
           rawStatus: i.status || '',
           due: i.due ? String(i.due).slice(0,10) : '—',
           days: _overdueDaysNum(i.due), link: `${base}/browse/${encodeURIComponent(i.key)}`
@@ -4863,7 +4901,7 @@ async function exportOverdueExcel() {
     const handedOff = rows.filter(r => r.moved).length;
     const titleText = `⚠  OVERDUE TASKS — ${projectName}   ·   ${reportDate}   ·   ${items.length} task(s), ${owners.length} owner(s)   ·   Generated ${generatedAt}`;
     // Second line earns its space: it explains the one column people misread.
-    const subText = `Current Owner = who must act NOW. ${handedOff} of ${items.length} task(s) are waiting on a reviewer, not the assignee (highlighted amber). Where several reviewers are listed, ALL of them must approve.`;
+    const subText = `Status names who must act NOW. ${handedOff} of ${items.length} task(s) sit with a reviewer rather than the assignee (bold, amber underline). Where several reviewers are named, ALL of them must approve.`;
     const HEADER_ROW = 2, DATA_START = 3;
     const lastCol = header.length - 1;
     const lastColLetter = XLSX.utils.encode_col(lastCol);
@@ -4872,10 +4910,10 @@ async function exportOverdueExcel() {
       [titleText],
       [subText],
       header,
-      ...rows.map(r => [r.n, r.key, r.summary, r.assigned, r.current, r.role, r.status, r.due, r.days===null?'—':r.days, r.link])
+      ...rows.map(r => [r.n, r.key, r.summary, r.owner, r.status, r.due, r.days===null?'—':r.days, r.link])
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{wch:5},{wch:13},{wch:50},{wch:22},{wch:30},{wch:26},{wch:40},{wch:12},{wch:9},{wch:34}];
+    ws['!cols'] = [{wch:5},{wch:13},{wch:58},{wch:22},{wch:46},{wch:12},{wch:9},{wch:34}];
     ws['!rows'] = [{hpx:26},{hpx:30},{hpx:28}, ...rows.map(r=>({hpx:r.multi?42:32}))];
     ws['!merges'] = [
       { s:{r:0,c:0}, e:{r:0,c:lastCol} },
@@ -4916,31 +4954,24 @@ async function exportOverdueExcel() {
       addr = XLSX.utils.encode_cell({r:rr,c:2}); // Summary
       if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'0F172A'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center', wrapText:true, indent:1}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Assigned To — soft owner tint
+      addr = XLSX.utils.encode_cell({r:rr,c:3}); // Owner — soft tint per person
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:ownerFg},sz:10}, fill:{fgColor:{rgb:ownerBg}}, alignment:{horizontal:'left',vertical:'center',indent:1}, border };
 
-      // Current Owner — amber whenever it differs from the assignee, so the
-      // handed-off rows are the ones that catch the eye. Lists every reviewer
-      // who must approve, not just the first.
+      // Status carries the responsible name(s). Amber-bordered when the person
+      // named is a reviewer rather than the assignee, so handed-off rows read
+      // differently at a glance.
       addr = XLSX.utils.encode_cell({r:rr,c:4});
-      if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:r.moved?'92400E':'334155'},sz:10},
-                     fill:{fgColor:{rgb:r.moved?'FEF3C7':bandFill}},
+      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'1E293B'},bold:r.moved}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}},
                      alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1},
-                     border: r.moved ? {bottom:{style:'thin',color:{rgb:'FCD34D'}}} : border };
+                     border: r.moved ? {bottom:{style:'thin',color:{rgb:'D97706'}}} : border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Role
-      if (ws[addr]) ws[addr].s = { font:{sz:9,color:{rgb:r.multi?'B45309':'64748B'},italic:true}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1}, border };
-
-      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Status (carries the reviewer names)
-      if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'1E293B'}}, fill:{fgColor:{rgb:_epicStatusFill(r.rawStatus)}}, alignment:{horizontal:'left',vertical:'center',wrapText:true,indent:1}, border };
-
-      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Due date
+      addr = XLSX.utils.encode_cell({r:rr,c:5}); // Due date
       if (ws[addr]) ws[addr].s = { font:{sz:10,color:{rgb:'475569'}}, fill:{fgColor:{rgb:bandFill}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:8}); // Days overdue — heat scale
+      addr = XLSX.utils.encode_cell({r:rr,c:6}); // Days overdue — heat scale
       if (ws[addr]) ws[addr].s = { font:{bold:true,color:{rgb:_overdueDaysText(r.days)},sz:10.5}, fill:{fgColor:{rgb:_overdueDaysFill(r.days)}}, alignment:{horizontal:'center',vertical:'center'}, border };
 
-      addr = XLSX.utils.encode_cell({r:rr,c:9}); // Link
+      addr = XLSX.utils.encode_cell({r:rr,c:7}); // Link
       if (ws[addr]) {
         ws[addr].s = { font:{color:{rgb:'94A3B8'},underline:true,sz:9}, fill:{fgColor:{rgb:bandFill}}, alignment:{vertical:'center',indent:1}, border };
         ws[addr].l = { Target: r.link, Tooltip: 'Open in Jira' };
@@ -6703,16 +6734,61 @@ function _computePMOSummary() {
   }).filter(r => r._reasons.length > 0)
     .sort((a,b) => b._score - a._score);
 
-  const wins = rows.slice()
-    .filter(r => (r.this_week||0) >= 80 || (r.delta||0) >= 10)
-    .sort((a,b) => (b.this_week||0) - (a.this_week||0))
-    .slice(0, 8);
-
   // Per-owner breakdown sorted best → worst for the team slide
   const teamRows = rows.slice().sort((a,b) => (b.this_week||0) - (a.this_week||0));
 
-  return { rag, gTotal, gDone, gIP, gWFA, gOv, completion, overdueRate, wipRatio,
-           watchlist: watchlistFull, wins, teamRows, total: rows.length };
+  // ── Chart series ───────────────────────────────────────────────────────
+  // Completion trend from the saved snapshots, on the series matching the
+  // current attribution mode so the deck and the dashboard agree.
+  const hist = (REPORT.history || []).slice(-12);
+  const trend = hist.map(s => {
+    const ser = (typeof _snapshotPeople === 'function' ? _snapshotPeople(s, _ATTR.mode) : null) || s.people || {};
+    let tot = 0, done = 0;
+    for (const [n,p] of Object.entries(ser)){
+      if (hiddenPeople.has(n)) continue;
+      if (p && typeof p === 'object'){
+        tot  += p.total||0;
+        done += (p.done!=null ? p.done : (p.completed||0));
+      }
+    }
+    return { date: s.date, pct: tot ? +(done/tot*100).toFixed(1) : null };
+  }).filter(t => t.pct !== null);
+
+  const gOpen = rows.reduce((s,r)=>s+(r.open||0),0);
+  const statusMix = [
+    {label:'Completed',            value:gDone},
+    {label:'In Progress',          value:gIP},
+    {label:'Waiting For Approval', value:gWFA},
+    {label:'Open',                 value:gOpen},
+  ].filter(x => x.value > 0);
+
+  // Overdue split: work not delivered vs. a review decision not made.
+  const ovDelivery = rows.reduce((s,r)=>s+(r.overdue_delivery||0),0);
+  const ovReview   = rows.reduce((s,r)=>s+(r.overdue_review||0),0);
+
+  const overdueByOwner = rows.slice()
+    .filter(r => (r.overdue||0) > 0)
+    .sort((a,b) => (b.overdue||0) - (a.overdue||0))
+    .slice(0, 12);
+
+  // Who is sitting on approvals right now, from the live records.
+  const recs = REPORT.records || rows.flatMap(r => r.issues || []);
+  const bottleneckMap = {};
+  recs.filter(r => r.in_review).forEach(r => {
+    const who = r.accountable || 'Unassigned';
+    if (hiddenPeople.has(who)) return;
+    if (!bottleneckMap[who]) bottleneckMap[who] = {owner:who, n:0, overdue:0, role:r.acc_role_label||'', keys:[]};
+    bottleneckMap[who].n++;
+    if (r.overdue) bottleneckMap[who].overdue++;
+    bottleneckMap[who].keys.push(r.key);
+  });
+  const bottlenecks = Object.values(bottleneckMap).sort((a,b) => b.n - a.n);
+  const inReviewTotal = recs.filter(r => r.in_review).length;
+
+  return { rag, gTotal, gDone, gIP, gWFA, gOv, gOpen, completion, overdueRate, wipRatio,
+           watchlist: watchlistFull, teamRows, total: rows.length,
+           trend, statusMix, ovDelivery, ovReview, overdueByOwner,
+           bottlenecks, inReviewTotal };
 }
 
 async function exportExecutivePPTX() {
@@ -6774,6 +6850,11 @@ async function exportExecutivePPTX() {
       slide.addText(`${projectName}  ·  ${reportDate}`, { x:10, y:0.12, w:3.1, h:0.66, fontSize:9, color:MUTED, align:'right', fontFace:'Arial', valign:'middle' });
     };
 
+    // Running page number: slides are conditional (Risks and Review
+    // Bottlenecks only render when they have content), so a hardcoded label
+    // silently misnumbers the deck as soon as one is skipped.
+    let _pageNo = 1;
+    const nextPage = () => String(++_pageNo);
     const addFooter = (slide, pageLabel, total) => {
       slide.addShape('rect', { x:0.22, y:7.22, w:13.11, h:0.03, fill:{color:ACCENT} });
       slide.addText(`Generated ${generatedAt}`, { x:0.4, y:7.26, w:7, h:0.22, fontSize:8, color:MUTED, fontFace:'Arial' });
@@ -6853,9 +6934,9 @@ async function exportExecutivePPTX() {
 
     // 3 RAG category cards
     const ragCards = [
-      {title:'✅  On Track', color:GREEN,  members:S.rag.green, desc:'≥80% complete, ≤1 overdue'},
-      {title:'⚠️  Watch',    color:AMBER,  members:S.rag.amber, desc:'50–79% or low pace'},
-      {title:'🔴  At Risk',  color:RED,    members:S.rag.red,   desc:'<50% complete or 4+ overdue'},
+      {title:'ON TRACK',        color:GREEN,  members:S.rag.green, desc:'≥80% complete, ≤1 overdue'},
+      {title:'NEEDS ATTENTION', color:AMBER,  members:S.rag.amber, desc:'50–79% or low pace'},
+      {title:'AT RISK',         color:RED,    members:S.rag.red,   desc:'<50% complete or 4+ overdue'},
     ];
     ragCards.forEach((card, ci) => {
       const cx = 0.5 + ci*4.28, cy = 2.3, cw = 4.1, ch = 4.6;
@@ -6868,24 +6949,24 @@ async function exportExecutivePPTX() {
       if (names) slide.addText(names, { x:cx+0.15, y:cy+0.9, w:cw-0.25, h:3.6, fontSize:10.5, color:DARKGRAY, fontFace:'Arial', valign:'top', paraSpaceAfter:2 });
       if (card.members.length > 10) slide.addText(`+${card.members.length-10} more…`, { x:cx+0.15, y:cy+ch-0.35, w:cw-0.25, h:0.28, fontSize:9, color:MUTED, fontFace:'Arial' });
     });
-    addFooter(slide, '2');
+    addFooter(slide, nextPage());
 
     // ── SLIDE 3: Key Metrics ─────────────────────────────────────────────
     slide = pptx.addSlide();
     addHeader(slide, 'Key Performance Metrics', 'Snapshot of this reporting period', TEAL);
     const kpis = [
       { label:'Overall Completion', value:`${S.completion}%`, sub:`${S.gDone} of ${S.gTotal} tasks done`,
-        icon:'📊', good:S.completion>=80, warn:S.completion>=50 },
+        good:S.completion>=80, warn:S.completion>=50 },
       { label:'Overdue Rate', value:`${S.overdueRate}%`, sub:`${S.gOv} tasks past due`,
-        icon:'⏰', good:S.overdueRate<=5, warn:S.overdueRate<=15 },
+        good:S.overdueRate<=5, warn:S.overdueRate<=15 },
+      { label:'Awaiting Review', value:`${S.inReviewTotal}`, sub:`${S.ovReview} of them overdue`,
+        good:S.ovReview===0, warn:S.ovReview<=5 },
       { label:'WIP Ratio', value:`${S.wipRatio}%`, sub:`${S.gIP} tasks in progress`,
-        icon:'⚙️', good:S.wipRatio<=25, warn:S.wipRatio<=40 },
-      { label:'Approval Queue', value:`${S.gWFA}`, sub:'waiting for sign-off',
-        icon:'✍️', good:S.gWFA<=3, warn:S.gWFA<=8 },
-      { label:'Team Members', value:`${S.total}`, sub:'active contributors',
-        icon:'👥', good:true },
-      { label:'Green Members', value:`${S.rag.green.length}`, sub:`${Math.round(S.rag.green.length/ragTotal*100)}% of team on track`,
-        icon:'✅', good:S.rag.green.length/ragTotal>=0.6, warn:S.rag.green.length/ragTotal>=0.4 },
+        good:S.wipRatio<=25, warn:S.wipRatio<=40 },
+      { label:'Overdue — Delivery', value:`${S.ovDelivery}`, sub:'work not finished',
+        good:S.ovDelivery===0, warn:S.ovDelivery<=5 },
+      { label:'Overdue — In Review', value:`${S.ovReview}`, sub:'decision not made',
+        good:S.ovReview===0, warn:S.ovReview<=5 },
     ];
     const kW = 4.0, kH = 1.55, kGap = 0.16, kX0 = 0.5, kY0 = 1.1;
     kpis.forEach((k,i) => {
@@ -6895,7 +6976,7 @@ async function exportExecutivePPTX() {
       const col_ = k.good ? GREEN : k.warn ? AMBER : RED;
       addKpiCard(slide, kx, ky, kW, kH, k.label, k.value, k.sub, col_, k.icon);
     });
-    addFooter(slide, '3');
+    addFooter(slide, nextPage());
 
     // ── SLIDE 4: Escalation Watchlist ────────────────────────────────────
     slide = pptx.addSlide();
@@ -6931,12 +7012,11 @@ async function exportExecutivePPTX() {
           { x:0.4, y:7.0, w:12.5, h:0.22, fontSize:9, color:MUTED, fontFace:'Arial', italic:true });
       }
     } else {
-      slide.addShape('roundRect', { x:1.5, y:2.0, w:10.3, h:2.5, rectRadius:0.12, fill:{color:'F0FDF4'}, line:{color:'BBF7D0',width:1} });
-      slide.addText('🎉', { x:1.5, y:2.2, w:10.3, h:1.0, fontSize:48, align:'center', fontFace:'Arial' });
-      slide.addText('No escalations this week!', { x:1.5, y:3.1, w:10.3, h:0.6, fontSize:22, bold:true, color:GREEN, align:'center', fontFace:'Arial' });
-      slide.addText('All team members are operating within acceptable thresholds.', { x:1.5, y:3.65, w:10.3, h:0.4, fontSize:13, color:SLATE, align:'center', fontFace:'Arial' });
+      slide.addShape('roundRect', { x:1.5, y:2.4, w:10.3, h:1.9, rectRadius:0.12, fill:{color:'F0FDF4'}, line:{color:'BBF7D0',width:1} });
+      slide.addText('No escalations this period', { x:1.5, y:2.8, w:10.3, h:0.6, fontSize:22, bold:true, color:GREEN, align:'center', fontFace:'Arial' });
+      slide.addText('All members are operating within the agreed thresholds.', { x:1.5, y:3.4, w:10.3, h:0.4, fontSize:13, color:SLATE, align:'center', fontFace:'Arial' });
     }
-    addFooter(slide, '4');
+    addFooter(slide, nextPage());
 
     // ── SLIDE 5: Team Performance Breakdown ──────────────────────────────
     slide = pptx.addSlide();
@@ -6956,7 +7036,7 @@ async function exportExecutivePPTX() {
       teamShow.forEach((r,i) => {
         const bg = i%2 ? LIGHT : WHITE;
         const pct = r.this_week||0, ov = r.overdue||0;
-        const status = pct>=80&&ov<=1?'✅ On Track':pct<50||ov>=4?'🔴 At Risk':'⚠️ Watch';
+        const status = pct>=80&&ov<=1?'On Track':pct<50||ov>=4?'At Risk':'Watch';
         const stCol  = pct>=80&&ov<=1?GREEN:pct<50||ov>=4?RED:AMBER;
         const dStr = r.delta===null||r.delta===undefined?'—':(r.delta>=0?'+':'')+r.delta+'%';
         tRows.push([
@@ -6976,7 +7056,7 @@ async function exportExecutivePPTX() {
           { x:0.35, y:7.0, w:12.6, h:0.22, fontSize:9, color:MUTED, italic:true, fontFace:'Arial' });
       }
     }
-    addFooter(slide, '5');
+    addFooter(slide, nextPage());
 
     // ── SLIDE 6: Key Risks ───────────────────────────────────────────────
     if (risks.length) {
@@ -6991,50 +7071,130 @@ async function exportExecutivePPTX() {
         slide.addText(`Risk ${ri+1}`, { x:0.62, y:ry+0.06, w:1.2, h:0.26, fontSize:9, bold:true, color:riskColors[ri%riskColors.length], fontFace:'Arial' });
         slide.addText(r.name||'', { x:1.7, y:ry+0.06, w:11.0, h:0.3, fontSize:13, bold:true, color:DARKGRAY, fontFace:'Arial' });
         if (r.note) slide.addText(r.note, { x:0.62, y:ry+0.38, w:12.1, h:0.3, fontSize:11, color:SLATE, fontFace:'Arial' });
-        if (r.tip)  slide.addText(`💡 Mitigation: ${r.tip}`, { x:0.62, y:ry+0.7, w:12.1, h:0.3, fontSize:10.5, italic:true, color:'92640C', fontFace:'Arial' });
+        if (r.tip)  slide.addText(`Mitigation: ${r.tip}`, { x:0.62, y:ry+0.7, w:12.1, h:0.3, fontSize:10.5, italic:true, color:'92640C', fontFace:'Arial' });
         ry += rh + 0.1;
       });
-      addFooter(slide, '6');
+      addFooter(slide, nextPage());
     }
 
-    // ── SLIDE 7: Wins & Highlights ───────────────────────────────────────
+    // ── SLIDE 7: Progress trend + work mix (real charts) ─────────────────
+    // Deliberately NOT a "top performers" slide. Completing assigned work is
+    // the job, not an achievement to be ranked on; a leaderboard invites
+    // gaming the numbers and says nothing a PM can act on. These charts show
+    // where the work actually is instead.
     slide = pptx.addSlide();
-    addHeader(slide, "This Week's Wins", 'Top performers and positive momentum', GREEN);
-    if (S.wins.length) {
-      const wRows = [[
-        {text:'Member',        options:{bold:true,color:WHITE,fill:{color:GREEN},fontSize:11}},
-        {text:'Completion',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
-        {text:'Tasks Done',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
-        {text:'WoW Change',    options:{bold:true,color:WHITE,fill:{color:GREEN},align:'center',fontSize:11}},
-        {text:'Highlight',     options:{bold:true,color:WHITE,fill:{color:GREEN},fontSize:11}},
+    addHeader(slide, 'Progress Trend & Work Mix', 'Completion over time and where the work currently sits', TEAL);
+
+    if (S.trend.length >= 2) {
+      slide.addChart(pptx.ChartType.line, [{
+        name: 'Team completion %',
+        labels: S.trend.map(t => t.date.slice(5)),
+        values: S.trend.map(t => t.pct),
+      }], {
+        x:0.45, y:1.15, w:7.4, h:4.0,
+        chartColors:[ACCENT], lineSize:3, lineSmooth:false,
+        showLegend:false, showTitle:false, showValue:false,
+        catAxisLabelFontSize:9, valAxisLabelFontSize:9,
+        valAxisMinVal:0, valAxisMaxVal:100,
+        catAxisLabelColor:SLATE, valAxisLabelColor:SLATE,
+        valGridLine:{color:'E2E8F0', size:0.5}, catGridLine:{style:'none'},
+        dataLabelFontSize:8,
+      });
+      slide.addText(`Completion trend — last ${S.trend.length} snapshots`,
+        { x:0.45, y:5.2, w:7.4, h:0.3, fontSize:10, color:SLATE, fontFace:'Arial' });
+    } else {
+      slide.addShape('roundRect', { x:0.45, y:1.15, w:7.4, h:4.0, rectRadius:0.1, fill:{color:LIGHT}, line:{color:'DCE3EA',width:0.7} });
+      slide.addText('Not enough history yet for a trend line.\nAt least two saved snapshots are needed.',
+        { x:0.45, y:2.7, w:7.4, h:0.9, fontSize:13, color:SLATE, align:'center', fontFace:'Arial' });
+    }
+
+    if (S.statusMix.length) {
+      slide.addChart(pptx.ChartType.doughnut, [{
+        name: 'Work mix',
+        labels: S.statusMix.map(s => s.label),
+        values: S.statusMix.map(s => s.value),
+      }], {
+        x:8.1, y:1.15, w:4.85, h:4.0,
+        chartColors:[GREEN, ACCENT, AMBER, MUTED],
+        holeSize:55, showLegend:true, legendPos:'b', legendFontSize:9.5,
+        showTitle:false, showValue:true, dataLabelFontSize:9,
+        dataLabelColor:WHITE, dataLabelPosition:'ctr',
+      });
+      slide.addText(`Work mix — ${S.gTotal} tasks`,
+        { x:8.1, y:5.2, w:4.85, h:0.3, fontSize:10, color:SLATE, align:'center', fontFace:'Arial' });
+    }
+
+    if (summaryText) {
+      slide.addShape('roundRect', { x:0.45, y:5.6, w:12.5, h:1.45, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA',width:0.7} });
+      slide.addText('Weekly commentary', { x:0.62, y:5.68, w:12.1, h:0.28, fontSize:10, bold:true, color:NAVY, fontFace:'Arial' });
+      slide.addText(summaryText, { x:0.62, y:5.95, w:12.1, h:1.02, fontSize:10.5, color:DARKGRAY, valign:'top', fontFace:'Arial' });
+    }
+    addFooter(slide, nextPage());
+
+    // ── SLIDE 8: Overdue analysis ────────────────────────────────────────
+    slide = pptx.addSlide();
+    addHeader(slide, 'Overdue Analysis', 'What is late, and whether it is stuck in delivery or in review', RED);
+
+    // The split that decides who to chase: undelivered work vs. an unmade
+    // review decision. Same number, completely different follow-up.
+    addKpiCard(slide, 0.45, 1.1, 4.0, 1.5, 'Total Overdue', `${S.gOv}`,
+               `${S.overdueRate}% of all tasks`, S.gOv ? RED : GREEN);
+    addKpiCard(slide, 4.62, 1.1, 4.0, 1.5, 'Delivery Not Complete', `${S.ovDelivery}`,
+               'chase the assignee', S.ovDelivery ? ORANGE : GREEN);
+    addKpiCard(slide, 8.79, 1.1, 4.15, 1.5, 'Awaiting Review Decision', `${S.ovReview}`,
+               'chase the reviewer', S.ovReview ? AMBER : GREEN);
+
+    if (S.overdueByOwner.length) {
+      slide.addChart(pptx.ChartType.bar, [{
+        name: 'Overdue tasks',
+        labels: S.overdueByOwner.map(r => r.owner),
+        values: S.overdueByOwner.map(r => r.overdue||0),
+      }], {
+        x:0.45, y:2.85, w:12.5, h:3.9,
+        barDir:'bar', chartColors:[RED],
+        showLegend:false, showTitle:false, showValue:true,
+        dataLabelFontSize:9, dataLabelColor:DARKGRAY, dataLabelPosition:'outEnd',
+        catAxisLabelFontSize:10, valAxisLabelFontSize:9,
+        catAxisLabelColor:DARKGRAY, valAxisLabelColor:SLATE,
+        valGridLine:{color:'E2E8F0', size:0.5}, catGridLine:{style:'none'},
+        barGapWidthPct:45,
+      });
+    } else {
+      slide.addShape('roundRect', { x:0.45, y:3.2, w:12.5, h:1.9, rectRadius:0.1, fill:{color:'F0FDF4'}, line:{color:'BBF7D0',width:1} });
+      slide.addText('Nothing is overdue.', { x:0.45, y:3.9, w:12.5, h:0.5, fontSize:20, bold:true, color:GREEN, align:'center', fontFace:'Arial' });
+    }
+    addFooter(slide, nextPage());
+
+    // ── SLIDE 9: Review bottlenecks ──────────────────────────────────────
+    // Who is holding the approval queue. This is the slide that turns
+    // "the project is late" into a name and a number.
+    if (S.bottlenecks.length) {
+      slide = pptx.addSlide();
+      addHeader(slide, 'Review Bottlenecks', 'Who is holding work in the approval queue right now', PURPLE);
+      const bRows = [[
+        {text:'Reviewer',  options:{bold:true,color:WHITE,fill:{color:PURPLE},fontSize:11}},
+        {text:'Role',      options:{bold:true,color:WHITE,fill:{color:PURPLE},fontSize:11}},
+        {text:'Awaiting',  options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:11}},
+        {text:'Overdue',   options:{bold:true,color:WHITE,fill:{color:PURPLE},align:'center',fontSize:11}},
+        {text:'Issue keys',options:{bold:true,color:WHITE,fill:{color:PURPLE},fontSize:11}},
       ]];
-      S.wins.forEach((r,i) => {
+      S.bottlenecks.slice(0,11).forEach((b,i) => {
         const bg = i%2 ? LIGHT : WHITE;
-        const d = r.delta;
-        const dStr = d===null||d===undefined?'NEW':(d>=0?'+':'')+d+'%';
-        const highlight = r.this_week>=100?'✅ Fully complete!':r.this_week>=90?'Outstanding progress':r.this_week>=80?'On track & strong':'Great weekly jump';
-        wRows.push([
-          {text:r.owner,                            options:{bold:true,fill:{color:bg},fontSize:11,color:DARKGRAY}},
-          {text:`${r.this_week}%`,                  options:{align:'center',fill:{color:bg},fontSize:14,bold:true,color:GREEN}},
-          {text:`${r.completed||0}/${r.total||0}`,  options:{align:'center',fill:{color:bg},fontSize:11}},
-          {text:dStr,                               options:{align:'center',fill:{color:bg},fontSize:11,bold:true,color:d>=0?GREEN:RED}},
-          {text:highlight,                          options:{fill:{color:bg},fontSize:10.5,color:SLATE,italic:true}},
+        bRows.push([
+          {text:b.owner,  options:{bold:true,fill:{color:bg},fontSize:11,color:DARKGRAY}},
+          {text:b.role||'Reviewer', options:{fill:{color:bg},fontSize:10,color:SLATE}},
+          {text:String(b.n),       options:{align:'center',fill:{color:bg},fontSize:12,bold:true,color:PURPLE}},
+          {text:String(b.overdue), options:{align:'center',fill:{color:bg},fontSize:12,bold:b.overdue>0,color:b.overdue>0?RED:SLATE}},
+          {text:b.keys.slice(0,6).join(', ') + (b.keys.length>6?` +${b.keys.length-6}`:''),
+                                   options:{fill:{color:bg},fontSize:9,color:SLATE}},
         ]);
       });
-      slide.addTable(wRows, { x:0.4, y:1.1, w:12.5, colW:[2.5,1.6,1.5,1.6,5.3],
-        fontSize:11, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.4}, rowH:0.48, autoPage:false });
-    } else {
-      slide.addText('No standout performers this week — but the team is making steady progress.', { x:0.5, y:2.5, w:12.3, h:0.5, fontSize:15, color:SLATE, fontFace:'Arial' });
+      slide.addTable(bRows, { x:0.45, y:1.1, w:12.5, colW:[2.5,2.0,1.2,1.2,5.6],
+        fontSize:11, fontFace:'Arial', border:{type:'solid',color:'DCE3EA',pt:0.4}, rowH:0.44, autoPage:false });
+      slide.addText(`${S.inReviewTotal} task(s) are awaiting a review decision. Where several reviewers are named on one task, all of them must approve.`,
+        { x:0.45, y:6.9, w:12.5, h:0.3, fontSize:9.5, color:MUTED, italic:true, fontFace:'Arial' });
+      addFooter(slide, nextPage());
     }
-    // AI summary panel
-    if (summaryText) {
-      const tY = S.wins.length ? 1.1 + (S.wins.length+1)*0.48 + 0.3 : 1.3;
-      slide.addText('📝 AI-Generated Weekly Commentary', { x:0.4, y:tY, w:12.5, h:0.35, fontSize:12, bold:true, color:NAVY, fontFace:'Arial' });
-      const boxH = Math.max(0.8, 7.1 - tY - 0.45);
-      slide.addShape('roundRect', { x:0.4, y:tY+0.38, w:12.5, h:boxH, rectRadius:0.08, fill:{color:LIGHT}, line:{color:'DCE3EA',width:0.7} });
-      slide.addText(summaryText, { x:0.6, y:tY+0.5, w:12.1, h:boxH-0.22, fontSize:11.5, color:DARKGRAY, valign:'top', fontFace:'Arial' });
-    }
-    addFooter(slide, '7');
 
     // ── SLIDE 8: Closing / Actions ───────────────────────────────────────
     slide = pptx.addSlide();
@@ -7088,12 +7248,22 @@ const EPIC_KEY = 'FIBTMP-489';
 const EPIC_HISTORY_START = '2026-07-13'; // yyyy-mm-dd, default start shown in the modal
 
 async function fetchEpicIssues(){
+  return _fetchIssuesFor({action:'epic_issues', epicKey: EPIC_KEY});
+}
+
+// Whole project, not one epic. Same shape (fields + status-only changelog), so
+// the daily-status export renders it with the identical code path.
+async function fetchProjectIssues(){
+  return _fetchIssuesFor({action:'project_issues'});
+}
+
+async function _fetchIssuesFor(payload){
   if (!GH_PROXY) throw new Error('No Worker proxy configured (meta gh-proxy).');
   const pw = sessionStorage.getItem('pw_cache') || '';
   const r = await window.fetch(GH_PROXY, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
-    body: JSON.stringify({action:'epic_issues', epicKey: EPIC_KEY})
+    body: JSON.stringify(payload)
   });
   if (!r.ok){
     let msg = 'HTTP '+r.status;
@@ -7225,7 +7395,12 @@ function _isDoneStatus(status){
 
 // Opens the "choose start date" modal. Defaults to whatever was picked last
 // time (remembered in localStorage), or EPIC_HISTORY_START the first time.
-function openEpicExcelModal(){
+// Which scope the date-picker modal will export: one epic, or the whole
+// project. Set by whichever menu item opened it.
+let _DAILY_SCOPE = 'epic';
+
+function openEpicExcelModal(scope){
+  _DAILY_SCOPE = (scope === 'project') ? 'project' : 'epic';
   const inp = document.getElementById('epic-excel-start');
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10);
@@ -7235,6 +7410,10 @@ function openEpicExcelModal(){
   inp.max = todayStr;
   const lbl = document.getElementById('epic-excel-today-label');
   if (lbl) lbl.textContent = now.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'}) + ' (today)';
+  const scopeLbl = document.getElementById('epic-excel-scope-label');
+  if (scopeLbl) scopeLbl.textContent = _DAILY_SCOPE === 'project'
+    ? 'Every task and sub-task in the project'
+    : `Epic ${EPIC_KEY} — its tasks and sub-tasks`;
   openModal('epic-excel-modal');
 }
 
@@ -7246,15 +7425,19 @@ function confirmEpicExcelExport(){
   if (!val){ toast('Pick a start date first.'); return; }
   try { localStorage.setItem('epicExcelStart', val); } catch(e){}
   closeModal('epic-excel-modal');
-  exportEpicExcel(val);
+  exportEpicExcel(val, _DAILY_SCOPE);
 }
 
-async function exportEpicExcel(historyStart){
+async function exportEpicExcel(historyStart, scope){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
-  toast(`Pulling ${EPIC_KEY} from Jira…`);
+  const wholeProject = scope === 'project';
+  const scopeName = wholeProject
+    ? ((REPORT.jira_base_url||'').includes('fibtask') ? 'FIBTMP' : 'Project')
+    : EPIC_KEY;
+  toast(`Pulling ${wholeProject ? 'the whole project' : EPIC_KEY} from Jira…`);
   try {
-    const issues = await fetchEpicIssues();
-    if (!issues.length){ toast(`No tasks/subtasks found under ${EPIC_KEY}.`); return; }
+    const issues = wholeProject ? await fetchProjectIssues() : await fetchEpicIssues();
+    if (!issues.length){ toast(`No tasks/subtasks found for ${scopeName}.`); return; }
 
     const startLabel = historyStart || EPIC_HISTORY_START;
     const days = _epicDayList(startLabel);
@@ -7339,7 +7522,7 @@ async function exportEpicExcel(historyStart){
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
         const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const titleText = `Epic ${EPIC_KEY}  ·  ${startLabel} → ${dateLabel} (Today)  ·  Generated ${generatedAt}`;
+        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+EPIC_KEY}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${issues.length} issue(s)  ·  Generated ${generatedAt}`;
         const HEADER_ROW = 1, DATA_START = 2;
 
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
@@ -7403,8 +7586,8 @@ async function exportEpicExcel(historyStart){
           }
         });
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, EPIC_KEY);
-        XLSX.writeFile(wb, `${EPIC_KEY}-daily-status-${startLabel}_to_${dateLabel}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, (wholeProject ? scopeName+' Daily' : EPIC_KEY).slice(0,31));
+        XLSX.writeFile(wb, `${wholeProject ? scopeName+'-project' : EPIC_KEY}-daily-status-${startLabel}_to_${dateLabel}.xlsx`);
         toast('✓ Epic Excel downloaded.');
       } catch(e){
         console.error('[export-epic]', e);
@@ -9127,7 +9310,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.4.0"
+SITE_VERSION = "2.5.0"
 
 
 def _build_stamp():
