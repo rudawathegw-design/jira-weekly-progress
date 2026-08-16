@@ -1878,7 +1878,24 @@ CC: @cc</textarea>
     <div class="rq-head-row">
       <div data-help="view">
         <div class="rq-kick">Current Owner</div>
-        <h2 class="rq-title">Current Levels</h2>
+        <div class="rq-title-row">
+          <h2 class="rq-title">Current Levels</h2>
+          <!-- Sits with the title rather than in the button cluster: it is the
+               one control that acts on the whole page, so it reads as part of
+               the heading. Hidden until guide mode is on. -->
+          <button class="rq-play" id="rq-tour-btn" onclick="guideTour()"
+                  title="Play the walkthrough" aria-label="Play the walkthrough"
+                  style="display:none">
+            <span class="rq-play-ico" id="rq-play-ico"></span>
+            <span class="rq-play-lbl" id="rq-play-lbl">Play all</span>
+          </button>
+          <button class="rq-stop" id="rq-stop-btn" onclick="guideStopAudio()"
+                  title="Stop the audio (Esc)" aria-label="Stop the audio">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                 stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line
+                 x1="19" y1="5" x2="5" y2="19"/></svg>
+          </button>
+        </div>
         <p class="rq-lede">Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
       </div>
       <div class="rq-head-btns">
@@ -1890,8 +1907,6 @@ CC: @cc</textarea>
                class="wv2" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
           <span id="rq-guide-lbl">Guide</span>
         </button>
-        <button class="chip guide-tour" id="rq-tour-btn" onclick="guideTour()"
-                title="Play the whole walkthrough" style="display:none">&#9654; Play all</button>
         <button class="chip" onclick="setAttrMode('assignee')"
                 title="Back to the weekly tables, counted against the assignee"
                 data-help="back">&larr; Weekly tables</button>
@@ -2799,6 +2814,31 @@ let _guideOn   = false;
 let _guideTip  = null;
 let _guideTour = null;   // index into RQ_TOUR while a walkthrough is running
 let _guideVoice = null;
+let _guidePaused = false;
+
+// Transport icons. Play and pause are drawn at the same size inside the same
+// disc, so swapping one for the other does not nudge the label along.
+const _ICO_PLAY  = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>`;
+const _ICO_PAUSE = `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1.5"/><rect x="13.5" y="5" width="4.5" height="14" rx="1.5"/></svg>`;
+
+// One place that decides what the transport looks like, so the button, the
+// label, the halo and the stop control can never disagree about the state.
+function _guideSetTransport(state){          // 'idle' | 'playing' | 'paused'
+  const btn  = document.getElementById('rq-tour-btn');
+  const ico  = document.getElementById('rq-play-ico');
+  const lbl  = document.getElementById('rq-play-lbl');
+  const stop = document.getElementById('rq-stop-btn');
+  if (!btn || !ico || !lbl) return;
+  btn.classList.toggle('playing', state === 'playing');
+  btn.classList.toggle('paused',  state === 'paused');
+  ico.innerHTML = state === 'playing' ? _ICO_PAUSE : _ICO_PLAY;
+  lbl.textContent = state === 'playing' ? 'Pause'
+                  : state === 'paused'  ? 'Resume' : 'Play all';
+  btn.title = state === 'playing' ? 'Pause the walkthrough'
+            : state === 'paused'  ? 'Resume the walkthrough'
+                                  : 'Play the walkthrough';
+  if (stop) stop.classList.toggle('show', state !== 'idle');
+}
 
 function _guidePickVoice(){
   if (!('speechSynthesis' in window)) return null;
@@ -2890,6 +2930,7 @@ function toggleGuide(){
   if (tour) tour.style.display = _guideOn ? '' : 'none';
   if (_guideOn){
     _rqApplyHelp();
+    _guideSetTransport('idle');     // also paints the play icon the first time
     toast('Guide on — hover to read, click to hear it. Esc to stop.');
   } else {
     _guideStop();
@@ -2898,16 +2939,33 @@ function toggleGuide(){
 
 function _guideStop(){
   _guideTour = null;
+  _guidePaused = false;
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   _guideMark(null);
   _guideHideTip();
+  _guideSetTransport('idle');
 }
 
-// Walks the whole view top to bottom, speaking each topic in turn.
+// Stop everything and go back to silence — the explicit exit, also bound to
+// Esc. Distinct from pause: this abandons the walkthrough rather than holding
+// its place.
+function guideStopAudio(){ _guideStop(); }
+
+// Walks the whole view top to bottom, speaking each topic in turn. Pressing
+// the button again pauses mid-sentence and keeps its place; pressing it once
+// more picks the sentence up where it left off.
 function guideTour(){
   if (!_guideOn) return;
-  if (_guideTour !== null){ _guideStop(); return; }   // second press = stop
+  if (_guideTour !== null){
+    if (_guidePaused){ speechSynthesis.resume(); _guidePaused = false;
+                       _guideSetTransport('playing'); }
+    else             { speechSynthesis.pause();  _guidePaused = true;
+                       _guideSetTransport('paused'); }
+    return;
+  }
   _guideTour = 0;
+  _guidePaused = false;
+  _guideSetTransport('playing');
   (function step(){
     if (_guideTour === null) return;                  // stopped mid-way
     if (_guideTour >= RQ_TOUR.length){ _guideStop(); return; }
@@ -2934,7 +2992,7 @@ function guideTour(){
   // also filter the queue or open the task in Jira.
   view.addEventListener('click', e => {
     if (!_guideOn) return;
-    if (e.target.closest('#rq-guide-btn, #rq-tour-btn')) return;   // the controls themselves
+    if (e.target.closest('#rq-guide-btn, #rq-tour-btn, #rq-stop-btn')) return;  // the controls themselves
     const el = e.target.closest('[data-help]');
     if (!el) return;
     e.preventDefault(); e.stopPropagation();
@@ -2943,7 +3001,14 @@ function guideTour(){
     if (!RQ_HELP[key]) return;
     _guideMark(el);
     _guideShowTip(el, key);
-    _guideSpeak(RQ_HELP[key].text, () => _guideMark(null));
+    // Even a single sentence gets the stop control, so there is always a way
+    // out of audio that has already started.
+    const stop = document.getElementById('rq-stop-btn');
+    if (stop) stop.classList.add('show');
+    _guideSpeak(RQ_HELP[key].text, () => {
+      _guideMark(null);
+      if (stop && _guideTour === null) stop.classList.remove('show');
+    });
   }, true);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && _guideOn) _guideStop();
@@ -10248,12 +10313,59 @@ document.addEventListener('keydown', function(e){
   .guide-btn{display:inline-flex;align-items:center;gap:6px}
   .guide-btn .guide-ico{width:14px;height:14px}
   .guide-btn .guide-ico .wv,.guide-btn .guide-ico .wv2{opacity:.35}
-  .guide-btn.on{background:linear-gradient(135deg,#0e9f8f,#0b7d70 70%);color:#fff;
-    border-color:transparent;box-shadow:0 6px 16px rgba(14,159,143,.28)}
+  /* Addressed by id, not by class: the glass layer repaints every .chip that
+     is not .blue/.green/.primary with `!important`, and a class-level rule
+     here lost the race — the fill went flat and the white label vanished into
+     a white pane. An id outranks anything that layer can express. */
+  #rq-guide-btn.on{background:linear-gradient(135deg,#0e9f8f,#0b7d70 70%) !important;
+    border-color:transparent !important;
+    box-shadow:0 6px 16px rgba(14,159,143,.28) !important}
+  #rq-guide-btn.on,#rq-guide-btn.on span,#rq-guide-btn.on svg{color:#fff !important;
+    -webkit-text-fill-color:#fff}
+  #rq-guide-btn.on:hover{background:linear-gradient(135deg,#0b8d7f,#096a60 70%) !important}
   .guide-btn.on .guide-ico .wv{opacity:1;animation:guideWave 1.4s ease-in-out infinite}
   .guide-btn.on .guide-ico .wv2{opacity:1;animation:guideWave 1.4s ease-in-out .25s infinite}
   @keyframes guideWave{0%,100%{opacity:.25}50%{opacity:1}}
-  .guide-tour{display:inline-flex;align-items:center;gap:6px}
+
+  /* Play / pause / stop, sitting on the heading line. Deliberately not a
+     .chip — the transport controls are the loudest thing in guide mode and
+     should not be flattened into the glass with everything else. */
+  .rq-title-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  #rq-tour-btn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+    border:none;border-radius:999px;padding:7px 16px 7px 8px;
+    font:800 12px/1 'Inter',system-ui,sans-serif;letter-spacing:.01em;
+    background:linear-gradient(135deg,#0e9f8f,#0b7d70 70%);
+    box-shadow:0 6px 18px -4px rgba(14,159,143,.5);
+    transition:transform .15s,box-shadow .2s,background .2s}
+  #rq-tour-btn,#rq-tour-btn span,#rq-tour-btn svg{color:#fff;-webkit-text-fill-color:#fff}
+  #rq-tour-btn:hover{transform:translateY(-1px);
+    background:linear-gradient(135deg,#12b3a1,#0b8d7f 70%);
+    box-shadow:0 9px 22px -4px rgba(14,159,143,.6)}
+  #rq-tour-btn:active{transform:translateY(0)}
+  /* The icon sits in its own disc so play and pause occupy identical space and
+     the label never shifts when the two swap. */
+  #rq-tour-btn .rq-play-ico{display:grid;place-items:center;width:22px;height:22px;flex:none;
+    border-radius:50%;background:rgba(255,255,255,.22)}
+  #rq-tour-btn .rq-play-ico svg{width:12px;height:12px;display:block}
+  #rq-tour-btn .rq-play-lbl{white-space:nowrap}
+  /* Playing: a soft halo pulses out of the button so it is obvious which
+     control is currently talking. */
+  #rq-tour-btn.playing{background:linear-gradient(135deg,#0b7d70,#095f56 70%);
+    animation:rqPlayPulse 2s ease-out infinite}
+  @keyframes rqPlayPulse{
+    0%{box-shadow:0 6px 18px -4px rgba(14,159,143,.5),0 0 0 0 rgba(14,159,143,.45)}
+    70%{box-shadow:0 6px 18px -4px rgba(14,159,143,.5),0 0 0 12px rgba(14,159,143,0)}
+    100%{box-shadow:0 6px 18px -4px rgba(14,159,143,.5),0 0 0 0 rgba(14,159,143,0)}}
+  /* Paused: colour drains out so a paused tour never looks like a live one. */
+  #rq-tour-btn.paused{background:linear-gradient(135deg,#64748b,#475569 70%);
+    box-shadow:0 6px 18px -6px rgba(71,85,105,.5);animation:none}
+  #rq-stop-btn{display:none;place-items:center;width:32px;height:32px;flex:none;
+    cursor:pointer;border-radius:50%;border:1.5px solid rgba(185,28,28,.28);
+    background:rgba(254,242,242,.9);color:#b91c1c;
+    transition:transform .15s,background .2s,border-color .2s}
+  #rq-stop-btn.show{display:grid}
+  #rq-stop-btn:hover{background:#b91c1c;color:#fff;border-color:transparent;transform:translateY(-1px)}
+  #rq-stop-btn svg{width:13px;height:13px}
   /* Every explainable region gets a dotted underlay so it is obvious what can
      be asked about. Nothing is drawn when guide mode is off. */
   body.guide-on #rq-view [data-help]{cursor:help;border-radius:12px;
@@ -10955,6 +11067,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.10.1 Guide transport moved onto the heading line as a play/pause pill
+#          with a stop button beside it, so the audio can always be paused
+#          mid-sentence or cut off outright. "Guide on" no longer loses its
+#          fill to the glass layer, which had left white text on white.
 #   2.10.0 Guide mode on Current Levels: a toggle that turns the Current Owner
 #          view into a narrated tour — hover any tile, filter or card for a
 #          plain-English explanation, click it to hear the same sentence read
@@ -10992,7 +11108,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.10.0"
+SITE_VERSION = "2.10.1"
 
 
 def _build_stamp():
