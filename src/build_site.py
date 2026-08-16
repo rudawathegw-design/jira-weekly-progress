@@ -2700,9 +2700,22 @@ function _rqCollect(){
     (r.issues || []).forEach(i => {
       const st = String(i.status || '').toLowerCase();
       if (!(i.in_review || REVIEW_STATUSES.has(st))) return;
-      const owner = i.accountable || r.owner;
-      if (hide && hide.has(owner)) return;
-      out.push({...i, owner, _stage: st, _days: _overdueDaysNum(i.due)});
+      const days = _overdueDaysNum(i.due);
+      // A gate can name several reviewers, and all of them are on the hook —
+      // FIBTMP-400 lists two Level 1 Reviewers. The weekly tables still count
+      // the task once against the primary, because a percentage that
+      // double-counts is a broken percentage. This queue answers a different
+      // question ("what is on my desk?"), so it lists the task under every
+      // reviewer at the gate, each with their own link.
+      const primary = i.accountable || r.owner;
+      const holders = [primary, ...(i.co_reviewers || [])]
+        .filter((n, ix, a) => n && a.indexOf(n) === ix);
+      holders.forEach(owner => {
+        if (hide && hide.has(owner)) return;
+        out.push({...i, owner, _stage: st, _days: days,
+                  _shared: holders.length > 1,
+                  _with: holders.filter(n => n !== owner)});
+      });
     });
   });
   return out;
@@ -2726,6 +2739,11 @@ function _rqRoleLabel(list){
   }
   return seen.join(' · ');
 }
+
+// A shared task appears once per holder, so anything that counts TASKS has to
+// count distinct keys or the totals inflate by however many reviewers a gate
+// happens to name.
+function _rqCount(list){ return new Set(list.map(i => i.key)).size; }
 
 function _rqGroup(items){
   const groups = {};
@@ -2792,7 +2810,7 @@ function _rqRender(){
   const segEl = document.getElementById('rq-stages');
   if (segEl) segEl.innerHTML = _RQ_STAGES.map(s => `
     <button class="${s.key===_rqStage?'on':''}" onclick="_rqSetStage('${s.key}')">${esc(s.label)}
-      <span class="sn">${all.filter(i => s.match(i._stage)).length}</span></button>`).join('');
+      <span class="sn">${_rqCount(all.filter(i => s.match(i._stage)))}</span></button>`).join('');
 
   const items = all.filter(i => stage.match(i._stage)).filter(i => !q ||
     (i.owner||'').toLowerCase().includes(q) ||
@@ -2814,10 +2832,12 @@ function _rqRender(){
   const overdueAll = items.filter(i => i.overdue);
   const worst      = items.reduce((m,i) => Math.max(m, i._days || 0), 0);
   const worstKey   = items.find(i => (i._days||0) === worst)?.key || '—';
-  const pct        = items.length ? Math.round(overdueAll.length/items.length*100) : 0;
+  const nItems     = _rqCount(items);
+  const nOverdue   = _rqCount(overdueAll);
+  const pct        = nItems ? Math.round(nOverdue/nItems*100) : 0;
   const tiles = [
-    ['In review',  items.length,        `across ${groups.length} owner${groups.length===1?'':'s'}`, false],
-    ['Overdue',    overdueAll.length,   `${pct}% of the queue`,                                     true],
+    ['In review',  nItems,   `across ${groups.length} owner${groups.length===1?'':'s'}`, false],
+    ['Overdue',    nOverdue, `${pct}% of the queue`,                                     true],
     ['Worst delay',worst ? worst+'d':'—', worstKey,                                                 true],
     ['Owners',     groups.length,       'holding work now',                                         false],
   ];
@@ -2849,7 +2869,11 @@ function _rqRender(){
         <a class="rq-task" href="${esc(base)}/browse/${esc(i.key)}" target="_blank" rel="noopener">
           <span class="rq-seq">${++_n}-</span>
           <span class="rq-key">${esc(i.key)}</span>
-          <span class="rq-sum" title="${esc(i.summary||'')}">${esc(i.summary||'')}</span>
+          <span class="rq-sum" title="${esc(i.summary||'')}">${esc(i.summary||'')}${
+            i._shared ? `<span class="rq-shared" title="Also with ${esc((i._with||[]).join(', '))}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                   stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              ${esc(String((i._with||[]).length + 1))}</span>` : ''}</span>
           <span class="rq-age">${i.due ? 'due '+esc(i.due) : 'no due date'}</span>
           <span class="rq-od">${i.overdue && i._days
             ? `<b>${i._days}d</b><span class="bar"><i style="width:${Math.min(100,Math.round((i._days/(g.worst||1))*100))}%"></i></span>`
@@ -10572,6 +10596,13 @@ document.addEventListener('keydown', function(e){
   .rq-task:hover{background:rgba(255,255,255,.55)}
   .rq-key{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#1366cc}
   .rq-sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Shared gate: the same task is on more than one reviewer's desk. Marked on
+     the row so two listings never read as two separate tasks. */
+  .rq-shared{display:inline-flex;align-items:center;gap:3px;vertical-align:middle;
+    margin-left:7px;padding:1px 6px 1px 5px;border-radius:999px;
+    background:rgba(45,165,165,.12);border:1px solid rgba(45,165,165,.3);
+    color:#14615F;font:800 9.5px/1.6 'Inter',system-ui,sans-serif}
+  .rq-shared svg{width:10px;height:10px}
   .rq-age{font-size:11px;color:#7b8798;text-align:right}
   .rq-od{display:flex;align-items:center;gap:6px;justify-content:flex-end}
   .rq-od b{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#b91c1c}
@@ -11156,6 +11187,11 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.15.0 A gate with several reviewers now lists the task under each of them,
+#          with its own link, instead of only the first name in the field. The
+#          tiles and stage counts count distinct tasks, so sharing a task does
+#          not inflate the queue, and a shared row is marked with the number of
+#          people holding it.
 #   2.14.0 The status decides who holds a task, not the Approvals field. A task
 #          at "Revision Level 2" goes to the Level 2 Reviewer; Level 1 to the
 #          Level 1 Reviewer; "Waiting For Approval" to the reporter. The
@@ -11227,7 +11263,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.14.0"
+SITE_VERSION = "2.15.0"
 
 
 def _build_stamp():
