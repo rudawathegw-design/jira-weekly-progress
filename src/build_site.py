@@ -2402,6 +2402,17 @@ const _LIVE = {
     const a = (issue.fields||{}).assignee;
     return (a && a.displayName) ? a.displayName : 'Unassigned';
   },
+  // Newest of a set of date strings, ignoring nulls and anything unparseable.
+  // Returns the original string so downstream code keeps Jira's own format.
+  newestDate(...vals){
+    let best = null, bestT = -Infinity;
+    for (const v of vals){
+      if (!v) continue;
+      const t = new Date(v).getTime();
+      if (!isNaN(t) && t > bestT){ bestT = t; best = v; }
+    }
+    return best;
+  },
   extractEvents(issue, maxAgeDays=30){
     const cl = ((issue.changelog||{}).histories) || [];
     const cutoff = Date.now() - maxAgeDays*86400000;
@@ -2426,7 +2437,15 @@ const _LIVE = {
     const f = issue.fields||{};
     const events = _LIVE.extractEvents(issue);
     const lastStatus = events.find(e=>e.field==='status') || null;
-    const changed = lastStatus ? lastStatus.when : (f.statuscategorychangedate || f.updated);
+    // No changelog on the live path (the Worker cannot afford to expand it for
+    // hundreds of issues), so `changed` falls back to a field date. It has to be
+    // the NEWER of the two, not statuscategorychangedate first: that one only
+    // moves when the status crosses a CATEGORY boundary, so a real transition
+    // like "Revision Level 2 → Waiting For Approval" leaves it untouched and the
+    // task reads as weeks stale. That is what made the Breaking bar appear on
+    // load and vanish on the first live refresh.
+    const changed = lastStatus ? lastStatus.when
+                               : _LIVE.newestDate(f.statuscategorychangedate, f.updated);
     const assignee = f.assignee||{};
     const issuetype = f.issuetype||{};
     // ── reviewer / involved custom fields (for status+owner exports) ──
@@ -2482,7 +2501,32 @@ const _LIVE = {
   },
   // Flat, unfiltered record list. Grouping/bucketing is done by regroupReport()
   // so the baked page and the live refresh share one code path.
-  records(issues){ return issues.map(i => _LIVE.issueRecord(i)); },
+  // The live path has no changelog, so a record on its own cannot say when the
+  // status last moved or what it moved from. The records from the previous pass
+  // can: they were either built by Python (which did read the changelog) or
+  // carried forward from one that was. Diffing against them recovers both.
+  records(issues){
+    const prev = new Map();
+    const src = (typeof _BASE_REPORT !== 'undefined' && _BASE_REPORT && _BASE_REPORT.records) || [];
+    for (const r of src) if (r && r.key) prev.set(r.key, r);
+    return issues.map(i => {
+      const rec = _LIVE.issueRecord(i);
+      const p = prev.get(rec.key);
+      if (!p) return rec;
+      if (p.status === rec.status){
+        // Still where it was. The older record knows when it actually got there
+        // and from where; a field date is a worse answer to both questions.
+        if (p.changed) rec.changed = p.changed;
+        if (p.status_from && !rec.status_from) rec.status_from = p.status_from;
+        if (!rec.events.length && (p.events || []).length) rec.events = p.events;
+      } else {
+        // It moved between two refreshes, so this pass IS the event: the status
+        // we held a moment ago is exactly what it moved from.
+        if (!rec.status_from) rec.status_from = p.status;
+      }
+      return rec;
+    });
+  },
   parsePrev(v){
     if (v===null||v===undefined) return null;
     if (typeof v === 'object') return v;
@@ -11244,6 +11288,11 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.11.1 Breaking bar no longer vanishes on the first live refresh. Without
+#          a changelog the live path fell back to statuscategorychangedate,
+#          which does not move when a status changes WITHIN a category, so
+#          every task read as weeks stale. It now diffs against the previous
+#          pass, which also recovers the "from" status the live path cannot see.
 #   2.11.0 Opening splash rebuilt as a sky descent: the camera falls through
 #          three cloud decks and the last one parts to reveal the two marks.
 #   2.10.2 One control instead of two: the separate Guide switch is gone and
@@ -11290,7 +11339,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.11.0"
+SITE_VERSION = "2.11.1"
 
 
 def _build_stamp():
