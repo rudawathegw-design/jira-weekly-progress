@@ -2852,6 +2852,10 @@ function _rqRender(){
     if (_guideOn) _rqApplyHelp();
     return;
   }
+  // The card's Copy/Excel buttons act on exactly what is rendered — current
+  // stage tab, search box and letter filter included — so they read the same
+  // groups the markup was built from rather than re-deriving them.
+  _RQ_GROUPS = groups;
   listEl.innerHTML = groups.map((g,gi) => {
     const sev = g.worst >= 14 ? 'sev-hi' : g.worst >= 5 ? '' : 'sev-lo';
     // Stage headings inside a person block, worst task first within each.
@@ -2872,7 +2876,7 @@ function _rqRender(){
       return `
       <div class="rq-stage-row">
       <div class="rq-stage ${cls}">${esc(st)}</div>
-      ${keys.length > 1 ? `<a class="rq-openall" href="${esc(allUrl)}" target="_blank"
+      ${keys.length ? `<a class="rq-openall" href="${esc(allUrl)}" target="_blank"
            rel="noopener" onclick="event.stopPropagation()"
            title="Open all ${keys.length} of these in one Jira list">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
@@ -2902,6 +2906,18 @@ function _rqRender(){
           ${g.role ? `<div class="rq-role">${esc(g.role)}</div>` : ''}
         </div>
         <div class="rq-meta">
+          <span class="rq-cardbtns">
+            <button class="rq-cbtn" onclick="event.stopPropagation();_rqCopyCard(${gi},this)"
+                    title="Copy this person's list as a table you can paste into Outlook">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy</button>
+            <button class="rq-cbtn" onclick="event.stopPropagation();_rqExcelCard(${gi},this)"
+                    title="Download this person's list as an Excel file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Excel</button>
+          </span>
           ${g.overdue ? `<span class="rq-pill od">${g.overdue} overdue · max ${g.worst}d</span>` : ''}
           <span class="rq-chev">&#9656;</span>
         </div>
@@ -2913,6 +2929,129 @@ function _rqRender(){
   // The tiles, stage buttons, rail and list were all just replaced, so the
   // guide's hover targets have to be stamped back on.
   if (_guideOn) _rqApplyHelp();
+}
+
+// ── Per-card export: one person's review queue ──────────────────────────────
+// Both actions take what is on screen for that card, so whatever the stage tab,
+// search box and A–Z rail have narrowed the view to is exactly what comes out.
+let _RQ_GROUPS = [];
+
+function _rqCardRows(gi){
+  const g = _RQ_GROUPS[gi];
+  if (!g) return null;
+  const base = (REPORT.jira_base_url || 'https://fibtask.atlassian.net').replace(/\/+$/,'');
+  // Same order the card shows: stage, then worst first inside each stage.
+  const rows = g.list.slice().sort((a,b) =>
+    String(a.status||'').localeCompare(String(b.status||'')) || (b._days||0)-(a._days||0));
+  return {g, base, rows};
+}
+
+async function _rqCopyCard(gi, btn){
+  const d = _rqCardRows(gi);
+  if (!d) return;
+  const {g, base, rows} = d;
+  const cell = 'padding:6px 9px;border:1px solid #d8e0ea;font-size:12.5px';
+  const body = rows.map((i,n) => `<tr${i.overdue ? ' style="background:#fef2f2"' : ''}>
+      <td style="${cell};text-align:right;color:#94a3b8">${n+1}</td>
+      <td style="${cell};font-family:Consolas,monospace"><a href="${esc(base)}/browse/${esc(i.key)}">${esc(i.key)}</a></td>
+      <td style="${cell}">${esc(i.summary||'')}</td>
+      <td style="${cell}">${esc(i.status||'')}</td>
+      <td style="${cell};white-space:nowrap">${esc(i.due||'—')}</td>
+      <td style="${cell};text-align:right;font-weight:700;color:${i.overdue?'#b91c1c':'#64748b'}">${
+        i.overdue && i._days ? i._days+'d' : '—'}</td></tr>`).join('');
+  const html = `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif">
+    <p style="margin:0 0 4px;font-size:15px;font-weight:700">${esc(g.name)}${g.role?` — ${esc(g.role)}`:''}</p>
+    <p style="margin:0 0 10px;font-size:12px;color:#64748b">${rows.length} task(s) in review${
+      g.overdue?` · ${g.overdue} overdue · longest ${g.worst} days past due`:''} · ${esc(REPORT.date||'')}</p>
+    <table style="border-collapse:collapse">
+      <tr style="background:#eef4fb">
+        <th style="${cell}">#</th><th style="${cell}">Key</th><th style="${cell}">Summary</th>
+        <th style="${cell}">Status</th><th style="${cell}">Due</th><th style="${cell}">Overdue</th>
+      </tr>${body}
+    </table></div>`;
+  const text = `${g.name}${g.role?' — '+g.role:''}\n` + rows.map((i,n) =>
+    `${n+1}. ${i.key}  ${i.summary||''}  [${i.status||''}]  due ${i.due||'—'}${
+      i.overdue && i._days ? `  (${i._days}d overdue)` : ''}`).join('\n');
+  try {
+    if (navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':  new Blob([html], {type:'text/html'}),
+        'text/plain': new Blob([text], {type:'text/plain'}),
+      })]);
+    } else {
+      // Older browsers: copy the rendered HTML out of a hidden selection so the
+      // paste still lands in Outlook as a table rather than as markup.
+      const div = document.createElement('div');
+      div.contentEditable = 'true';
+      div.style.cssText = 'position:fixed;left:-9999px;top:0';
+      div.innerHTML = html;
+      document.body.appendChild(div);
+      const range = document.createRange();
+      range.selectNodeContents(div);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges(); div.remove();
+    }
+    if (btn){ const t = btn.lastChild; const was = t.textContent;
+              t.textContent = ' Copied'; setTimeout(()=>{ t.textContent = was; }, 1400); }
+    toast(`✓ ${g.name} — ${rows.length} task(s) copied. Paste into Outlook with Ctrl+V.`);
+  } catch(e){ toast('Copy failed: ' + (e.message||e)); }
+}
+
+async function _rqExcelCard(gi, btn){
+  const d = _rqCardRows(gi);
+  if (!d) return;
+  const {g, base, rows} = d;
+  const orig = btn ? btn.lastChild.textContent : '';
+  if (btn) btn.lastChild.textContent = ' …';
+  try {
+    await new Promise((resolve, reject) => {
+      if (window.XLSX && XLSX.utils && XLSX.writeFile) return resolve();
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Could not load the Excel library.'));
+      document.head.appendChild(s);
+    });
+    const head = ['#','Key','Summary','Status','Due','Days overdue','Also held by','Link'];
+    const aoa = [
+      [`${g.name}${g.role ? ' — ' + g.role : ''}`],
+      [`${rows.length} task(s) in review${g.overdue ? ` · ${g.overdue} overdue` : ''} · ${REPORT.date||''}`],
+      [],
+      head,
+      ...rows.map((i,n) => [n+1, i.key, i.summary||'', i.status||'', i.due||'',
+                            i.overdue && i._days ? i._days : '',
+                            (i._with||[]).join(', '), `${base}/browse/${i.key}`]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:4},{wch:14},{wch:62},{wch:20},{wch:12},{wch:13},{wch:22},{wch:44}];
+    const hdrRow = 3;   // 0-based: title, subtitle, blank, header
+    head.forEach((_,c) => {
+      const ref = XLSX.utils.encode_cell({r:hdrRow, c});
+      if (ws[ref]) ws[ref].s = {font:{bold:true,color:{rgb:'FFFFFF'}},
+                                fill:{fgColor:{rgb:'1F7E7E'}},
+                                alignment:{horizontal:'center'}};
+    });
+    if (ws['A1']) ws['A1'].s = {font:{bold:true,sz:14}};
+    rows.forEach((i,n) => {
+      if (!i.overdue) return;
+      for (let c=0;c<head.length;c++){
+        const ref = XLSX.utils.encode_cell({r:hdrRow+1+n, c});
+        if (ws[ref]) ws[ref].s = {fill:{fgColor:{rgb:'FEF2F2'}}};
+      }
+    });
+    const wb = XLSX.utils.book_new();
+    // Excel rejects : \ / ? * [ ] in a sheet name and caps it at 31 chars.
+    XLSX.utils.book_append_sheet(wb, ws, (g.name||'Review').replace(/[:\\\/?*\[\]]/g,' ').slice(0,31));
+    const safe = (g.name||'review').replace(/[^\w؀-ۿ-]+/g,'-').replace(/^-|-$/g,'');
+    XLSX.writeFile(wb, `review-queue-${safe}-${REPORT.date||'export'}.xlsx`);
+    toast(`✓ ${g.name} — ${rows.length} task(s) exported.`);
+  } catch(e){
+    toast('Excel export failed: ' + (e.message||e));
+  } finally {
+    if (btn) btn.lastChild.textContent = orig;
+  }
 }
 
 // ── Guide mode (Current Owner view) ─────────────────────────────────────────
@@ -10589,19 +10728,28 @@ document.addEventListener('keydown', function(e){
   .rq-stage::before{content:'';width:6px;height:6px;border-radius:50%;background:#1366cc}
   /* The pill keeps its shape; the action sits beside it on the same line. */
   .rq-stage-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  /* Card actions. Quiet by default so they never compete with the overdue
+     pill, which is the number the card is really about. */
+  .rq-cardbtns{display:inline-flex;align-items:center;gap:6px}
+  .rq-cbtn{display:inline-flex;align-items:center;gap:5px;cursor:pointer;
+    padding:5px 11px;border-radius:8px;white-space:nowrap;
+    font:800 10.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.03em;
+    color:#40575c;background:rgba(255,255,255,.82);
+    border:1px solid rgba(45,165,165,.28);
+    transition:background .15s,border-color .15s,color .15s,transform .15s}
+  .rq-cbtn svg{width:12px;height:12px}
+  .rq-cbtn:hover{background:#2DA5A5;border-color:#2DA5A5;color:#fff;
+    transform:translateY(-1px)}
+  @media (max-width:760px){.rq-cbtn span,.rq-cbtn{font-size:10px}}
   .rq-openall{display:inline-flex;align-items:center;gap:5px;margin:14px 0 8px;
     padding:4px 11px;border-radius:999px;text-decoration:none;white-space:nowrap;
     font:800 10px/1 'Inter',system-ui,sans-serif;letter-spacing:.04em;
     color:#14615F;background:rgba(45,165,165,.10);
     border:1px solid rgba(45,165,165,.28);
-    opacity:0;transition:opacity .15s,background .15s,border-color .15s,transform .15s}
+    transition:background .15s,border-color .15s,transform .15s}
   .rq-openall svg{width:11px;height:11px}
-  /* Revealed on hover of the person card so eight of these do not shout at once;
-     always visible on touch, where there is no hover to reveal them. */
-  .rq-person:hover .rq-openall,.rq-openall:focus-visible{opacity:1}
   .rq-openall:hover{background:rgba(45,165,165,.2);border-color:#2DA5A5;
     transform:translateY(-1px)}
-  @media (hover:none){.rq-openall{opacity:1}}
   .rq-stage.st-wfa{background:linear-gradient(135deg,rgba(254,249,195,.95),rgba(254,243,199,.9));
     border-color:rgba(253,230,138,.95);color:#78350f}
   .rq-stage.st-wfa::before{background:#d97706}
@@ -11216,6 +11364,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.17.0 Every owner card carries Copy and Excel. Copy puts a formatted table
+#          on the clipboard that pastes into Outlook with working Jira links;
+#          Excel downloads the same list as a styled sheet. Both act on what
+#          the card is actually showing, so the stage tab, search box and A-Z
+#          filter all narrow the output. "Open all" is now always visible and
+#          appears for single-task stages too.
 #   2.16.0 "Open all N" beside each stage heading: opens that person's tasks at
 #          that stage as one Jira list, rather than a tab per task.
 #   2.15.0 A gate with several reviewers now lists the task under each of them,
@@ -11294,7 +11448,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.16.0"
+SITE_VERSION = "2.17.0"
 
 
 def _build_stamp():
