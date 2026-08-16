@@ -1876,13 +1876,26 @@ CC: @cc</textarea>
        they are hidden rather than stacked on top of each other. -->
   <section class="rq-inline" id="rq-view" style="display:none">
     <div class="rq-head-row">
-      <div>
+      <div data-help="view">
         <div class="rq-kick">Current Owner</div>
         <h2 class="rq-title">Current Levels</h2>
         <p class="rq-lede">Tasks parked in review, grouped by the person holding them now. Sorted by longest overdue.</p>
       </div>
-      <button class="chip" onclick="setAttrMode('assignee')"
-              title="Back to the weekly tables, counted against the assignee">&larr; Weekly tables</button>
+      <div class="rq-head-btns">
+        <button class="chip guide-btn" id="rq-guide-btn" onclick="toggleGuide()"
+                title="Explain this page — hover to read, click to hear it">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" class="guide-ico"><path
+               d="M11 5 6 9H2v6h4l5 4V5z"/><path class="wv" d="M15.5 8.5a5 5 0 0 1 0 7"/><path
+               class="wv2" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <span id="rq-guide-lbl">Guide</span>
+        </button>
+        <button class="chip guide-tour" id="rq-tour-btn" onclick="guideTour()"
+                title="Play the whole walkthrough" style="display:none">&#9654; Play all</button>
+        <button class="chip" onclick="setAttrMode('assignee')"
+                title="Back to the weekly tables, counted against the assignee"
+                data-help="back">&larr; Weekly tables</button>
+      </div>
     </div>
     <div class="rq-tiles" id="rq-tiles"></div>
     <div class="rq-bar">
@@ -2642,6 +2655,9 @@ function _rqSyncMode(){
     if (el) el.style.display = on ? 'none' : '';
   });
   if (on) _rqRender();
+  // Guide mode only makes sense on this view — switching back to the weekly
+  // tables must not leave a voice narrating a hidden section.
+  else if (_guideOn) toggleGuide();
 }
 function _rqSetStage(k){ _rqStage = k; _rqRender(); }
 function _rqSetLetter(L){ _rqLetter = (_rqLetter === L) ? '' : L; _rqRender(); }
@@ -2695,6 +2711,7 @@ function _rqRender(){
   const listEl = document.getElementById('rq-list');
   if (!groups.length){
     listEl.innerHTML = `<div class="rq-empty">Nothing sitting in review${q?' for that search':''}.</div>`;
+    if (_guideOn) _rqApplyHelp();
     return;
   }
   listEl.innerHTML = groups.map((g,gi) => {
@@ -2736,7 +2753,207 @@ function _rqRender(){
       <div class="rq-list">${body}</div>
     </div>`;
   }).join('');
+
+  // The tiles, stage buttons, rail and list were all just replaced, so the
+  // guide's hover targets have to be stamped back on.
+  if (_guideOn) _rqApplyHelp();
 }
+
+// ── Guide mode (Current Owner view) ─────────────────────────────────────────
+// Hover an element for the written explanation, click it to hear the same
+// sentence read out. Speech uses the browser's own synthesiser rather than
+// recorded files: nothing to host, nothing to keep in sync when the copy
+// changes, and no key in the page. If no voice is installed the tooltip still
+// works — the text is the source of truth and the audio is the extra.
+const RQ_HELP = {
+  view: {title:'Current Owner', text:
+    'This is the Current Owner view. Instead of counting a task against the person it is assigned to, it counts it against whoever is holding it right now in review. Use it to see where work is waiting, and with whom.'},
+  'tile-review': {title:'In review', text:
+    'The total number of tasks currently sitting in a review stage, and underneath, how many different people are holding them.'},
+  'tile-overdue': {title:'Overdue', text:
+    'How many of those tasks have already passed their due date, and what share of the whole queue that is.'},
+  'tile-worst': {title:'Worst delay', text:
+    'The longest a single task has been waiting past its due date, in days. The task key underneath tells you which one it is.'},
+  'tile-owners': {title:'Owners', text:
+    'How many people are holding at least one task in review at this moment.'},
+  stages: {title:'Review stages', text:
+    'These buttons filter the queue by review stage: waiting for approval, revision level one, or revision level two. The small number on each button always counts the whole queue, so it does not shift under you when you filter.'},
+  search: {title:'Filter', text:
+    'Type here to narrow the queue by a person’s name, a task key, or any word from the task summary.'},
+  rail: {title:'A to Z', text:
+    'Jump straight to a person by the first letter of their name. Faded letters have nobody behind them right now. Press All to clear the letter filter.'},
+  person: {title:'Owner card', text:
+    'Each card is one person holding work. The badge on the right shows how many of their tasks are overdue and their worst delay in days. Click the card to collapse or expand their list of tasks.'},
+  task: {title:'Task row', text:
+    'One task. Reading across: its number in this person’s list, the Jira key, the summary, the due date, and how many days it is overdue. Clicking the row opens the task in Jira.'},
+  back: {title:'Weekly tables', text:
+    'Go back to the weekly tables, where every task counts against the person it is assigned to rather than the person reviewing it.'},
+};
+// Order of the guided walkthrough. Topics whose element is not on the page at
+// the time — an empty queue has no cards — are skipped rather than narrated
+// into thin air.
+const RQ_TOUR = ['view','tile-review','tile-overdue','tile-worst','tile-owners',
+                 'stages','search','rail','person','task','back'];
+
+let _guideOn   = false;
+let _guideTip  = null;
+let _guideTour = null;   // index into RQ_TOUR while a walkthrough is running
+let _guideVoice = null;
+
+function _guidePickVoice(){
+  if (!('speechSynthesis' in window)) return null;
+  const vs = speechSynthesis.getVoices().filter(v => /^en(-|_|$)/i.test(v.lang || ''));
+  if (!vs.length) return null;
+  // Prefer a natural/online voice, then any en-GB/en-US, then whatever is first.
+  return vs.find(v => /natural|neural|online/i.test(v.name))
+      || vs.find(v => /^en-(GB|US)/i.test(v.lang)) || vs[0];
+}
+if ('speechSynthesis' in window){
+  // Voices load asynchronously on Chrome; the first getVoices() is often empty.
+  speechSynthesis.onvoiceschanged = () => { _guideVoice = _guidePickVoice(); };
+}
+
+function _guideSpeak(text, onEnd){
+  if (!('speechSynthesis' in window)){ onEnd && onEnd(); return; }
+  speechSynthesis.cancel();
+  if (!_guideVoice) _guideVoice = _guidePickVoice();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = (_guideVoice && _guideVoice.lang) || 'en-US';
+  if (_guideVoice) u.voice = _guideVoice;
+  u.rate = 0.97; u.pitch = 1;
+  u.onend = () => onEnd && onEnd();
+  u.onerror = () => onEnd && onEnd();
+  speechSynthesis.speak(u);
+}
+
+function _guideTipEl(){
+  if (!_guideTip){
+    _guideTip = document.createElement('div');
+    _guideTip.className = 'help-tip';
+    document.body.appendChild(_guideTip);
+  }
+  return _guideTip;
+}
+
+function _guideShowTip(el, key){
+  const h = RQ_HELP[key];
+  if (!h) return;
+  const tip = _guideTipEl();
+  tip.innerHTML = `<span class="ht-t">${esc(h.title)}</span>${esc(h.text)}` +
+                  `<span class="ht-k">Click to hear this read out</span>`;
+  tip.classList.add('show');
+  // Above the element by default; flip below when there is no room up top.
+  const r = el.getBoundingClientRect();
+  const w = tip.offsetWidth, ht = tip.offsetHeight;
+  let left = r.left + r.width/2 - w/2;
+  left = Math.max(10, Math.min(left, window.innerWidth - w - 10));
+  let top = r.top - ht - 10;
+  if (top < 10) top = Math.min(r.bottom + 10, window.innerHeight - ht - 10);
+  tip.style.left = left + 'px';
+  tip.style.top  = top  + 'px';
+}
+
+function _guideHideTip(){ if (_guideTip) _guideTip.classList.remove('show'); }
+
+function _guideMark(el){
+  document.querySelectorAll('#rq-view [data-help].speaking')
+          .forEach(n => n.classList.remove('speaking'));
+  if (el) el.classList.add('speaking');
+}
+
+// Re-applied after every _rqRender(), because the tiles, stage buttons, rail
+// and list are all rebuilt from scratch and lose their attributes.
+function _rqApplyHelp(){
+  const tileKeys = ['tile-review','tile-overdue','tile-worst','tile-owners'];
+  document.querySelectorAll('#rq-tiles .rq-tile').forEach((el,i) => {
+    if (tileKeys[i]) el.setAttribute('data-help', tileKeys[i]);
+  });
+  const set = (sel, key) => { const el = document.querySelector(sel);
+                              if (el) el.setAttribute('data-help', key); };
+  set('#rq-stages','stages');
+  set('#rq-search','search');
+  set('#rq-rail','rail');
+  // One example of each repeating shape is enough — labelling all forty task
+  // rows would turn the whole queue into a wall of outlines.
+  set('#rq-list .rq-person .rq-head','person');
+  set('#rq-list .rq-task','task');
+}
+
+function toggleGuide(){
+  _guideOn = !_guideOn;
+  document.body.classList.toggle('guide-on', _guideOn);
+  const btn = document.getElementById('rq-guide-btn');
+  const lbl = document.getElementById('rq-guide-lbl');
+  const tour = document.getElementById('rq-tour-btn');
+  if (btn)  btn.classList.toggle('on', _guideOn);
+  if (lbl)  lbl.textContent = _guideOn ? 'Guide on' : 'Guide';
+  if (tour) tour.style.display = _guideOn ? '' : 'none';
+  if (_guideOn){
+    _rqApplyHelp();
+    toast('Guide on — hover to read, click to hear it. Esc to stop.');
+  } else {
+    _guideStop();
+  }
+}
+
+function _guideStop(){
+  _guideTour = null;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  _guideMark(null);
+  _guideHideTip();
+}
+
+// Walks the whole view top to bottom, speaking each topic in turn.
+function guideTour(){
+  if (!_guideOn) return;
+  if (_guideTour !== null){ _guideStop(); return; }   // second press = stop
+  _guideTour = 0;
+  (function step(){
+    if (_guideTour === null) return;                  // stopped mid-way
+    if (_guideTour >= RQ_TOUR.length){ _guideStop(); return; }
+    const key = RQ_TOUR[_guideTour++];
+    const el  = document.querySelector(`#rq-view [data-help="${key}"]`);
+    if (!el || !RQ_HELP[key]) return step();          // not on the page — skip
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    _guideMark(el);
+    _guideShowTip(el, key);
+    _guideSpeak(RQ_HELP[key].text, () => setTimeout(step, 350));
+  })();
+}
+
+(function installGuide(){
+  const view = document.getElementById('rq-view');
+  if (!view) return;
+  view.addEventListener('mouseover', e => {
+    if (!_guideOn || _guideTour !== null) return;
+    const el = e.target.closest('[data-help]');
+    if (el) _guideShowTip(el, el.getAttribute('data-help')); else _guideHideTip();
+  });
+  view.addEventListener('mouseleave', () => { if (_guideTour === null) _guideHideTip(); });
+  // Capture phase: in guide mode a click means "explain this", so it must not
+  // also filter the queue or open the task in Jira.
+  view.addEventListener('click', e => {
+    if (!_guideOn) return;
+    if (e.target.closest('#rq-guide-btn, #rq-tour-btn')) return;   // the controls themselves
+    const el = e.target.closest('[data-help]');
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    _guideStop();
+    const key = el.getAttribute('data-help');
+    if (!RQ_HELP[key]) return;
+    _guideMark(el);
+    _guideShowTip(el, key);
+    _guideSpeak(RQ_HELP[key].text, () => _guideMark(null));
+  }, true);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && _guideOn) _guideStop();
+  });
+  // Leaving Current Owner mode with the guide still talking would leave a
+  // voice narrating a page nobody is looking at.
+  window.addEventListener('beforeunload', () => {
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+  });
+})();
 
 // ── Status mapping modal ────────────────────────────────────────────────────
 function openStatusMapModal(){
@@ -10021,6 +10238,45 @@ document.addEventListener('keydown', function(e){
   .rq-inline{margin-top:4px}
   .rq-head-row{display:flex;align-items:flex-start;justify-content:space-between;
     gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .rq-head-btns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+  /* ── Guide mode ───────────────────────────────────────────────────────────
+     Hover any part of the Current Owner view for a written explanation, click
+     it to hear the same sentence spoken. Off by default: while it is on, the
+     view stops behaving like a dashboard and behaves like a tour, so clicks
+     are intercepted rather than filtering or opening Jira. */
+  .guide-btn{display:inline-flex;align-items:center;gap:6px}
+  .guide-btn .guide-ico{width:14px;height:14px}
+  .guide-btn .guide-ico .wv,.guide-btn .guide-ico .wv2{opacity:.35}
+  .guide-btn.on{background:linear-gradient(135deg,#0e9f8f,#0b7d70 70%);color:#fff;
+    border-color:transparent;box-shadow:0 6px 16px rgba(14,159,143,.28)}
+  .guide-btn.on .guide-ico .wv{opacity:1;animation:guideWave 1.4s ease-in-out infinite}
+  .guide-btn.on .guide-ico .wv2{opacity:1;animation:guideWave 1.4s ease-in-out .25s infinite}
+  @keyframes guideWave{0%,100%{opacity:.25}50%{opacity:1}}
+  .guide-tour{display:inline-flex;align-items:center;gap:6px}
+  /* Every explainable region gets a dotted underlay so it is obvious what can
+     be asked about. Nothing is drawn when guide mode is off. */
+  body.guide-on #rq-view [data-help]{cursor:help;border-radius:12px;
+    box-shadow:inset 0 0 0 1px rgba(14,159,143,.28);transition:box-shadow .15s}
+  body.guide-on #rq-view [data-help]:hover{
+    box-shadow:inset 0 0 0 2px rgba(14,159,143,.6),0 4px 14px rgba(14,159,143,.14)}
+  body.guide-on #rq-view [data-help].speaking{
+    box-shadow:inset 0 0 0 2px #0e9f8f,0 0 0 4px rgba(14,159,143,.18)}
+  /* Tooltip lives on <body>, outside the #app filter used by dark mode, so it
+     is coloured explicitly for both themes instead of being inverted. */
+  .help-tip{position:fixed;z-index:900;max-width:330px;pointer-events:none;
+    background:rgba(15,28,51,.94);color:#f8fafc;border:1px solid rgba(255,255,255,.14);
+    border-radius:12px;padding:10px 13px;font:500 12.5px/1.5 'Inter',system-ui,sans-serif;
+    box-shadow:0 14px 34px rgba(2,8,23,.34);opacity:0;transform:translateY(4px);
+    transition:opacity .14s,transform .14s}
+  .help-tip.show{opacity:1;transform:none}
+  .help-tip .ht-t{display:block;font-size:9.5px;font-weight:800;letter-spacing:.14em;
+    text-transform:uppercase;color:#5eead4;margin-bottom:5px}
+  .help-tip .ht-k{display:block;margin-top:7px;padding-top:6px;font-size:10.5px;color:#94a3b8;
+    border-top:1px solid rgba(255,255,255,.12)}
+  html.theme-dark .help-tip{background:rgba(48,48,46,.96);border-color:rgba(255,255,255,.14);
+    color:#f5f4ee}
+  html.theme-dark .help-tip .ht-t{color:#d97757}
   .rq-kick{font-size:9.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
     color:#0e9f8f;margin-bottom:4px}
   .rq-title{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
@@ -10699,6 +10955,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.10.0 Guide mode on Current Levels: a toggle that turns the Current Owner
+#          view into a narrated tour — hover any tile, filter or card for a
+#          plain-English explanation, click it to hear the same sentence read
+#          out, or press Play all to walk the whole page top to bottom. Uses
+#          the browser's own speech synthesiser, so there is nothing to host
+#          and the audio never drifts from the text.
 #   2.9.2  Donut centre shows the same precision as the "This Period" tile,
 #          so one figure stops looking like two.
 #   2.9.1  One definition of what counts toward the project: hidden people and
@@ -10730,7 +10992,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.9.2"
+SITE_VERSION = "2.10.0"
 
 
 def _build_stamp():
