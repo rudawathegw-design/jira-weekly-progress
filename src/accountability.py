@@ -259,20 +259,32 @@ def resolve_accountable(issue, status_map=None) -> dict:
         people = _users(fields, LEVEL_FIELDS[status_level])
         level  = status_level
 
-    # NOTE: there is deliberately no "borrow the other level" fallback.
+    # 3) "Waiting For Approval" names no level and often carries no Approvals
+    #    record, but the Reviewers fields still say who was lined up to decide.
+    #    Level 1 is the first gate, so it holds the task; Level 2 only if Level 1
+    #    is empty.
     #
-    # "Waiting For Approval" is its own stage in this workflow — it carries no
-    # Approvals record and names no level — so falling back to the Level 1
-    # Reviewers field invented an approver nobody had asked to approve. Such an
-    # issue now resolves to the assignee below, like any other working status.
-    #
-    # Likewise, a "Revision Level 1" status with an empty Level 1 field must NOT
-    # borrow the Level 2 reviewer: that reported a real person under the wrong
+    #    This was removed once, on the reasoning that using the field "invented
+    #    an approver nobody had asked". That is the wrong reading: a populated
+    #    Level 1 Reviewers field is a routing decision somebody made in Jira, not
+    #    an inference. Dropping it sent every awaiting-approval task back to the
+    #    assignee, who has already handed off and cannot act — which is the exact
+    #    misattribution this module exists to prevent.
+    if not people and status_level is None:
+        for lvl in (1, 2):
+            people = _users(fields, LEVEL_FIELDS[lvl])
+            if people:
+                level = lvl
+                break
+
+    # There is still deliberately no "borrow the other level" fallback for a
+    # LEVELLED status: a "Revision Level 1" with an empty Level 1 field must NOT
+    # borrow the Level 2 reviewer. That reports a real person under the wrong
     # label. It reads as unresolved instead.
     if not people:
         if status_level is None:
-            # Awaiting approval, but Jira names no approver — the assignee still
-            # owns it. Not "in review": nobody has been asked for a decision.
+            # Awaiting approval and no reviewer configured anywhere — the
+            # assignee still owns it. Not "in review": nobody has been asked.
             return base
         # In review, but Jira has no reviewer configured. Keep the assignee so
         # the task is never orphaned, and flag it — an unrouted review is a real

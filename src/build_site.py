@@ -1996,7 +1996,7 @@ const ATTR_MODES = {
   assignee:    {label:'Assigned To',   short:'Assigned',
                 desc:'Every task counts against the person it is assigned to in Jira.'},
   accountable: {label:'Current Owner', short:'Current',
-                desc:'A task at Revision Level 1/2 counts against the reviewer holding it; everything else counts against the assignee.'},
+                desc:'A task waiting for approval or at Revision Level 1/2 counts against the reviewer holding it; everything else counts against the assignee.'},
 };
 const ATTR_BUCKETS = ['Open','In Progress','Waiting For Approval','Completed'];
 // Mirrors DEFAULT_STATUS_BUCKETS in src/accountability.py. "Revision Level 1/2"
@@ -2177,15 +2177,25 @@ const _ACC = {
       people = _ACC.users(fields, LEVEL_FIELDS[statusLevel]);
       level = statusLevel;
     }
-    // No "borrow the other level" fallback, deliberately. "Waiting For Approval"
-    // is its own stage — no Approvals record, no level — so using the Level 1
-    // Reviewers field invented an approver nobody had asked. It resolves to the
-    // assignee instead. And a "Revision Level 1" with an empty Level 1 field
-    // must not borrow the Level 2 reviewer: that names a real person under the
-    // wrong label; it reads as unresolved.
+    // 3) "Waiting For Approval" names no level and often carries no Approvals
+    // record, but the Reviewers fields still say who was lined up to decide.
+    // Level 1 is the first gate, so it holds the task; Level 2 only if Level 1
+    // is empty. A populated Reviewers field is a routing decision someone made
+    // in Jira, not an invented approver — ignoring it sent every awaiting-
+    // approval task back to an assignee who has already handed off.
+    if (!people.length && statusLevel === null){
+      for (const lvl of [1,2]){
+        people = _ACC.users(fields, LEVEL_FIELDS[lvl]);
+        if (people.length){ level = lvl; break; }
+      }
+    }
+    // Still no "borrow the other level" fallback for a LEVELLED status: a
+    // "Revision Level 1" with an empty Level 1 field must not borrow the Level 2
+    // reviewer; that names a real person under the wrong label, so it reads as
+    // unresolved.
     if (!people.length){
-      // Awaiting approval with no approver named: the assignee still owns it,
-      // and it is NOT in review — nobody has been asked for a decision.
+      // Awaiting approval and no reviewer configured anywhere: the assignee
+      // still owns it, and it is NOT in review — nobody has been asked.
       if (statusLevel === null) return base;
       const role = statusLevel === 2 ? 'level2' : 'level1';
       return {...base, in_review:true, unresolved:true, level:statusLevel,
@@ -11109,6 +11119,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.12.0 "Waiting For Approval" now counts against the reviewer holding it,
+#          not the assignee. The Level 1 Reviewers field is a routing decision
+#          made in Jira; ignoring it sent every awaiting-approval task back to
+#          someone who had already handed off. Level 1 is the first gate, so it
+#          wins; Level 2 only when Level 1 is empty; assignee only when neither
+#          is set. Revision Level 1/2 are unchanged.
 #   2.11.3 Breaking bar restyled on #2DA5A5: a card with a raised label tab
 #          and each headline its own small pill. The accent is one CSS
 #          variable, so the whole bar recolours from a single line.
@@ -11163,7 +11179,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.11.3"
+SITE_VERSION = "2.12.0"
 
 
 def _build_stamp():
