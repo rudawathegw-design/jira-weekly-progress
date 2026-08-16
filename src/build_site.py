@@ -1033,275 +1033,80 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- ═══════════════ Opening splash (plays after unlock) ════════════════════ -->
 <div id="intro-splash" aria-hidden="true">
 <style>
-/* ── Sky-descent opening ───────────────────────────────────────────────────
-   The camera starts high above a bright sky, falls through three cloud decks,
-   and the last deck parts to reveal the two marks. Everything shares one
-   perspective container so the clouds, shapes, badges and title all sit in the
-   same space rather than each faking depth on its own.
-
-   Timeline (seconds):
-     0.00  descent begins, cloud decks rush past the camera
-     1.05  final cloud bank parts left/right
-     1.15  the two marks fly in and converge
-     1.40  orbit ring strokes on, 3D shapes drift into place
-     2.00  title rises out of depth
-     2.75  camera pushes through, sky fades out
-     3.35  done                                                              */
-#intro-splash{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none;
-  perspective:1000px;perspective-origin:50% 42%}
+#intro-splash{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none}
 #intro-splash.on{display:block}
-
-/* ── Sky ──────────────────────────────────────────────────────────────────
-   Pale blue at the top easing to the report's own warm paper at the horizon,
-   so the hand-off to the app underneath is a colour match, not a cut. */
-#intro-splash .sp-bg{position:absolute;inset:0;
-  background:
-    radial-gradient(90% 60% at 50% 108%,rgba(201,162,39,.22),transparent 65%),
-    radial-gradient(70% 50% at 78% 6%,rgba(255,255,255,.95),transparent 60%),
-    linear-gradient(178deg,#CFE6F2 0%,#E4F0F4 34%,#F6F4EC 68%,#FAF9F5 100%)}
-#intro-splash.on .sp-bg{animation:spBgOut .6s 2.75s cubic-bezier(.4,0,.2,1) forwards}
-@keyframes spBgOut{to{opacity:0}}
-/* Sun flare behind the marks — gives the descent a light source to fall toward. */
-#intro-splash .sp-sun{position:absolute;left:50%;top:42%;width:640px;height:640px;margin:-320px 0 0 -320px;
-  border-radius:50%;opacity:0;
-  background:radial-gradient(circle,rgba(255,255,255,.85) 0%,rgba(255,252,244,.34) 34%,rgba(201,162,39,.06) 56%,transparent 70%)}
-#intro-splash.on .sp-sun{animation:spSun 2.2s .9s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes spSun{0%{opacity:0;transform:scale(.55)}45%{opacity:1}100%{opacity:.6;transform:scale(1)}}
-
-/* ── Cloud decks ──────────────────────────────────────────────────────────
-   Each deck is one element painted with a handful of soft radial blobs. Three
-   decks sit at different Z depths and rush toward the camera at different rates
-   — the parallax between them is what reads as falling.
-
-   Softness comes from the gradient stops, NOT from filter:blur(). A blur on a
-   full-viewport element that is simultaneously scaling costs a full-frame
-   re-rasterise every frame, which stalled the opening by most of a second on
-   the first paint. The gradients alone are indistinguishable here. */
-#intro-splash .sp-deck{position:absolute;left:-30%;right:-30%;top:0;height:100%;
-  will-change:transform,opacity;opacity:0}
-#intro-splash .sp-deck::before,#intro-splash .sp-deck::after{content:'';position:absolute;inset:0;
-  background-repeat:no-repeat}
-/* Blob fields differ per deck so the three never read as the same cloud twice. */
-#intro-splash .sp-d1{}
-#intro-splash .sp-d1::before{
-  background-image:
-    radial-gradient(38% 26% at 18% 30%,#fff 0%,rgba(255,255,255,.86) 46%,transparent 72%),
-    radial-gradient(30% 22% at 40% 22%,#fff 0%,rgba(255,255,255,.8) 48%,transparent 74%),
-    radial-gradient(44% 30% at 76% 36%,#fff 0%,rgba(255,255,255,.84) 46%,transparent 72%),
-    radial-gradient(26% 20% at 60% 46%,#fff 0%,rgba(255,255,255,.7) 50%,transparent 76%)}
-#intro-splash .sp-d2{}
-#intro-splash .sp-d2::before{
-  background-image:
-    radial-gradient(34% 24% at 30% 62%,#fff 0%,rgba(255,255,255,.9) 46%,transparent 72%),
-    radial-gradient(40% 28% at 68% 70%,#fff 0%,rgba(255,255,255,.88) 46%,transparent 72%),
-    radial-gradient(24% 18% at 50% 56%,#fff 0%,rgba(255,255,255,.75) 50%,transparent 76%),
-    radial-gradient(30% 22% at 88% 58%,#fff 0%,rgba(255,255,255,.8) 48%,transparent 74%)}
-#intro-splash .sp-d3{}
-#intro-splash .sp-d3::before{
-  background-image:
-    radial-gradient(46% 30% at 14% 84%,#fff 0%,rgba(255,255,255,.92) 46%,transparent 72%),
-    radial-gradient(38% 26% at 54% 92%,#fff 0%,rgba(255,255,255,.88) 46%,transparent 72%),
-    radial-gradient(42% 28% at 90% 80%,#fff 0%,rgba(255,255,255,.9) 46%,transparent 72%)}
-#intro-splash.on .sp-d1{animation:spDeck 1.5s 0s cubic-bezier(.36,0,.66,-.04) forwards}
-#intro-splash.on .sp-d2{animation:spDeck 1.5s .18s cubic-bezier(.36,0,.66,-.04) forwards}
-#intro-splash.on .sp-d3{animation:spDeck 1.5s .36s cubic-bezier(.36,0,.66,-.04) forwards}
-/* Start small and far, end huge and past the camera — the deck "swallows" the
-   frame and then clears, which is the falling-through beat. */
-@keyframes spDeck{
-  0%{opacity:0;transform:translate3d(0,-30vh,-900px) scale(.55)}
-  22%{opacity:1}
-  70%{opacity:1}
-  100%{opacity:0;transform:translate3d(0,42vh,520px) scale(2.4)}}
-
-/* ── Parting bank ─────────────────────────────────────────────────────────
-   The last cloud layer is split in two halves that slide apart and reveal the
-   marks behind them, rather than dissolving. */
-#intro-splash .sp-bank{position:absolute;top:0;height:100%;width:76%;opacity:0;will-change:transform,opacity}
-#intro-splash .sp-bank-l{left:-14%;
-  background-image:
-    radial-gradient(52% 34% at 34% 42%,#fff 0%,rgba(255,255,255,.94) 48%,transparent 74%),
-    radial-gradient(40% 28% at 62% 56%,#fff 0%,rgba(255,255,255,.9) 48%,transparent 74%),
-    radial-gradient(34% 24% at 16% 60%,#fff 0%,rgba(255,255,255,.86) 50%,transparent 76%)}
-#intro-splash .sp-bank-r{right:-14%;
-  background-image:
-    radial-gradient(52% 34% at 66% 44%,#fff 0%,rgba(255,255,255,.94) 48%,transparent 74%),
-    radial-gradient(40% 28% at 38% 58%,#fff 0%,rgba(255,255,255,.9) 48%,transparent 74%),
-    radial-gradient(34% 24% at 84% 62%,#fff 0%,rgba(255,255,255,.86) 50%,transparent 76%)}
-#intro-splash.on .sp-bank-l{animation:spBankIn .55s .5s ease-out forwards,
-  spBankL .95s 1.05s cubic-bezier(.6,0,.2,1) forwards}
-#intro-splash.on .sp-bank-r{animation:spBankIn .55s .5s ease-out forwards,
-  spBankR .95s 1.05s cubic-bezier(.6,0,.2,1) forwards}
-@keyframes spBankIn{from{opacity:0;transform:scale(1.15)}to{opacity:1;transform:none}}
-@keyframes spBankL{to{opacity:0;transform:translate3d(-62%,6%,340px) scale(1.5)}}
-@keyframes spBankR{to{opacity:0;transform:translate3d(62%,6%,340px) scale(1.5)}}
-
-/* Legacy elements from the previous opening — kept inert so stale markup or a
-   cached page can't paint them over the new scene. */
-#intro-splash .sp-half,#intro-splash .sp-grid{display:none}
-
-/* ── Stage ────────────────────────────────────────────────────────────────
-   Two chained animations: the drop-in from above, then the push-through exit.
-   They never overlap, so the later one cleanly takes over the transform. */
-#intro-splash .sp-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
-  transform-style:preserve-3d}
-#intro-splash.on .sp-center{animation:spDrop 1.3s .95s cubic-bezier(.16,1,.3,1) both,
-  spDolly .6s 2.75s cubic-bezier(.5,0,.75,0) forwards}
-@keyframes spDrop{from{opacity:0;transform:translate3d(0,-34vh,-380px) rotateX(24deg)}
-  to{opacity:1;transform:none}}
-@keyframes spDolly{to{opacity:0;transform:translateZ(460px) scale(1.2)}}
-
-#intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:30px;position:relative;
-  transform-style:preserve-3d}
-#intro-splash .sp-fib,#intro-splash .sp-cbi{opacity:0;position:relative;overflow:hidden;
-  transform-style:preserve-3d;backface-visibility:hidden}
+#intro-splash .sp-half{position:absolute;left:0;width:100%;height:50.5%;background:linear-gradient(180deg,#FAF9F5,#F3F0E8)}
+#intro-splash .sp-top{top:0}
+#intro-splash .sp-bot{bottom:0}
+#intro-splash.on .sp-top{animation:spTop .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
+#intro-splash.on .sp-bot{animation:spBot .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes spTop{to{transform:translateY(-102%)}}
+@keyframes spBot{to{transform:translateY(102%)}}
+#intro-splash .sp-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+#intro-splash.on .sp-center{animation:spFade .3s 1.1s ease forwards}
+@keyframes spFade{to{opacity:0;transform:scale(.96)}}
+#intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:26px;position:relative}
+#intro-splash .sp-fib,#intro-splash .sp-cbi{opacity:0;position:relative;overflow:hidden}
 /* Both marks are real logo files inlined as data URIs at build time. The FIB
    "B" sits on a white tile (the file is a coloured mark on transparency); the
    CBI seal is the supplied artwork, untinted, on white. */
-#intro-splash .sp-fib{width:104px;height:104px;border-radius:26px;background:#fff;
-  display:grid;place-items:center;
-  box-shadow:0 30px 55px -22px rgba(28,64,55,.42),0 0 0 1px rgba(46,101,87,.10),
-    0 0 40px -10px rgba(79,157,139,.35)}
-#intro-splash .sp-cbi{width:104px;height:104px;border-radius:50%;background:#fff;
-  display:grid;place-items:center;
-  box-shadow:0 30px 55px -22px rgba(28,64,55,.42),0 0 0 1px rgba(46,101,87,.10),
-    0 0 40px -10px rgba(201,162,39,.32)}
-#intro-splash .sp-fib img{width:60px;height:60px;object-fit:contain;display:block}
-#intro-splash .sp-cbi img{width:86px;height:86px;object-fit:contain;display:block}
+#intro-splash .sp-fib{width:96px;height:96px;border-radius:24px;background:#fff;
+  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(46,101,87,.45),0 0 0 1px rgba(46,101,87,.10)}
+#intro-splash .sp-cbi{width:96px;height:96px;border-radius:50%;background:#fff;
+  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(20,62,52,.35),0 0 0 1px rgba(20,62,52,.08)}
+#intro-splash .sp-fib img{width:56px;height:56px;object-fit:contain;display:block}
+#intro-splash .sp-cbi img{width:80px;height:80px;object-fit:contain;display:block}
 /* A logo that failed to inline collapses to nothing rather than a broken icon. */
 #intro-splash .sp-fib img[src=""],#intro-splash .sp-cbi img[src=""]{display:none}
-#intro-splash.on .sp-fib{animation:spFromL .95s 1.15s cubic-bezier(.16,1,.3,1) forwards}
-#intro-splash.on .sp-cbi{animation:spFromR .95s 1.15s cubic-bezier(.16,1,.3,1) forwards}
-/* Converge in 3D: each mark starts far back and off to its own side, swings
-   around its Y axis as it comes forward, overshoots centre, then settles. */
-@keyframes spFromL{
-  0%{opacity:0;transform:translate3d(-52vw,0,-620px) rotateY(58deg) rotateZ(-14deg)}
-  45%{opacity:1}
-  74%{transform:translate3d(16px,0,70px) rotateY(-10deg) rotateZ(3deg)}
-  100%{opacity:1;transform:none}}
-@keyframes spFromR{
-  0%{opacity:0;transform:translate3d(52vw,0,-620px) rotateY(-58deg) rotateZ(14deg)}
-  45%{opacity:1}
-  74%{transform:translate3d(-16px,0,70px) rotateY(10deg) rotateZ(-3deg)}
-  100%{opacity:1;transform:none}}
-#intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent)}
-#intro-splash.on .sp-fib::after{animation:spShine .65s 2.0s ease forwards}
-#intro-splash.on .sp-cbi::after{animation:spShine .65s 2.1s ease forwards}
+#intro-splash.on .sp-fib{animation:spFromL .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
+#intro-splash.on .sp-cbi{animation:spFromR .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
+/* Converge: each mark travels in from its own side, overshoots slightly past
+   centre, then settles — reads as the two institutions meeting. */
+@keyframes spFromL{from{opacity:0;transform:translateX(-46vw) rotate(-18deg) scale(.7)}
+  55%{opacity:1}72%{transform:translateX(14px) rotate(2deg) scale(1.04)}to{opacity:1;transform:none}}
+@keyframes spFromR{from{opacity:0;transform:translateX(46vw) rotate(18deg) scale(.7)}
+  55%{opacity:1}72%{transform:translateX(-14px) rotate(-2deg) scale(1.04)}to{opacity:1;transform:none}}
+#intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
+#intro-splash.on .sp-fib::after{animation:spShine .5s .62s ease forwards}
+#intro-splash.on .sp-cbi::after{animation:spShine .5s .70s ease forwards}
 @keyframes spShine{to{transform:translateX(130%) skewX(-18deg)}}
-#intro-splash .sp-link{width:38px;height:38px;border-radius:50%;
-  background:linear-gradient(150deg,#F2D77A,#C9A227);border:none;
-  display:grid;place-items:center;color:#3A2C05;font:700 17px/1 system-ui,sans-serif;
-  opacity:0;transform:translateZ(60px) scale(.3);z-index:3;
-  box-shadow:0 10px 26px -6px rgba(201,162,39,.75),0 0 0 1px rgba(255,255,255,.25) inset}
-#intro-splash.on .sp-link{animation:spPop .55s 1.95s cubic-bezier(.18,1.5,.4,1) forwards,
-  spHalo 1.3s 2.3s ease-out}
-@keyframes spPop{to{opacity:1;transform:translateZ(60px) scale(1)}}
+#intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4);z-index:2;
+  box-shadow:0 6px 18px -6px rgba(201,162,39,.6)}
+#intro-splash.on .sp-link{animation:spPop .4s .62s cubic-bezier(.18,1.5,.4,1) forwards,
+  spHalo 1.1s .95s ease-out}
+@keyframes spPop{to{opacity:1;transform:scale(1)}}
 /* Pulse leaving the link once the marks have met. */
-@keyframes spHalo{from{box-shadow:0 0 0 0 rgba(242,215,122,.6)}
-  to{box-shadow:0 0 0 34px rgba(242,215,122,0)}}
-
-/* ── Orbit ring ───────────────────────────────────────────────────────────
-   Strokes itself on clockwise instead of fading — 415 ≈ 2πr for r=66 — and
-   rights itself from a tilted plane as it draws. */
-#intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:230px;height:230px;
-  margin:-115px 0 0 -115px;overflow:visible;pointer-events:none}
-#intro-splash.on .sp-ring{animation:spRingTilt 1.4s 1.3s cubic-bezier(.16,1,.3,1) forwards}
-@keyframes spRingTilt{from{transform:rotateX(62deg) rotateZ(-12deg) translateZ(-120px)}
-  to{transform:none}}
-#intro-splash .sp-ring circle{fill:none;stroke:rgba(79,157,139,.55);stroke-width:1.5;
+@keyframes spHalo{from{box-shadow:0 0 0 0 rgba(201,162,39,.55)}
+  to{box-shadow:0 0 0 26px rgba(201,162,39,0)}}
+/* Ring strokes itself on clockwise instead of fading — 415 ≈ 2πr for r=66. */
+#intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:172px;height:172px;
+  margin:-86px 0 0 -86px;overflow:visible;pointer-events:none}
+#intro-splash .sp-ring circle{fill:none;stroke:rgba(79,157,139,.45);stroke-width:2;
   stroke-linecap:round;stroke-dasharray:415;stroke-dashoffset:415;
-  transform:rotate(-90deg);transform-origin:50% 50%;
-  filter:drop-shadow(0 0 5px rgba(79,157,139,.35))}
-#intro-splash.on .sp-ring circle{animation:spDraw 1.1s 1.4s cubic-bezier(.5,0,.2,1) forwards}
+  transform:rotate(-90deg);transform-origin:50% 50%}
+#intro-splash.on .sp-ring circle{animation:spDraw .85s .3s cubic-bezier(.5,0,.2,1) forwards}
 @keyframes spDraw{to{stroke-dashoffset:0}}
-
-/* ── 3D shapes ────────────────────────────────────────────────────────────
-   Two real cubes (six built faces each, not a fake) and a tilted disc, drifting
-   in the space around the marks. Glassy and low-contrast so they stay scenery —
-   they read as depth cues, not as content competing with the logos. */
-#intro-splash .sp-shape{position:absolute;transform-style:preserve-3d;opacity:0;
-  will-change:transform,opacity}
-#intro-splash .sp-cube{width:74px;height:74px;transform-style:preserve-3d}
-#intro-splash .sp-cube i{position:absolute;inset:0;display:block;border-radius:10px;
-  border:1px solid rgba(79,157,139,.42);background:rgba(255,255,255,.42);
-  box-shadow:0 0 26px -8px rgba(46,101,87,.5) inset}
-#intro-splash .sp-cube i:nth-child(1){transform:translateZ(37px)}
-#intro-splash .sp-cube i:nth-child(2){transform:rotateY(180deg) translateZ(37px)}
-#intro-splash .sp-cube i:nth-child(3){transform:rotateY(90deg)  translateZ(37px)}
-#intro-splash .sp-cube i:nth-child(4){transform:rotateY(-90deg) translateZ(37px)}
-#intro-splash .sp-cube i:nth-child(5){transform:rotateX(90deg)  translateZ(37px)}
-#intro-splash .sp-cube i:nth-child(6){transform:rotateX(-90deg) translateZ(37px)}
-/* The gold cube reads as the CBI side of the pairing. */
-#intro-splash .sp-s2 .sp-cube i{border-color:rgba(201,162,39,.45);
-  box-shadow:0 0 26px -8px rgba(201,162,39,.55) inset}
-#intro-splash .sp-disc{width:130px;height:130px;border-radius:50%;
-  border:1.5px solid rgba(79,157,139,.35);
-  background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.7),rgba(255,255,255,.05) 70%);
-  box-shadow:0 22px 44px -26px rgba(28,64,55,.6)}
-#intro-splash .sp-s1{left:14%;top:30%}
-#intro-splash .sp-s2{right:15%;bottom:30%}
-#intro-splash .sp-s3{right:20%;top:22%}
-#intro-splash .sp-s4{left:19%;bottom:24%}
-/* Each shape arrives from its own depth, then keeps turning slowly so the
-   scene is never fully static while the title is being read. */
-#intro-splash.on .sp-s1{animation:spShapeIn 1.1s 1.45s cubic-bezier(.16,1,.3,1) forwards,
-  spSpinA 13s 2.55s linear infinite}
-#intro-splash.on .sp-s2{animation:spShapeIn 1.1s 1.60s cubic-bezier(.16,1,.3,1) forwards,
-  spSpinB 16s 2.70s linear infinite}
-#intro-splash.on .sp-s3{animation:spShapeIn 1.1s 1.75s cubic-bezier(.16,1,.3,1) forwards,
-  spSpinC 19s 2.85s linear infinite}
-#intro-splash.on .sp-s4{animation:spShapeIn 1.1s 1.90s cubic-bezier(.16,1,.3,1) forwards,
-  spSpinC 22s 3.00s linear infinite reverse}
-@keyframes spShapeIn{from{opacity:0;transform:translate3d(0,60px,-520px) rotateX(40deg) rotateY(-30deg) scale(.6)}
-  to{opacity:1;transform:rotateX(-16deg) rotateY(24deg)}}
-@keyframes spSpinA{to{transform:rotateX(-16deg) rotateY(384deg)}}
-@keyframes spSpinB{to{transform:rotateX(344deg) rotateY(24deg)}}
-@keyframes spSpinC{to{transform:rotateX(-16deg) rotateY(24deg) rotateZ(360deg)}}
-@media (max-width:900px){#intro-splash .sp-shape{display:none}}
-
-/* ── Title ────────────────────────────────────────────────────────────────*/
-#intro-splash .sp-title{margin-top:38px;opacity:0;transform-style:preserve-3d}
-#intro-splash .sp-title h1{margin:0;font:800 clamp(26px,4vw,42px)/1.15 system-ui,'Segoe UI',sans-serif;
-  color:#2F2C21;text-shadow:0 12px 28px rgba(46,101,87,.16)}
-#intro-splash .sp-title h1 span{
-  background:linear-gradient(100deg,#4F9D8B,#2E6557 55%,#C9A227);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
-#intro-splash .sp-title p{margin:10px 0 0;font:600 13px/1 system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#8a8676}
-#intro-splash.on .sp-title{animation:spUp .7s 2.0s cubic-bezier(.16,1,.3,1) forwards}
-@keyframes spUp{from{opacity:0;transform:translate3d(0,34px,-160px) rotateX(28deg)}
-  to{opacity:1;transform:none}}
-#intro-splash .sp-line{height:2px;width:0;margin:18px auto 0;border-radius:3px;
-  background:linear-gradient(90deg,transparent,#C9A227,#78DCC4,transparent)}
-#intro-splash.on .sp-line{animation:spLine .6s 2.25s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes spLine{to{width:220px}}
-
-/* Floating chips sit at their own depths so they drift past the camera. */
-#intro-splash .sp-f{position:absolute;font:700 12.5px/1 system-ui,sans-serif;color:#3A7D6E;
-  background:rgba(255,255,255,.82);border:1px solid rgba(79,157,139,.28);border-radius:999px;
-  padding:9px 15px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  box-shadow:0 16px 30px -16px rgba(46,101,87,.55);opacity:0}
-#intro-splash.on .sp-f{animation:spF .9s cubic-bezier(.16,1,.3,1) forwards,spFOut .45s 2.6s ease forwards}
-#intro-splash .sp-f1{left:9%;top:16%;animation-delay:2.05s,2.6s!important}
-#intro-splash .sp-f2{right:10%;top:19%;animation-delay:2.15s,2.6s!important}
-#intro-splash .sp-f3{left:12%;bottom:17%;animation-delay:2.25s,2.6s!important}
-#intro-splash .sp-f4{right:13%;bottom:15%;animation-delay:2.35s,2.6s!important}
-@keyframes spF{from{opacity:0;transform:translate3d(0,26px,-220px) scale(.8)}
-  to{opacity:1;transform:none}}
-@keyframes spFOut{to{opacity:0;transform:translate3d(0,-14px,140px) scale(1.08)}}
+#intro-splash .sp-title{margin-top:30px;opacity:0}
+#intro-splash .sp-title h1{margin:0;font:800 clamp(26px,4vw,40px)/1.15 system-ui,'Segoe UI',sans-serif;color:#3D3929}
+#intro-splash .sp-title h1 span{color:#3A7D6E}
+#intro-splash .sp-title p{margin:8px 0 0;font:600 13px/1 system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#8a8676}
+#intro-splash.on .sp-title{animation:spUp .45s .62s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes spUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+#intro-splash .sp-line{height:3px;width:0;margin:14px auto 0;border-radius:3px;background:linear-gradient(90deg,#C9A227,#4F9D8B)}
+#intro-splash.on .sp-line{animation:spLine .45s .8s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes spLine{to{width:180px}}
+#intro-splash .sp-f{position:absolute;font:700 13px/1 system-ui,sans-serif;color:#3A7D6E;background:#fff;border:1.5px solid #C3E0D8;border-radius:12px;padding:8px 12px;box-shadow:0 12px 26px -12px rgba(58,125,110,.5);opacity:0}
+#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s 1.0s ease forwards}
+#intro-splash .sp-f1{left:12%;top:24%;animation-delay:.68s,1.0s!important}
+#intro-splash .sp-f2{right:13%;top:28%;animation-delay:.74s,1.0s!important}
+#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:.80s,1.0s!important}
+#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:.86s,1.0s!important}
+@keyframes spF{from{opacity:0;transform:translateY(18px) scale(.85)}to{opacity:1;transform:none}}
+@keyframes spFOut{to{opacity:0;transform:translateY(-10px) scale(.9)}}
 @media (max-width:760px){#intro-splash .sp-f{display:none}}
 </style>
-<div class="sp-bg"></div>
-<div class="sp-sun"></div>
-<!-- Three cloud decks the camera falls through, then a bank that parts. -->
-<div class="sp-deck sp-d1"></div>
-<div class="sp-deck sp-d2"></div>
-<div class="sp-deck sp-d3"></div>
-<div class="sp-bank sp-bank-l"></div>
-<div class="sp-bank sp-bank-r"></div>
-<!-- Real six-faced cubes and two discs, drifting around the marks. -->
-<div class="sp-shape sp-s1"><div class="sp-cube"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
-<div class="sp-shape sp-s2"><div class="sp-cube"><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
-<div class="sp-shape sp-s3"><div class="sp-disc"></div></div>
-<div class="sp-shape sp-s4"><div class="sp-disc"></div></div>
+<div class="sp-half sp-top"></div>
+<div class="sp-half sp-bot"></div>
 <div class="sp-center">
   <div>
     <div class="sp-badges">
@@ -3725,8 +3530,7 @@ function playIntro(){
     }
   } catch(e){}
   s.classList.add('on');
-  // Longest chain: the camera push-through starts at 2.75s and runs .6s.
-  setTimeout(function(){ s.style.display = 'none'; }, 3400);
+  setTimeout(function(){ s.style.display = 'none'; }, 1850);
 }
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
@@ -11288,13 +11092,13 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.11.2 Opening splash back to the panel wipe; the sky-descent version is
+#          withdrawn.
 #   2.11.1 Breaking bar no longer vanishes on the first live refresh. Without
 #          a changelog the live path fell back to statuscategorychangedate,
 #          which does not move when a status changes WITHIN a category, so
 #          every task read as weeks stale. It now diffs against the previous
 #          pass, which also recovers the "from" status the live path cannot see.
-#   2.11.0 Opening splash rebuilt as a sky descent: the camera falls through
-#          three cloud decks and the last one parts to reveal the two marks.
 #   2.10.2 One control instead of two: the separate Guide switch is gone and
 #          "Explain this page" both turns the narration on and starts it,
 #          carrying a red NEW marker until it has been used once.
@@ -11339,7 +11143,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.11.1"
+SITE_VERSION = "2.11.2"
 
 
 def _build_stamp():
