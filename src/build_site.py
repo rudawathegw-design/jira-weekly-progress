@@ -2863,8 +2863,22 @@ function _rqRender(){
     const body = Object.keys(byStage).sort().map(st => {
       const l = st.toLowerCase();
       const cls = l.includes('waiting') ? 'st-wfa' : l.includes('level 2') ? 'st-l2' : '';
+      // "Open all" as a single Jira search rather than a window.open per key:
+      // a popup blocker kills every tab after the first, and seven tabs is a
+      // worse answer than one list you can work down anyway.
+      const keys = byStage[st].map(x => x.key).filter(Boolean);
+      const jql  = `key in (${keys.join(',')}) ORDER BY duedate ASC`;
+      const allUrl = `${base}/issues/?jql=${encodeURIComponent(jql)}`;
       return `
+      <div class="rq-stage-row">
       <div class="rq-stage ${cls}">${esc(st)}</div>
+      ${keys.length > 1 ? `<a class="rq-openall" href="${esc(allUrl)}" target="_blank"
+           rel="noopener" onclick="event.stopPropagation()"
+           title="Open all ${keys.length} of these in one Jira list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Open all ${keys.length}</a>` : ''}
+      </div>
       ${byStage[st].slice().sort((a,b)=>(b._days||0)-(a._days||0)).map(i => `
         <a class="rq-task" href="${esc(base)}/browse/${esc(i.key)}" target="_blank" rel="noopener">
           <span class="rq-seq">${++_n}-</span>
@@ -10573,6 +10587,21 @@ document.addEventListener('keydown', function(e){
     background:linear-gradient(135deg,rgba(226,236,250,.95),rgba(238,244,252,.9));
     border:1px solid rgba(191,214,240,.9)}
   .rq-stage::before{content:'';width:6px;height:6px;border-radius:50%;background:#1366cc}
+  /* The pill keeps its shape; the action sits beside it on the same line. */
+  .rq-stage-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rq-openall{display:inline-flex;align-items:center;gap:5px;margin:14px 0 8px;
+    padding:4px 11px;border-radius:999px;text-decoration:none;white-space:nowrap;
+    font:800 10px/1 'Inter',system-ui,sans-serif;letter-spacing:.04em;
+    color:#14615F;background:rgba(45,165,165,.10);
+    border:1px solid rgba(45,165,165,.28);
+    opacity:0;transition:opacity .15s,background .15s,border-color .15s,transform .15s}
+  .rq-openall svg{width:11px;height:11px}
+  /* Revealed on hover of the person card so eight of these do not shout at once;
+     always visible on touch, where there is no hover to reveal them. */
+  .rq-person:hover .rq-openall,.rq-openall:focus-visible{opacity:1}
+  .rq-openall:hover{background:rgba(45,165,165,.2);border-color:#2DA5A5;
+    transform:translateY(-1px)}
+  @media (hover:none){.rq-openall{opacity:1}}
   .rq-stage.st-wfa{background:linear-gradient(135deg,rgba(254,249,195,.95),rgba(254,243,199,.9));
     border-color:rgba(253,230,138,.95);color:#78350f}
   .rq-stage.st-wfa::before{background:#d97706}
@@ -11187,6 +11216,8 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.16.0 "Open all N" beside each stage heading: opens that person's tasks at
+#          that stage as one Jira list, rather than a tab per task.
 #   2.15.0 A gate with several reviewers now lists the task under each of them,
 #          with its own link, instead of only the first name in the field. The
 #          tiles and stage counts count distinct tasks, so sharing a task does
@@ -11263,7 +11294,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.15.0"
+SITE_VERSION = "2.16.0"
 
 
 def _build_stamp():
