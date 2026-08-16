@@ -262,17 +262,23 @@ def resolve_accountable(issue, status_map=None) -> dict:
 
     people, level = [], status_level
 
-    # 1) A pending approval is the most precise signal — it names both the level
-    #    and the person who still owes the decision.
-    pending = _pending_approvals(fields)
-    if pending:
-        match = next((p for p in pending if p[0] == status_level), None) if status_level else None
-        level, people = match if match else pending[0]
-
-    # 2) Otherwise use the level implied by the status name.
-    if not people and status_level in LEVEL_FIELDS:
+    # 1) A levelled status states its own gate. "Revision Level 2" means the
+    #    Level 2 Reviewers field, full stop — that field is the routing someone
+    #    configured in Jira for exactly this stage.
+    #
+    #    The Approvals field used to be consulted FIRST, and when it held no
+    #    pending entry at this level it fell back to `pending[0]` — any stage, any
+    #    level. A task at Revision Level 2 with a stale Level 1 approval pending
+    #    was therefore credited to the Level 1 reviewer. The status is the
+    #    authority; an approval record only fills a gap, and only at the same
+    #    level, because a pending entry at another level is a different gate.
+    if status_level in LEVEL_FIELDS:
         people = _users(fields, LEVEL_FIELDS[status_level])
         level  = status_level
+        if not people:
+            match = next((p for p in _pending_approvals(fields) if p[0] == status_level), None)
+            if match:
+                level, people = match
 
     # 3) "Waiting For Approval" carries no level and no Approvals record, and by
     #    the time a task reaches it the level reviewers are already done — the

@@ -2173,17 +2173,22 @@ const _ACC = {
     const statusLevel = m ? parseInt(m[1],10) : null;
     let people = [], level = statusLevel;
 
-    // 1) A pending approval names both the level and who still owes a decision.
-    const pending = _ACC.pendingApprovals(fields);
-    if (pending.length){
-      const match = statusLevel ? pending.find(p => p.level === statusLevel) : null;
-      const pick = match || pending[0];
-      level = pick.level; people = pick.people;
-    }
-    // 2) Otherwise the level implied by the status name.
-    if (!people.length && LEVEL_FIELDS[statusLevel]){
+    // 1) A levelled status states its own gate. "Revision Level 2" means the
+    // Level 2 Reviewers field, full stop — that field is the routing someone
+    // configured in Jira for exactly this stage.
+    //
+    // The Approvals field used to be consulted FIRST, and with no pending entry
+    // at this level it fell back to pending[0] — any stage, any level. A task at
+    // Revision Level 2 with a stale Level 1 approval pending was therefore
+    // credited to the Level 1 reviewer. The status is the authority; an approval
+    // record only fills a gap, and only at the same level.
+    if (LEVEL_FIELDS[statusLevel]){
       people = _ACC.users(fields, LEVEL_FIELDS[statusLevel]);
       level = statusLevel;
+      if (!people.length){
+        const match = _ACC.pendingApprovals(fields).find(p => p.level === statusLevel);
+        if (match){ level = match.level; people = match.people; }
+      }
     }
     // 3) "Waiting For Approval" carries no level and no Approvals record, and by
     // the time a task reaches it the level reviewers are already done — the
@@ -11151,6 +11156,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.14.0 The status decides who holds a task, not the Approvals field. A task
+#          at "Revision Level 2" goes to the Level 2 Reviewer; Level 1 to the
+#          Level 1 Reviewer; "Waiting For Approval" to the reporter. The
+#          Approvals record now only fills a gap, and only at the same level —
+#          it used to be read first and could fall back to a pending entry from
+#          a different level, crediting a Level 2 task to the Level 1 reviewer.
 #   2.13.1 An owner card states every role that person holds in the tasks shown
 #          under it. It used to take the role of whichever task sorted first,
 #          so someone who is Level 1 on one task and Level 2 on another was
@@ -11216,7 +11227,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.13.1"
+SITE_VERSION = "2.14.0"
 
 
 def _build_stamp():
