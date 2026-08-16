@@ -900,18 +900,25 @@ body.laser-on #laser-dot{display:block}
   .act-row{grid-template-columns:1fr;gap:4px}
 }
 
-/* ── Breaking-news ticker ────────────────────────────────────── */
-#ticker-bar{display:none;align-items:stretch;gap:0;margin-bottom:14px;
-  border-radius:12px;overflow:hidden;
-  border:1.5px solid #bbf7d0;background:#fff;
-  box-shadow:0 4px 18px rgba(22,163,74,.14)}
+/* ── Breaking-news ticker ──────────────────────────────────────
+   One accent, declared once. Everything below tints from it, so the bar can
+   be re-coloured by changing --tk alone. */
+#ticker-bar{--tk:#2DA5A5;--tk-dk:#1F7E7E;--tk-dp:#14615F;
+  --tk-tint:#F1FAFA;--tk-line:rgba(45,165,165,.22);
+  display:none;align-items:stretch;gap:0;margin-bottom:14px;
+  border-radius:14px;overflow:hidden;
+  border:1px solid var(--tk-line);background:#fff;
+  box-shadow:0 1px 2px rgba(20,97,95,.06),0 10px 26px -12px rgba(20,97,95,.30)}
 #ticker-bar.show{display:flex}
-.ticker-label{flex-shrink:0;display:flex;align-items:center;gap:7px;
-  padding:0 14px;
-  background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;
-  font-weight:800;font-size:11.5px;letter-spacing:.14em;
+.ticker-label{flex-shrink:0;display:flex;align-items:center;gap:8px;
+  padding:0 16px;
+  background:linear-gradient(135deg,var(--tk),var(--tk-dp) 92%);color:#fff;
+  font-weight:800;font-size:11px;letter-spacing:.16em;
   text-transform:uppercase;white-space:nowrap;
-  border-right:1.5px solid #bbf7d0;position:relative;overflow:hidden;z-index:2}
+  position:relative;overflow:hidden;z-index:2;
+  /* A lit top edge and a shadow cast onto the track: the label reads as a
+     raised tab rather than a rectangle glued to the left. */
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),6px 0 14px -8px rgba(20,97,95,.55)}
 /* moving stroke / sheen sweeping across the label — subtle "live" effect */
 .ticker-label::after{content:'';position:absolute;top:0;left:-60%;width:55%;height:100%;
   background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);
@@ -920,12 +927,12 @@ body.laser-on #laser-dot{display:block}
 .ticker-label .tdot{width:8px;height:8px;border-radius:50%;background:#fff;
   box-shadow:0 0 0 4px rgba(255,255,255,.25);animation:livePulse 1.4s infinite;position:relative;z-index:1}
 .ticker-track{flex:1;overflow:hidden;position:relative;min-width:0;
-  background:#f6fef9}
+  background:linear-gradient(180deg,#fff,var(--tk-tint))}
 .ticker-track::before,.ticker-track::after{content:'';position:absolute;
-  top:0;bottom:0;width:42px;z-index:1;pointer-events:none}
-.ticker-track::before{left:0;background:linear-gradient(90deg,#f6fef9,transparent)}
-.ticker-track::after {right:0;background:linear-gradient(270deg,#f6fef9,transparent)}
-.ticker-strip{display:inline-flex;align-items:center;gap:18px;padding:9px 18px;
+  top:0;bottom:0;width:48px;z-index:1;pointer-events:none}
+.ticker-track::before{left:0;background:linear-gradient(90deg,#fff,transparent)}
+.ticker-track::after {right:0;background:linear-gradient(270deg,var(--tk-tint),transparent)}
+.ticker-strip{display:inline-flex;align-items:center;gap:14px;padding:10px 20px;
   animation:tickerScroll 50s linear infinite;white-space:nowrap}
 .ticker-bar:hover .ticker-strip,
 #ticker-bar:hover .ticker-strip{animation-play-state:paused}
@@ -933,27 +940,37 @@ body.laser-on #laser-dot{display:block}
   from{transform:translateX(0)}
   to  {transform:translateX(-50%)}
 }
-.ticker-item{display:inline-flex;align-items:center;gap:7px;
-  text-decoration:none;color:#0f172a;font-size:13px;
-  padding:4px 10px;border-radius:7px;
-  border:1px solid transparent;transition:background .15s,border-color .15s}
-.ticker-item:hover{background:#fff;border-color:#bbf7d0}
+/* Each headline is its own small card, so the strip reads as a row of items
+   rather than one long sentence that happens to contain links. */
+.ticker-item{display:inline-flex;align-items:center;gap:8px;
+  text-decoration:none;color:#0f172a;font-size:12.5px;
+  padding:5px 12px 5px 6px;border-radius:9px;
+  background:rgba(255,255,255,.7);border:1px solid var(--tk-line);
+  box-shadow:0 1px 2px rgba(20,97,95,.05);
+  transition:background .15s,border-color .15s,box-shadow .15s,transform .15s}
+.ticker-item:hover{background:#fff;border-color:var(--tk);
+  box-shadow:0 6px 16px -8px rgba(20,97,95,.5);transform:translateY(-1px)}
 .ticker-num{display:inline-flex;align-items:center;justify-content:center;
-  min-width:18px;height:18px;padding:0 4px;border-radius:4px;
-  background:#16a34a;color:#fff;font-size:10px;font-weight:800;
-  letter-spacing:.02em;flex-shrink:0}
+  min-width:20px;height:20px;padding:0 5px;border-radius:6px;
+  background:linear-gradient(135deg,var(--tk),var(--tk-dk));color:#fff;
+  font-size:10px;font-weight:800;letter-spacing:.02em;flex-shrink:0}
 .ticker-key{font-family:'JetBrains Mono',monospace;font-size:11.5px;
-  font-weight:700;color:#1e40af}
-.ticker-arrow{color:#94a3b8;font-weight:700}
-.ticker-status{font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;
+  font-weight:700;color:var(--tk-dp)}
+.ticker-arrow{color:#9fb4b4;font-weight:700;font-size:11px}
+.ticker-status{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;
   border:1px solid #e2e8f0;background:#f8fafc;color:#334155;text-transform:capitalize}
 .ticker-status.st-done{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 .ticker-status.st-progress{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
-.ticker-status.st-wait{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
+/* Waiting is the state this bar exists to surface, so it carries the accent
+   rather than sharing blue with In Progress. */
+.ticker-status.st-wait{background:rgba(45,165,165,.12);color:var(--tk-dp);
+  border-color:rgba(45,165,165,.35)}
 .ticker-status.st-hold{background:#fef9c3;color:#854d0e;border-color:#fde68a}
-.ticker-owner{font-weight:700;color:#475569;font-size:12px}
-.ticker-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:#64748b}
-.ticker-sep{color:#86efac;font-weight:700}
+.ticker-owner{font-weight:700;color:#40575c;font-size:12px}
+.ticker-time{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#7b9192}
+/* The separator was a bullet between sentences; as a card row it only needs a
+   faint spacer dot. */
+.ticker-sep{color:rgba(45,165,165,.45);font-weight:700;font-size:10px}
 
 /* ── LIVE freshness chip ─────────────────────────────────────── */
 @keyframes livePulse {
@@ -11092,6 +11109,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.11.3 Breaking bar restyled on #2DA5A5: a card with a raised label tab
+#          and each headline its own small pill. The accent is one CSS
+#          variable, so the whole bar recolours from a single line.
 #   2.11.2 Opening splash back to the panel wipe; the sky-descent version is
 #          withdrawn.
 #   2.11.1 Breaking bar no longer vanishes on the first live refresh. Without
@@ -11143,7 +11163,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.11.2"
+SITE_VERSION = "2.11.3"
 
 
 def _build_stamp():
