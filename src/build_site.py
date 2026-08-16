@@ -2703,6 +2703,25 @@ function _rqCollect(){
   return out;
 }
 
+// Roles in workflow order, so a mixed label always reads "Level 1 · Level 2"
+// rather than in whatever order the tasks happened to arrive.
+const _RQ_ROLE_ORDER = ['Assignee','Level 1 Reviewer','Level 2 Reviewer','Approver','Reporter'];
+function _rqRoleLabel(list){
+  const seen = [...new Set(list.map(i => i.acc_role_label).filter(Boolean))];
+  if (seen.length <= 1) return seen[0] || '';
+  seen.sort((a,b) => {
+    const ia = _RQ_ROLE_ORDER.indexOf(a), ib = _RQ_ROLE_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  // "Level 1 Reviewer · Level 2 Reviewer" twice over is a mouthful; when every
+  // role is a review level, say it once.
+  if (seen.every(r => r.endsWith('Reviewer'))){
+    const lv = seen.map(r => r.replace(' Reviewer','').replace('Level ','')).join(' & ');
+    return `Level ${lv} Reviewer`;
+  }
+  return seen.join(' · ');
+}
+
 function _rqGroup(items){
   const groups = {};
   items.forEach(i => { (groups[i.owner] = groups[i.owner] || []).push(i); });
@@ -2715,7 +2734,11 @@ function _rqGroup(items){
     return {
       name, list, worst,
       overdue: overdue.length,
-      role: list.find(i => i.acc_role_label)?.acc_role_label || '',
+      // Every role this person actually holds in the visible list, not the role
+      // of whichever task sorted first. One person is routinely Level 1 on one
+      // task and Level 2 on another, and picking one at random labelled the
+      // whole card with a role that contradicted the tasks under it.
+      role: _rqRoleLabel(list),
       wfa: list.filter(i => i._stage === 'waiting for approval').length,
       l1:  list.filter(i => i._stage.includes('level 1')).length,
       l2:  list.filter(i => i._stage.includes('level 2')).length,
@@ -11128,6 +11151,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.13.1 An owner card states every role that person holds in the tasks shown
+#          under it. It used to take the role of whichever task sorted first,
+#          so someone who is Level 1 on one task and Level 2 on another was
+#          labelled with one of them at random.
 #   2.13.0 "Waiting For Approval" counts against the REPORTER. By that stage the
 #          level reviewers have signed off and an automation has moved the task
 #          on; what is left is the requester accepting their own work. Reporter
@@ -11189,7 +11216,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.13.0"
+SITE_VERSION = "2.13.1"
 
 
 def _build_stamp():
