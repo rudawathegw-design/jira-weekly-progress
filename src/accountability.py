@@ -14,7 +14,10 @@ Resolution chain (first hit wins):
      names the level ("Revision Level 1"/"Revision Level 2").
   2. The level implied by the status name → that level's Reviewers field
      (customfield_10784 / _10785).
-  3. "Waiting For Approval" with no level → Level 1 Reviewers, then Level 2.
+  3. "Waiting For Approval" → the REPORTER. By this point the level reviewers
+     have already signed off ("Revision Level 1" → "Review Complete") and a Jira
+     automation has moved the task on; what remains is the requester's own
+     acceptance. Neither reviewer nor assignee can clear this stage.
   4. Fall back to the assignee, flagged `unresolved` so the UI can surface the
      governance gap ("in review but no reviewer configured") instead of quietly
      blaming the assignee.
@@ -46,12 +49,14 @@ ROLE_ASSIGNEE = "assignee"
 ROLE_LEVEL1   = "level1"
 ROLE_LEVEL2   = "level2"
 ROLE_APPROVER = "approver"      # awaiting approval, level not identified
+ROLE_REPORTER = "reporter"      # awaiting the requester's own sign-off
 
 ROLE_LABELS = {
     ROLE_ASSIGNEE: "Assignee",
     ROLE_LEVEL1:   "Level 1 Reviewer",
     ROLE_LEVEL2:   "Level 2 Reviewer",
     ROLE_APPROVER: "Approver",
+    ROLE_REPORTER: "Reporter",
 }
 
 # ── attribution modes ───────────────────────────────────────────────────────
@@ -201,6 +206,16 @@ def _assignee(fields):
     return None
 
 
+def _reporter(fields) -> dict | None:
+    """The person who raised the request — the approver at the final gate."""
+    r = fields.get("reporter") or {}
+    if r.get("accountId"):
+        return {"id": r["accountId"], "name": r.get("displayName") or UNASSIGNED}
+    if r.get("displayName"):
+        return {"id": "", "name": r["displayName"]}
+    return None
+
+
 def assignee_name(issue) -> str:
     a = _assignee(issue.get("fields") or {})
     return a["name"] if a else UNASSIGNED
@@ -259,23 +274,21 @@ def resolve_accountable(issue, status_map=None) -> dict:
         people = _users(fields, LEVEL_FIELDS[status_level])
         level  = status_level
 
-    # 3) "Waiting For Approval" names no level and often carries no Approvals
-    #    record, but the Reviewers fields still say who was lined up to decide.
-    #    Level 1 is the first gate, so it holds the task; Level 2 only if Level 1
-    #    is empty.
-    #
-    #    This was removed once, on the reasoning that using the field "invented
-    #    an approver nobody had asked". That is the wrong reading: a populated
-    #    Level 1 Reviewers field is a routing decision somebody made in Jira, not
-    #    an inference. Dropping it sent every awaiting-approval task back to the
-    #    assignee, who has already handed off and cannot act — which is the exact
-    #    misattribution this module exists to prevent.
+    # 3) "Waiting For Approval" carries no level and no Approvals record, and by
+    #    the time a task reaches it the level reviewers are already done — the
+    #    observed transition chain is
+    #        In Progress → Revision Level 1 → Review Complete → Waiting For Approval
+    #    with the last hop made by a Jira automation, not a person. What is left
+    #    is the REPORTER accepting the work they asked for. Attributing this
+    #    stage to a reviewer credits someone who has already signed off; to the
+    #    assignee, someone who handed off two stages ago.
     if not people and status_level is None:
-        for lvl in (1, 2):
-            people = _users(fields, LEVEL_FIELDS[lvl])
-            if people:
-                level = lvl
-                break
+        rep = _reporter(fields)
+        if rep:
+            return {**base, "owner": rep["name"], "owner_id": rep["id"],
+                    "role": ROLE_REPORTER, "role_label": ROLE_LABELS[ROLE_REPORTER],
+                    "level": None, "co_owners": [], "in_review": True,
+                    "unresolved": False}
 
     # There is still deliberately no "borrow the other level" fallback for a
     # LEVELLED status: a "Revision Level 1" with an empty Level 1 field must NOT

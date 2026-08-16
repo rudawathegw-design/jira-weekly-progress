@@ -27,7 +27,9 @@ def fetch_all_issues(base_url, email, token, jql):
             "jql": jql,
             "maxResults": 100,
             # ✅ INCLUDED THE REVIEWER FIELDS
-            "fields": "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated,customfield_10784,customfield_10785,customfield_10092,customfield_10520",
+            # reporter is not decoration: at "Waiting For Approval" the reporter
+            # is the person who owes the decision, so attribution needs it.
+            "fields": "summary,assignee,reporter,status,duedate,priority,issuetype,statuscategorychangedate,updated,customfield_10784,customfield_10785,customfield_10092,customfield_10520",
             "expand": "changelog",
         }
         if next_page_token:

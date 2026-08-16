@@ -31,7 +31,7 @@ const LEVEL_FIELDS = { 1: "customfield_10784", 2: "customfield_10785" };
 const APPROVALS_FIELD = "customfield_10092";
 const INVOLVED_FIELD = "customfield_10520";
 const JIRA_BASE_FIELDS =
-  "summary,assignee,status,duedate,priority,issuetype,statuscategorychangedate,updated";
+  "summary,assignee,reporter,status,duedate,priority,issuetype,statuscategorychangedate,updated";
 const JIRA_LIVE_FIELDS =
   `${JIRA_BASE_FIELDS},${LEVEL_FIELDS[1]},${LEVEL_FIELDS[2]},${APPROVALS_FIELD},${INVOLVED_FIELD}`;
 
@@ -85,6 +85,9 @@ function slimIssue(i) {
       updated: f.updated || null,
       statuscategorychangedate: f.statuscategorychangedate || null,
       assignee: slimUser(f.assignee),
+      // At "Waiting For Approval" the reporter holds the task, so the live
+      // path needs them for attribution - not just for display.
+      reporter: slimUser(f.reporter),
       status: {
         name: st.name || "",
         statusCategory: { key: ((st.statusCategory || {}).key) || "" },

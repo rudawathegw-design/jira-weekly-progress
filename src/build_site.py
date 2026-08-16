@@ -1996,7 +1996,7 @@ const ATTR_MODES = {
   assignee:    {label:'Assigned To',   short:'Assigned',
                 desc:'Every task counts against the person it is assigned to in Jira.'},
   accountable: {label:'Current Owner', short:'Current',
-                desc:'A task waiting for approval or at Revision Level 1/2 counts against the reviewer holding it; everything else counts against the assignee.'},
+                desc:'A task at Revision Level 1/2 counts against that level’s reviewer, and one waiting for approval against the reporter who must accept it; everything else counts against the assignee.'},
 };
 const ATTR_BUCKETS = ['Open','In Progress','Waiting For Approval','Completed'];
 // Mirrors DEFAULT_STATUS_BUCKETS in src/accountability.py. "Revision Level 1/2"
@@ -2086,6 +2086,7 @@ const APPROVALS_FIELD = 'customfield_10092';
 const LEVEL_RE = /level\s*([0-9]+)/i;
 const ROLE_LABELS = {
   assignee:'Assignee', level1:'Level 1 Reviewer', level2:'Level 2 Reviewer', approver:'Approver',
+  reporter:'Reporter',
 };
 
 const _ACC = {
@@ -2148,6 +2149,13 @@ const _ACC = {
     if (a && a.displayName) return {id:'', name:a.displayName};
     return null;
   },
+  // The person who raised the request — the approver at the final gate.
+  reporter(fields){
+    const r = fields.reporter;
+    if (r && r.accountId) return {id:r.accountId, name:r.displayName || 'Unassigned'};
+    if (r && r.displayName) return {id:'', name:r.displayName};
+    return null;
+  },
   resolve(issue, statusMap){
     const fields = issue.fields || {};
     const a = _ACC.assignee(fields);
@@ -2177,17 +2185,18 @@ const _ACC = {
       people = _ACC.users(fields, LEVEL_FIELDS[statusLevel]);
       level = statusLevel;
     }
-    // 3) "Waiting For Approval" names no level and often carries no Approvals
-    // record, but the Reviewers fields still say who was lined up to decide.
-    // Level 1 is the first gate, so it holds the task; Level 2 only if Level 1
-    // is empty. A populated Reviewers field is a routing decision someone made
-    // in Jira, not an invented approver — ignoring it sent every awaiting-
-    // approval task back to an assignee who has already handed off.
+    // 3) "Waiting For Approval" carries no level and no Approvals record, and by
+    // the time a task reaches it the level reviewers are already done — the
+    // observed chain is In Progress → Revision Level 1 → Review Complete →
+    // Waiting For Approval, with the last hop made by a Jira automation rather
+    // than a person. What is left is the REPORTER accepting the work they asked
+    // for. A reviewer here has already signed off; the assignee handed off two
+    // stages ago.
     if (!people.length && statusLevel === null){
-      for (const lvl of [1,2]){
-        people = _ACC.users(fields, LEVEL_FIELDS[lvl]);
-        if (people.length){ level = lvl; break; }
-      }
+      const rep = _ACC.reporter(fields);
+      if (rep) return {...base, owner:rep.name, owner_id:rep.id,
+                       role:'reporter', role_label:ROLE_LABELS.reporter,
+                       level:null, co_owners:[], in_review:true, unresolved:false};
     }
     // Still no "borrow the other level" fallback for a LEVELLED status: a
     // "Revision Level 1" with an empty Level 1 field must not borrow the Level 2
@@ -11119,12 +11128,13 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
-#   2.12.0 "Waiting For Approval" now counts against the reviewer holding it,
-#          not the assignee. The Level 1 Reviewers field is a routing decision
-#          made in Jira; ignoring it sent every awaiting-approval task back to
-#          someone who had already handed off. Level 1 is the first gate, so it
-#          wins; Level 2 only when Level 1 is empty; assignee only when neither
-#          is set. Revision Level 1/2 are unchanged.
+#   2.13.0 "Waiting For Approval" counts against the REPORTER. By that stage the
+#          level reviewers have signed off and an automation has moved the task
+#          on; what is left is the requester accepting their own work. Reporter
+#          is now fetched by both the weekly build and the Worker.
+#   2.12.0 "Waiting For Approval" stopped counting against the assignee, who has
+#          already handed off. (Superseded by 2.13.0, which names the reporter
+#          rather than the level reviewer.)
 #   2.11.3 Breaking bar restyled on #2DA5A5: a card with a raised label tab
 #          and each headline its own small pill. The accent is one CSS
 #          variable, so the whole bar recolours from a single line.
@@ -11179,7 +11189,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.12.0"
+SITE_VERSION = "2.13.0"
 
 
 def _build_stamp():
