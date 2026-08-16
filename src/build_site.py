@@ -4114,7 +4114,11 @@ function renderPMOPanel() {
 
   // How late is late. A 2-day slip and a 5-month one are not the same problem,
   // and the count alone hides which you have.
-  const _recs = REPORT.records || rows.flatMap(r => r.issues || []);
+  // Ages come from the SAME rows every other number on this panel is built
+  // from. Reading REPORT.records instead counted hidden people and unassigned
+  // work, so the age buckets summed to more than the overdue total printed one
+  // tile to the left — 8+18+28 against a stated 50.
+  const _recs = rows.flatMap(r => r.issues || []);
   const _ovAges = _recs.filter(i => i.overdue).map(i => _overdueDaysNum(i.due)).filter(n => n !== null);
   const _bucket = { week:0, month:0, older:0 };
   _ovAges.forEach(n => { if (n <= 7) _bucket.week++; else if (n <= 30) _bucket.month++; else _bucket.older++; });
@@ -4159,10 +4163,15 @@ function renderPMOPanel() {
           <div class="kpi-tile-value ${ovClass}">${overdueRate}%</div>
           <div class="kpi-tile-sub">${gOv} of ${gTotal} past due ${_delta(overdueRate, _prev&&_prev.overdueRate, true)}</div>
         </div>
-        <div class="kpi-tile">
-          <div class="kpi-tile-label">Overdue Age</div>
-          <div class="kpi-tile-value ${_bucket.older ? 'kpi-bad' : _bucket.month ? 'kpi-warn' : 'kpi-good'}">${_oldestOv}d</div>
-          <div class="kpi-tile-sub">oldest · ${_bucket.week}/${_bucket.month}/${_bucket.older} in &le;7d / &le;30d / 30d+</div>
+        <!-- Was "Overdue Age / 150d / oldest · 8/18/28 in <=7d / <=30d / 30d+".
+             Three counts separated by slashes read as a date - 8/18/28 - and
+             nobody could parse it, so the tile said nothing. It now leads with
+             the number a manager can act on: how many are badly late. The full
+             age split stays, in the tooltip. -->
+        <div class="kpi-tile" title="Of ${gOv} overdue task(s): ${_bucket.week} up to a week late, ${_bucket.month} between one week and a month, ${_bucket.older} more than a month.">
+          <div class="kpi-tile-label">Over a Month Late</div>
+          <div class="kpi-tile-value ${_bucket.older ? 'kpi-bad' : _bucket.month ? 'kpi-warn' : 'kpi-good'}">${_bucket.older}</div>
+          <div class="kpi-tile-sub">of ${gOv} overdue &middot; oldest is ${_oldestOv} days</div>
         </div>
         <div class="kpi-tile">
           <div class="kpi-tile-label">Approval Queue</div>
@@ -10671,16 +10680,21 @@ document.addEventListener('keydown', function(e){
   .rq-tile .val.warn{color:#c2410c}
   .rq-tile .sub{font-size:11px;color:#7b8798;margin-top:2px}
   .rq-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-  .rq-seg{display:inline-flex;background:rgba(255,255,255,.55);
+  /* flex:none — the search box beside it is flex:1, so without this the track
+     is the thing that gives when the row runs out of width, and the last chip's
+     count gets squeezed against the rounded edge. It wraps to its own line
+     instead (.rq-bar already allows wrapping). */
+  .rq-seg{display:inline-flex;flex:none;flex-wrap:wrap;background:rgba(255,255,255,.55);
     border:1px solid rgba(255,255,255,.9);border-radius:11px;padding:3px;gap:2px;
     -webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm)}
   .rq-seg button{border:none;background:transparent;border-radius:8px;padding:7px 13px;
     font:600 12.5px 'Inter',system-ui,sans-serif;color:#5d6b83;cursor:pointer;
-    display:inline-flex;align-items:center;gap:6px}
+    display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap}
   .rq-seg button:hover{color:#0f1c33;background:rgba(255,255,255,.6)}
   .rq-seg button.on{background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;
     font-weight:700;box-shadow:0 8px 18px -10px rgba(10,59,124,.6)}
-  .rq-seg .sn{font-family:'JetBrains Mono',monospace;font-size:10.5px;opacity:.75}
+  .rq-seg .sn{font-family:'JetBrains Mono',monospace;font-size:10.5px;opacity:.75;
+    font-variant-numeric:tabular-nums;min-width:1.1em;text-align:center;flex:none}
   .rq-search{flex:1;min-width:200px;max-width:340px;border:1px solid rgba(255,255,255,.9);
     border-radius:10px;background:rgba(255,255,255,.6);padding:9px 13px;font-size:12.5px;
     font-family:inherit;color:#0f1c33;outline:none;
@@ -11364,6 +11378,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.18.0 "Overdue Age" replaced with "Over a Month Late". Its subtitle read
+#          "8/18/28 in <=7d / <=30d / 30d+" — three counts that scanned as a
+#          date and told nobody anything. It also drew from the raw record list
+#          while the tile beside it used the counted rows, so the buckets summed
+#          to more overdue tasks than the panel said existed. Both fixed; the
+#          full age split moved to the tooltip. Stage chips no longer compress.
 #   2.17.0 Every owner card carries Copy and Excel. Copy puts a formatted table
 #          on the clipboard that pastes into Outlook with working Jira links;
 #          Excel downloads the same list as a styled sheet. Both act on what
@@ -11448,7 +11468,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.17.0"
+SITE_VERSION = "2.18.0"
 
 
 def _build_stamp():
