@@ -11432,6 +11432,12 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.19.0 The opening splash now runs on the tower film. It plays full-bleed
+#          and alone for its first 1.77s; then a scrim lifts and the marks,
+#          ring and title land on it. Title is the project name in Arabic. The
+#          cream split-curtain wipe is gone (it covered the video) and the
+#          palette is inverted for the dark base. Audio plays through a 3.5x
+#          gain stage — the clip's own mix is too quiet at volume 1.0.
 #   2.18.0 "Overdue Age" replaced with "Over a Month Late". Its subtitle read
 #          "8/18/28 in <=7d / <=30d / 30d+" — three counts that scanned as a
 #          date and told nobody anything. It also drew from the raw record list
@@ -11522,7 +11528,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.18.0"
+SITE_VERSION = "2.19.0"
 
 
 def _build_stamp():
