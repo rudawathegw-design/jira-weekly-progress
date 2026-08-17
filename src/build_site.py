@@ -1050,85 +1050,109 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- ═══════════════ Opening splash (plays after unlock) ════════════════════ -->
 <div id="intro-splash" aria-hidden="true">
 <style>
-#intro-splash{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none}
+/* ── Opening title sequence ────────────────────────────────────────────────
+   Beat 1 (0 → 1.77s): the film runs clean, full-bleed, no overlay.
+   Beat 2 (1.77s →   ): scrim lifts and the two marks, the ring and the Arabic
+   title land on top of it. Everything below is offset from that 1.77s cue, so
+   moving the cue means editing the delays in one place only.            */
+#intro-splash{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none;background:#07120f}
 #intro-splash.on{display:block}
-#intro-splash .sp-half{position:absolute;left:0;width:100%;height:50.5%;background:linear-gradient(180deg,#FAF9F5,#F3F0E8)}
-#intro-splash .sp-top{top:0}
-#intro-splash .sp-bot{bottom:0}
-#intro-splash.on .sp-top{animation:spTop .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
-#intro-splash.on .sp-bot{animation:spBot .55s 1.25s cubic-bezier(.65,0,.35,1) forwards}
-@keyframes spTop{to{transform:translateY(-102%)}}
-@keyframes spBot{to{transform:translateY(102%)}}
+#intro-splash.out{animation:spExit .5s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes spExit{to{opacity:0;transform:scale(1.06);filter:blur(6px)}}
+
+#intro-splash .sp-video{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;transform:scale(1.04)}
+#intro-splash.on .sp-video{animation:spZoom 4.6s linear forwards}
+@keyframes spZoom{to{transform:scale(1.13)}}
+
+/* Holds the footage back so white marks and Arabic type stay readable over
+   whatever frame happens to be on screen. */
+#intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(120% 90% at 50% 46%,rgba(4,20,16,.30) 0%,rgba(4,20,16,.76) 55%,rgba(3,13,10,.93) 100%)}
+#intro-splash.on .sp-scrim{animation:spScrim .5s 1.77s ease forwards}
+@keyframes spScrim{to{opacity:1}}
+
 #intro-splash .sp-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
-#intro-splash.on .sp-center{animation:spFade .3s 1.1s ease forwards}
-@keyframes spFade{to{opacity:0;transform:scale(.96)}}
+#intro-splash.on .sp-center{animation:spFade .35s 3.80s ease forwards}
+@keyframes spFade{to{opacity:0;transform:scale(.97)}}
+
 #intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:26px;position:relative}
 #intro-splash .sp-fib,#intro-splash .sp-cbi{opacity:0;position:relative;overflow:hidden}
 /* Both marks are real logo files inlined as data URIs at build time. The FIB
    "B" sits on a white tile (the file is a coloured mark on transparency); the
    CBI seal is the supplied artwork, untinted, on white. */
 #intro-splash .sp-fib{width:96px;height:96px;border-radius:24px;background:#fff;
-  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(46,101,87,.45),0 0 0 1px rgba(46,101,87,.10)}
+  display:grid;place-items:center;box-shadow:0 22px 50px -14px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.22)}
 #intro-splash .sp-cbi{width:96px;height:96px;border-radius:50%;background:#fff;
-  display:grid;place-items:center;box-shadow:0 18px 40px -14px rgba(20,62,52,.35),0 0 0 1px rgba(20,62,52,.08)}
+  display:grid;place-items:center;box-shadow:0 22px 50px -14px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.22)}
 #intro-splash .sp-fib img{width:56px;height:56px;object-fit:contain;display:block}
 #intro-splash .sp-cbi img{width:80px;height:80px;object-fit:contain;display:block}
-/* A logo that failed to inline collapses to nothing rather than a broken icon. */
+/* If a logo file was missing at build time the src is empty — hide the broken
+   image icon rather than showing it inside the tile. */
 #intro-splash .sp-fib img[src=""],#intro-splash .sp-cbi img[src=""]{display:none}
-#intro-splash.on .sp-fib{animation:spFromL .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
-#intro-splash.on .sp-cbi{animation:spFromR .6s .05s cubic-bezier(.18,1.15,.3,1) forwards}
-/* Converge: each mark travels in from its own side, overshoots slightly past
-   centre, then settles — reads as the two institutions meeting. */
-@keyframes spFromL{from{opacity:0;transform:translateX(-46vw) rotate(-18deg) scale(.7)}
-  55%{opacity:1}72%{transform:translateX(14px) rotate(2deg) scale(1.04)}to{opacity:1;transform:none}}
-@keyframes spFromR{from{opacity:0;transform:translateX(46vw) rotate(18deg) scale(.7)}
-  55%{opacity:1}72%{transform:translateX(-14px) rotate(-2deg) scale(1.04)}to{opacity:1;transform:none}}
+#intro-splash.on .sp-fib{animation:spFromL .6s 1.82s cubic-bezier(.18,1.15,.3,1) forwards}
+#intro-splash.on .sp-cbi{animation:spFromR .6s 1.82s cubic-bezier(.18,1.15,.3,1) forwards}
+@keyframes spFromL{0%{opacity:0;transform:translateX(-70px) rotate(-12deg) scale(.7)}
+                  100%{opacity:1;transform:none}}
+@keyframes spFromR{0%{opacity:0;transform:translateX(70px) rotate(12deg) scale(.7)}
+                  100%{opacity:1;transform:none}}
+/* A light sweep across each tile once it has settled — reads as polish, not
+   as another entrance. */
 #intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
-#intro-splash.on .sp-fib::after{animation:spShine .5s .62s ease forwards}
-#intro-splash.on .sp-cbi::after{animation:spShine .5s .70s ease forwards}
+#intro-splash.on .sp-fib::after{animation:spShine .5s 2.39s ease forwards}
+#intro-splash.on .sp-cbi::after{animation:spShine .5s 2.47s ease forwards}
 @keyframes spShine{to{transform:translateX(130%) skewX(-18deg)}}
+
 #intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4);z-index:2;
-  box-shadow:0 6px 18px -6px rgba(201,162,39,.6)}
-#intro-splash.on .sp-link{animation:spPop .4s .62s cubic-bezier(.18,1.5,.4,1) forwards,
-  spHalo 1.1s .95s ease-out}
+  box-shadow:0 10px 24px -8px rgba(0,0,0,.7)}
+#intro-splash.on .sp-link{animation:spPop .4s 2.39s cubic-bezier(.18,1.5,.4,1) forwards,
+                                    spGlow 1.4s 2.79s ease-in-out infinite}
 @keyframes spPop{to{opacity:1;transform:scale(1)}}
-/* Pulse leaving the link once the marks have met. */
-@keyframes spHalo{from{box-shadow:0 0 0 0 rgba(201,162,39,.55)}
-  to{box-shadow:0 0 0 26px rgba(201,162,39,0)}}
-/* Ring strokes itself on clockwise instead of fading — 415 ≈ 2πr for r=66. */
+@keyframes spGlow{0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,.55)}
+                     50%{box-shadow:0 0 0 12px rgba(201,162,39,0)}}
+
+/* Ring is drawn as an SVG stroke so it can animate on rather than just fade —
+   dasharray sweep, clockwise from 12 o'clock. */
 #intro-splash .sp-ring{position:absolute;left:50%;top:50%;width:172px;height:172px;
-  margin:-86px 0 0 -86px;overflow:visible;pointer-events:none}
-#intro-splash .sp-ring circle{fill:none;stroke:rgba(79,157,139,.45);stroke-width:2;
-  stroke-linecap:round;stroke-dasharray:415;stroke-dashoffset:415;
-  transform:rotate(-90deg);transform-origin:50% 50%}
-#intro-splash.on .sp-ring circle{animation:spDraw .85s .3s cubic-bezier(.5,0,.2,1) forwards}
+  transform:translate(-50%,-50%);pointer-events:none}
+#intro-splash .sp-ring circle{fill:none;stroke:rgba(163,224,207,.75);stroke-width:2;
+  stroke-dasharray:415;stroke-dashoffset:415;transform:rotate(-90deg);transform-origin:50% 50%}
+#intro-splash.on .sp-ring circle{animation:spDraw .85s 2.02s cubic-bezier(.5,0,.2,1) forwards}
 @keyframes spDraw{to{stroke-dashoffset:0}}
-#intro-splash .sp-title{margin-top:30px;opacity:0}
-#intro-splash .sp-title h1{margin:0;font:800 clamp(26px,4vw,40px)/1.15 system-ui,'Segoe UI',sans-serif;color:#3D3929}
-#intro-splash .sp-title h1 span{color:#3A7D6E}
-#intro-splash .sp-title p{margin:8px 0 0;font:600 13px/1 system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#8a8676}
-#intro-splash.on .sp-title{animation:spUp .45s .62s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes spUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
-#intro-splash .sp-line{height:3px;width:0;margin:14px auto 0;border-radius:3px;background:linear-gradient(90deg,#C9A227,#4F9D8B)}
-#intro-splash.on .sp-line{animation:spLine .45s .8s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes spLine{to{width:180px}}
-#intro-splash .sp-f{position:absolute;font:700 13px/1 system-ui,sans-serif;color:#3A7D6E;background:#fff;border:1.5px solid #C3E0D8;border-radius:12px;padding:8px 12px;box-shadow:0 12px 26px -12px rgba(58,125,110,.5);opacity:0}
-#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s 1.0s ease forwards}
-#intro-splash .sp-f1{left:12%;top:24%;animation-delay:.68s,1.0s!important}
-#intro-splash .sp-f2{right:13%;top:28%;animation-delay:.74s,1.0s!important}
-#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:.80s,1.0s!important}
-#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:.86s,1.0s!important}
-@keyframes spF{from{opacity:0;transform:translateY(18px) scale(.85)}to{opacity:1;transform:none}}
-@keyframes spFOut{to{opacity:0;transform:translateY(-10px) scale(.9)}}
+
+#intro-splash .sp-title{margin-top:32px;opacity:0}
+/* Arabic project title carries the sequence, so it gets the display size and
+   an Arabic-first font stack; the English line underneath is the sub-label. */
+#intro-splash .sp-title h1{margin:0;direction:rtl;
+  font:700 clamp(30px,5.2vw,56px)/1.35 'Segoe UI','Dubai','Tahoma','Arial',sans-serif;
+  color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.65)}
+#intro-splash .sp-title p{margin:12px 0 0;font:600 12px/1 system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.78)}
+#intro-splash.on .sp-title{animation:spUp .5s 2.42s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes spUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:none}}
+#intro-splash .sp-line{height:3px;width:0;margin:16px auto 0;border-radius:3px;background:linear-gradient(90deg,#C9A227,#4F9D8B)}
+#intro-splash.on .sp-line{animation:spLine .5s 2.60s cubic-bezier(.22,1,.36,1) forwards}
+@keyframes spLine{to{width:190px}}
+
+/* Four small chips drift in around the lockup, then clear out before the exit
+   so the last frame is just the marks and the title. */
+#intro-splash .sp-f{position:absolute;font:700 13px/1 system-ui,sans-serif;color:#eafaf4;
+  background:rgba(12,38,31,.55);border:1.5px solid rgba(163,224,207,.35);border-radius:12px;padding:8px 12px;
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  box-shadow:0 14px 30px -14px rgba(0,0,0,.8);opacity:0}
+#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s 3.55s ease forwards}
+#intro-splash .sp-f1{left:12%;top:24%;animation-delay:2.50s,3.55s!important}
+#intro-splash .sp-f2{right:13%;top:28%;animation-delay:2.56s,3.55s!important}
+#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:2.62s,3.55s!important}
+#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:2.68s,3.55s!important}
+@keyframes spF{0%{opacity:0;transform:translateY(14px) scale(.9)}100%{opacity:1;transform:none}}
+@keyframes spFOut{to{opacity:0;transform:translateY(-10px)}}
 @media (max-width:760px){#intro-splash .sp-f{display:none}}
 </style>
-<div class="sp-half sp-top"></div>
-<div class="sp-half sp-bot"></div>
+<video id="sp-video" class="sp-video" src="assets/intro.mp4" playsinline preload="auto" loop></video>
+<div class="sp-scrim"></div>
 <div class="sp-center">
   <div>
     <div class="sp-badges">
-      <!-- Ring is drawn as an SVG stroke so it can animate on rather than
-           just fade — dasharray sweep, clockwise from 12 o'clock. -->
       <svg class="sp-ring" viewBox="0 0 140 140" aria-hidden="true">
         <circle cx="70" cy="70" r="66" />
       </svg>
@@ -1137,8 +1161,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div class="sp-cbi"><img src="__LOGO_CBI__" alt="Central Bank of Iraq"></div>
     </div>
     <div class="sp-title">
-      <h1><span>Weekly</span> Progress Report</h1>
-      <p>First Iraq Bank &middot; PMO</p>
+      <h1 lang="ar" dir="rtl">&#1605;&#1588;&#1585;&#1608;&#1593; &#1575;&#1604;&#1573;&#1589;&#1604;&#1575;&#1581; &#1575;&#1604;&#1605;&#1589;&#1585;&#1601;&#1610;</h1>
+      <p>First Iraq Bank &middot; PMO &middot; Weekly Progress</p>
       <div class="sp-line"></div>
     </div>
   </div>
@@ -3770,8 +3794,38 @@ function playIntro(){
       return;
     }
   } catch(e){}
+  var v = document.getElementById('sp-video');
+  if (v){
+    v.volume = 1;
+    // The clip's own mix is quiet and volume caps at 1.0, so the audio is
+    // routed through a WebAudio gain stage to bring it up to a usable level
+    // on laptop speakers. Same-origin file, so the graph is allowed.
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !v._boosted){
+        var ctx = new AC();
+        var g = ctx.createGain();
+        g.gain.value = 3.5;
+        ctx.createMediaElementSource(v).connect(g).connect(ctx.destination);
+        if (ctx.state === 'suspended'){ ctx.resume(); }
+        v._boosted = true;
+      }
+    } catch(e){}
+    try { v.currentTime = 0; } catch(e){}
+    // Sound is allowed to play here because unlock() runs off the click on the
+    // password gate; if a browser refuses anyway, fall back to a muted run
+    // rather than losing the opener.
+    var p = v.play();
+    if (p && p.catch) p.catch(function(){ v.muted = true; v.play().catch(function(){}); });
+  }
   s.classList.add('on');
-  setTimeout(function(){ s.style.display = 'none'; }, 1850);
+  // 0 → 1.77s the film runs alone; the clip itself ends at 2.93s and holds on
+  // its last frame under the scrim; the exit starts at 3.95s, gone at 4.45s.
+  setTimeout(function(){ s.classList.add('out'); }, 3950);
+  setTimeout(function(){
+    s.style.display = 'none';
+    if (v){ try { v.pause(); } catch(e){} }
+  }, 4450);
 }
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
