@@ -1018,25 +1018,26 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
    Beat 2 (1.77s →   ): scrim lifts and the two marks, the ring and the Arabic
    title land on top of it. Everything below is offset from that 1.77s cue, so
    moving the cue means editing the delays in one place only.            */
-#intro-splash{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none;background:#07120f}
+#intro-splash{--cue:1.77s;position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;pointer-events:none;background:#07120f}
+/* No clip buffered in time: the film beat is dropped and the lockup starts
+   immediately, rather than making everyone wait on a blank screen. */
+#intro-splash.quick{--cue:0s}
+#intro-splash.quick .sp-video{display:none}
 #intro-splash.on{display:block}
 #intro-splash.out{animation:spExit .5s cubic-bezier(.65,0,.35,1) forwards}
 @keyframes spExit{to{opacity:0;transform:scale(1.06);filter:blur(6px)}}
 
-#intro-splash .sp-video{position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;transform:scale(1.04)}
-#intro-splash.on .sp-video{animation:spZoom 4.6s linear forwards}
-@keyframes spZoom{to{transform:scale(1.13)}}
+#intro-splash .sp-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 
 /* Holds the footage back so white marks and Arabic type stay readable over
    whatever frame happens to be on screen. */
 #intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
   background:radial-gradient(120% 90% at 50% 46%,rgba(4,20,16,.30) 0%,rgba(4,20,16,.76) 55%,rgba(3,13,10,.93) 100%)}
-#intro-splash.on .sp-scrim{animation:spScrim .5s 1.77s ease forwards}
+#intro-splash.on .sp-scrim{animation:spScrim .5s var(--cue) ease forwards}
 @keyframes spScrim{to{opacity:1}}
 
 #intro-splash .sp-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
-#intro-splash.on .sp-center{animation:spFade .35s 3.80s ease forwards}
+#intro-splash.on .sp-center{animation:spFade .35s calc(var(--cue) + 2.03s) ease forwards}
 @keyframes spFade{to{opacity:0;transform:scale(.97)}}
 
 #intro-splash .sp-badges{display:flex;align-items:center;justify-content:center;gap:26px;position:relative}
@@ -1053,8 +1054,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* If a logo file was missing at build time the src is empty — hide the broken
    image icon rather than showing it inside the tile. */
 #intro-splash .sp-fib img[src=""],#intro-splash .sp-cbi img[src=""]{display:none}
-#intro-splash.on .sp-fib{animation:spFromL .6s 1.82s cubic-bezier(.18,1.15,.3,1) forwards}
-#intro-splash.on .sp-cbi{animation:spFromR .6s 1.82s cubic-bezier(.18,1.15,.3,1) forwards}
+#intro-splash.on .sp-fib{animation:spFromL .6s calc(var(--cue) + .05s) cubic-bezier(.18,1.15,.3,1) forwards}
+#intro-splash.on .sp-cbi{animation:spFromR .6s calc(var(--cue) + .05s) cubic-bezier(.18,1.15,.3,1) forwards}
 @keyframes spFromL{0%{opacity:0;transform:translateX(-70px) rotate(-12deg) scale(.7)}
                   100%{opacity:1;transform:none}}
 @keyframes spFromR{0%{opacity:0;transform:translateX(70px) rotate(12deg) scale(.7)}
@@ -1062,14 +1063,14 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* A light sweep across each tile once it has settled — reads as polish, not
    as another entrance. */
 #intro-splash .sp-fib::after,#intro-splash .sp-cbi::after{content:'';position:absolute;inset:0;transform:translateX(-130%) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent)}
-#intro-splash.on .sp-fib::after{animation:spShine .5s 2.39s ease forwards}
-#intro-splash.on .sp-cbi::after{animation:spShine .5s 2.47s ease forwards}
+#intro-splash.on .sp-fib::after{animation:spShine .5s calc(var(--cue) + .62s) ease forwards}
+#intro-splash.on .sp-cbi::after{animation:spShine .5s calc(var(--cue) + .70s) ease forwards}
 @keyframes spShine{to{transform:translateX(130%) skewX(-18deg)}}
 
 #intro-splash .sp-link{width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid #C9A227;display:grid;place-items:center;color:#8a6d1c;font:700 15px/1 system-ui,sans-serif;opacity:0;transform:scale(.4);z-index:2;
   box-shadow:0 10px 24px -8px rgba(0,0,0,.7)}
-#intro-splash.on .sp-link{animation:spPop .4s 2.39s cubic-bezier(.18,1.5,.4,1) forwards,
-                                    spGlow 1.4s 2.79s ease-in-out infinite}
+#intro-splash.on .sp-link{animation:spPop .4s calc(var(--cue) + .62s) cubic-bezier(.18,1.5,.4,1) forwards,
+                                    spGlow 1.4s calc(var(--cue) + 1.02s) ease-in-out infinite}
 @keyframes spPop{to{opacity:1;transform:scale(1)}}
 @keyframes spGlow{0%,100%{box-shadow:0 0 0 0 rgba(201,162,39,.55)}
                      50%{box-shadow:0 0 0 12px rgba(201,162,39,0)}}
@@ -1080,7 +1081,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   transform:translate(-50%,-50%);pointer-events:none}
 #intro-splash .sp-ring circle{fill:none;stroke:rgba(163,224,207,.75);stroke-width:2;
   stroke-dasharray:415;stroke-dashoffset:415;transform:rotate(-90deg);transform-origin:50% 50%}
-#intro-splash.on .sp-ring circle{animation:spDraw .85s 2.02s cubic-bezier(.5,0,.2,1) forwards}
+#intro-splash.on .sp-ring circle{animation:spDraw .85s calc(var(--cue) + .25s) cubic-bezier(.5,0,.2,1) forwards}
 @keyframes spDraw{to{stroke-dashoffset:0}}
 
 #intro-splash .sp-title{margin-top:32px;opacity:0}
@@ -1090,10 +1091,10 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   font:700 clamp(30px,5.2vw,56px)/1.35 'Segoe UI','Dubai','Tahoma','Arial',sans-serif;
   color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.65)}
 #intro-splash .sp-title p{margin:12px 0 0;font:600 12px/1 system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.78)}
-#intro-splash.on .sp-title{animation:spUp .5s 2.42s cubic-bezier(.22,1,.36,1) forwards}
+#intro-splash.on .sp-title{animation:spUp .5s calc(var(--cue) + .65s) cubic-bezier(.22,1,.36,1) forwards}
 @keyframes spUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:none}}
 #intro-splash .sp-line{height:3px;width:0;margin:16px auto 0;border-radius:3px;background:linear-gradient(90deg,#C9A227,#4F9D8B)}
-#intro-splash.on .sp-line{animation:spLine .5s 2.60s cubic-bezier(.22,1,.36,1) forwards}
+#intro-splash.on .sp-line{animation:spLine .5s calc(var(--cue) + .83s) cubic-bezier(.22,1,.36,1) forwards}
 @keyframes spLine{to{width:190px}}
 
 /* Four small chips drift in around the lockup, then clear out before the exit
@@ -1102,16 +1103,16 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   background:rgba(12,38,31,.55);border:1.5px solid rgba(163,224,207,.35);border-radius:12px;padding:8px 12px;
   -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   box-shadow:0 14px 30px -14px rgba(0,0,0,.8);opacity:0}
-#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s 3.55s ease forwards}
-#intro-splash .sp-f1{left:12%;top:24%;animation-delay:2.50s,3.55s!important}
-#intro-splash .sp-f2{right:13%;top:28%;animation-delay:2.56s,3.55s!important}
-#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:2.62s,3.55s!important}
-#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:2.68s,3.55s!important}
+#intro-splash.on .sp-f{animation:spF .7s cubic-bezier(.22,1,.36,1) forwards,spFOut .3s calc(var(--cue) + 1.78s) ease forwards}
+#intro-splash .sp-f1{left:12%;top:24%;animation-delay:calc(var(--cue) + .73s),calc(var(--cue) + 1.78s)!important}
+#intro-splash .sp-f2{right:13%;top:28%;animation-delay:calc(var(--cue) + .79s),calc(var(--cue) + 1.78s)!important}
+#intro-splash .sp-f3{left:16%;bottom:26%;animation-delay:calc(var(--cue) + .85s),calc(var(--cue) + 1.78s)!important}
+#intro-splash .sp-f4{right:17%;bottom:23%;animation-delay:calc(var(--cue) + .91s),calc(var(--cue) + 1.78s)!important}
 @keyframes spF{0%{opacity:0;transform:translateY(14px) scale(.9)}100%{opacity:1;transform:none}}
 @keyframes spFOut{to{opacity:0;transform:translateY(-10px)}}
 @media (max-width:760px){#intro-splash .sp-f{display:none}}
 </style>
-<video id="sp-video" class="sp-video" src="assets/intro.mp4" playsinline preload="auto" loop></video>
+<video id="sp-video" class="sp-video" src="assets/intro.mp4" playsinline preload="auto"></video>
 <div class="sp-scrim"></div>
 <div class="sp-center">
   <div>
@@ -1165,8 +1166,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- Version badge — outside the gate on purpose: lets anyone confirm which
      build is live without signing in. Contains no report data. -->
-<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.0, built 2026-08-17 13:39 UTC (commit 020c2b7)">
-  <span class="ver-num">v2.19.0</span>
+<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.1, built 2026-08-17 13:39 UTC (commit 020c2b7)">
+  <span class="ver-num">v2.19.1</span>
   <span class="ver-sep">·</span>
   <span>2026-08-17</span>
   <span class="ver-sep">·</span>
@@ -1922,7 +1923,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 13:39 UTC · commit 020c2b7"><span class="ver-num">v2.19.0</span> · 2026-08-17 · 020c2b7</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 13:39 UTC · commit 020c2b7"><span class="ver-num">v2.19.1</span> · 2026-08-17 · 020c2b7</span>
   </footer>
 </div>
 </div>
@@ -1940,7 +1941,7 @@ let GH_PAT   = '';
 // ── Build identity ─────────────────────────────────────────────────────────
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
-const SITE_VERSION = "2.19.0";
+const SITE_VERSION = "2.19.1";
 const BUILD_TIME   = "2026-08-17 13:39 UTC";
 const BUILD_COMMIT = "020c2b7";
 
@@ -3758,7 +3759,13 @@ function playIntro(){
     }
   } catch(e){}
   var v = document.getElementById('sp-video');
-  if (v){
+  // readyState 3 = enough buffered to start playing through. The clip is a few
+  // MB, so on a cold or slow connection it will not be there yet — in that case
+  // drop the film beat and run the lockup on its own rather than holding the
+  // report behind a download.
+  var ready = !!(v && v.readyState >= 3);
+  if (!ready) s.classList.add('quick');
+  if (ready){
     v.volume = 1;
     // The clip's own mix is quiet and volume caps at 1.0, so the audio is
     // routed through a WebAudio gain stage to bring it up to a usable level
@@ -3782,14 +3789,21 @@ function playIntro(){
     if (p && p.catch) p.catch(function(){ v.muted = true; v.play().catch(function(){}); });
   }
   s.classList.add('on');
-  // 0 → 1.77s the film runs alone; the clip itself ends at 2.93s and holds on
-  // its last frame under the scrim; the exit starts at 3.95s, gone at 4.45s.
-  setTimeout(function(){ s.classList.add('out'); }, 3950);
+  // The clip runs once and is not looped — it is 2.93s long against a 2.18s
+  // lockup, so looping it made the opener look like it played twice.
+  var cue = ready ? 1770 : 0;
+  setTimeout(function(){ s.classList.add('out'); }, cue + 2180);
   setTimeout(function(){
     s.style.display = 'none';
     if (v){ try { v.pause(); } catch(e){} }
-  }, 4450);
+  }, cue + 2680);
 }
+// Start buffering the opener while the password is still being typed, so the
+// unlock is not the first time the file is asked for.
+document.addEventListener('DOMContentLoaded', function(){
+  var v = document.getElementById('sp-video');
+  if (v){ try { v.load(); } catch(e){} }
+});
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'block';
