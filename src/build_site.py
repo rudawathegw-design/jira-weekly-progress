@@ -3769,14 +3769,22 @@ async function checkPw(){
     }
     sessionStorage.setItem('pw_cache', v);
     err.textContent = '';
-    // Then try to refresh from API for any live changes since build
-    await _loadHiddenListRemote();
-    // Re-group under the saved attribution settings before the first paint, so
-    // a non-default mode is honoured immediately instead of flashing the
-    // build-time grouping and then swapping.
+    // Reveal the app and play the opener straight off the decrypt — do NOT
+    // wait on the network first. The live hidden-list refresh below makes two
+    // sequential GitHub round-trips (~4s on a cold call), and it used to sit in
+    // front of unlock(), which is what starts the intro — so pressing Enter
+    // bought that whole delay as a black pause before the video appeared.
+    //
+    // The build-time hidden list is already applied above, so this first paint
+    // is correct. The remote refresh now runs in the background and re-groups
+    // only if it turns up a newer list (someone hidden via live admin since the
+    // last build) — a brief, rare correction instead of a guaranteed 4s wait.
     adoptBaseReport(data.report);
     unlock();
     init();
+    _loadHiddenListRemote()
+      .then(() => applyAttribution())
+      .catch(() => {});
   } catch(e){
     err.textContent = 'Incorrect password — try again.';
     inp.value = '';
@@ -11446,6 +11454,11 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.19.2 The opener no longer waits on the network. checkPw() was
+#          awaiting the live hidden-list refresh (two GitHub round-trips,
+#          ~4s cold) before unlock() started the intro, so pressing Enter
+#          paused ~4s on black before the video. The refresh now runs in
+#          the background; the intro plays straight off the decrypt.
 #   2.19.1 Opener fixes: the clip is no longer looped (it is 2.93s against
 #          a 2.18s lockup, so it restarted and read as playing twice), the
 #          push-in is gone (that was the shake), and buffering now starts
@@ -11549,7 +11562,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.19.1"
+SITE_VERSION = "2.19.2"
 
 
 def _build_stamp():
