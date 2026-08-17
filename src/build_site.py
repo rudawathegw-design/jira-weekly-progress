@@ -1069,7 +1069,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* Holds the footage back so white marks and Arabic type stay readable over
    whatever frame happens to be on screen. */
 #intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
-  background:radial-gradient(115% 85% at 50% 45%,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 48%,rgba(0,0,0,.92) 80%,rgba(0,0,0,.98) 100%)}
+  background:transparent}
 #intro-splash.on .sp-scrim{animation:spScrim .5s var(--cue) ease forwards}
 @keyframes spScrim{to{opacity:1}}
 
@@ -11451,6 +11451,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.19.4 No overlay on the film. The dark scrim is removed entirely —
+#          the clip plays clean at full quality and only the marks and
+#          the Arabic title sit on top, kept readable by their own
+#          text/box shadows rather than a background wash.
 #   2.19.3 Opener audio + look. The 3.5x gain boost is gone — the clip
 #          plays at its own quiet level — and the sound now fades out over
 #          the last 0.7s instead of cutting off. The scrim is a deeper,
@@ -11563,7 +11567,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.19.3"
+SITE_VERSION = "2.19.4"
 
 
 def _build_stamp():

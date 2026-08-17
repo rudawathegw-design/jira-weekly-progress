@@ -1032,7 +1032,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* Holds the footage back so white marks and Arabic type stay readable over
    whatever frame happens to be on screen. */
 #intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
-  background:radial-gradient(115% 85% at 50% 45%,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 48%,rgba(0,0,0,.92) 80%,rgba(0,0,0,.98) 100%)}
+  background:transparent}
 #intro-splash.on .sp-scrim{animation:spScrim .5s var(--cue) ease forwards}
 @keyframes spScrim{to{opacity:1}}
 
@@ -1166,8 +1166,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- Version badge — outside the gate on purpose: lets anyone confirm which
      build is live without signing in. Contains no report data. -->
-<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.3, built 2026-08-17 14:25 UTC (commit 5507730)">
-  <span class="ver-num">v2.19.3</span>
+<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.4, built 2026-08-17 14:25 UTC (commit 5507730)">
+  <span class="ver-num">v2.19.4</span>
   <span class="ver-sep">·</span>
   <span>2026-08-17</span>
   <span class="ver-sep">·</span>
@@ -1923,7 +1923,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 14:25 UTC · commit 5507730"><span class="ver-num">v2.19.3</span> · 2026-08-17 · 5507730</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 14:25 UTC · commit 5507730"><span class="ver-num">v2.19.4</span> · 2026-08-17 · 5507730</span>
   </footer>
 </div>
 </div>
@@ -1941,7 +1941,7 @@ let GH_PAT   = '';
 // ── Build identity ─────────────────────────────────────────────────────────
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
-const SITE_VERSION = "2.19.3";
+const SITE_VERSION = "2.19.4";
 const BUILD_TIME   = "2026-08-17 14:25 UTC";
 const BUILD_COMMIT = "5507730";
 
