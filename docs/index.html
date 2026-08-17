@@ -1032,7 +1032,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* Holds the footage back so white marks and Arabic type stay readable over
    whatever frame happens to be on screen. */
 #intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
-  background:radial-gradient(120% 90% at 50% 46%,rgba(4,20,16,.30) 0%,rgba(4,20,16,.76) 55%,rgba(3,13,10,.93) 100%)}
+  background:radial-gradient(115% 85% at 50% 45%,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 48%,rgba(0,0,0,.92) 80%,rgba(0,0,0,.98) 100%)}
 #intro-splash.on .sp-scrim{animation:spScrim .5s var(--cue) ease forwards}
 @keyframes spScrim{to{opacity:1}}
 
@@ -1166,8 +1166,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- Version badge — outside the gate on purpose: lets anyone confirm which
      build is live without signing in. Contains no report data. -->
-<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.2, built 2026-08-17 14:14 UTC (commit a1ff000)">
-  <span class="ver-num">v2.19.2</span>
+<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.19.3, built 2026-08-17 14:14 UTC (commit a1ff000)">
+  <span class="ver-num">v2.19.3</span>
   <span class="ver-sep">·</span>
   <span>2026-08-17</span>
   <span class="ver-sep">·</span>
@@ -1923,7 +1923,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 14:14 UTC · commit a1ff000"><span class="ver-num">v2.19.2</span> · 2026-08-17 · a1ff000</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-17 14:14 UTC · commit a1ff000"><span class="ver-num">v2.19.3</span> · 2026-08-17 · a1ff000</span>
   </footer>
 </div>
 </div>
@@ -1941,7 +1941,7 @@ let GH_PAT   = '';
 // ── Build identity ─────────────────────────────────────────────────────────
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
-const SITE_VERSION = "2.19.2";
+const SITE_VERSION = "2.19.3";
 const BUILD_TIME   = "2026-08-17 14:14 UTC";
 const BUILD_COMMIT = "a1ff000";
 
@@ -3774,27 +3774,24 @@ function playIntro(){
   var ready = !!(v && v.readyState >= 3);
   if (!ready) s.classList.add('quick');
   if (ready){
+    // Play at the clip's own level — no boost. The mix is quiet by design and
+    // the ask is to keep it that soft, low background tone.
     v.volume = 1;
-    // The clip's own mix is quiet and volume caps at 1.0, so the audio is
-    // routed through a WebAudio gain stage to bring it up to a usable level
-    // on laptop speakers. Same-origin file, so the graph is allowed.
-    try {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && !v._boosted){
-        var ctx = new AC();
-        var g = ctx.createGain();
-        g.gain.value = 3.5;
-        ctx.createMediaElementSource(v).connect(g).connect(ctx.destination);
-        if (ctx.state === 'suspended'){ ctx.resume(); }
-        v._boosted = true;
-      }
-    } catch(e){}
     try { v.currentTime = 0; } catch(e){}
     // Sound is allowed to play here because unlock() runs off the click on the
     // password gate; if a browser refuses anyway, fall back to a muted run
     // rather than losing the opener.
     var p = v.play();
     if (p && p.catch) p.catch(function(){ v.muted = true; v.play().catch(function(){}); });
+    // Ease the sound out across the last stretch of the clip so it settles into
+    // silence under the title instead of being chopped off when the clip ends.
+    var FADE = 0.7; // seconds of tail to fade across
+    var fadeTimer = setInterval(function(){
+      if (v.muted){ clearInterval(fadeTimer); return; }
+      var d = v.duration || 2.93, left = d - v.currentTime;
+      if (left <= FADE) v.volume = Math.max(0, left / FADE);
+      if (v.paused || v.ended || left <= 0.03){ v.volume = 0; clearInterval(fadeTimer); }
+    }, 50);
   }
   s.classList.add('on');
   // The clip runs once and is not looped — it is 2.93s long against a 2.18s

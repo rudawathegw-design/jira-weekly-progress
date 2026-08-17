@@ -1069,7 +1069,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 /* Holds the footage back so white marks and Arabic type stay readable over
    whatever frame happens to be on screen. */
 #intro-splash .sp-scrim{position:absolute;inset:0;opacity:0;
-  background:radial-gradient(120% 90% at 50% 46%,rgba(4,20,16,.30) 0%,rgba(4,20,16,.76) 55%,rgba(3,13,10,.93) 100%)}
+  background:radial-gradient(115% 85% at 50% 45%,rgba(0,0,0,.42) 0%,rgba(0,0,0,.72) 48%,rgba(0,0,0,.92) 80%,rgba(0,0,0,.98) 100%)}
 #intro-splash.on .sp-scrim{animation:spScrim .5s var(--cue) ease forwards}
 @keyframes spScrim{to{opacity:1}}
 
@@ -3811,27 +3811,24 @@ function playIntro(){
   var ready = !!(v && v.readyState >= 3);
   if (!ready) s.classList.add('quick');
   if (ready){
+    // Play at the clip's own level — no boost. The mix is quiet by design and
+    // the ask is to keep it that soft, low background tone.
     v.volume = 1;
-    // The clip's own mix is quiet and volume caps at 1.0, so the audio is
-    // routed through a WebAudio gain stage to bring it up to a usable level
-    // on laptop speakers. Same-origin file, so the graph is allowed.
-    try {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (AC && !v._boosted){
-        var ctx = new AC();
-        var g = ctx.createGain();
-        g.gain.value = 3.5;
-        ctx.createMediaElementSource(v).connect(g).connect(ctx.destination);
-        if (ctx.state === 'suspended'){ ctx.resume(); }
-        v._boosted = true;
-      }
-    } catch(e){}
     try { v.currentTime = 0; } catch(e){}
     // Sound is allowed to play here because unlock() runs off the click on the
     // password gate; if a browser refuses anyway, fall back to a muted run
     // rather than losing the opener.
     var p = v.play();
     if (p && p.catch) p.catch(function(){ v.muted = true; v.play().catch(function(){}); });
+    // Ease the sound out across the last stretch of the clip so it settles into
+    // silence under the title instead of being chopped off when the clip ends.
+    var FADE = 0.7; // seconds of tail to fade across
+    var fadeTimer = setInterval(function(){
+      if (v.muted){ clearInterval(fadeTimer); return; }
+      var d = v.duration || 2.93, left = d - v.currentTime;
+      if (left <= FADE) v.volume = Math.max(0, left / FADE);
+      if (v.paused || v.ended || left <= 0.03){ v.volume = 0; clearInterval(fadeTimer); }
+    }, 50);
   }
   s.classList.add('on');
   // The clip runs once and is not looped — it is 2.93s long against a 2.18s
@@ -11454,6 +11451,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.19.3 Opener audio + look. The 3.5x gain boost is gone — the clip
+#          plays at its own quiet level — and the sound now fades out over
+#          the last 0.7s instead of cutting off. The scrim is a deeper,
+#          near-black shadow so the marks and Arabic title read cleanly.
 #   2.19.2 The opener no longer waits on the network. checkPw() was
 #          awaiting the live hidden-list refresh (two GitHub round-trips,
 #          ~4s cold) before unlock() started the intro, so pressing Enter
@@ -11562,7 +11563,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.19.2"
+SITE_VERSION = "2.19.3"
 
 
 def _build_stamp():
