@@ -400,10 +400,10 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 /* Mustashar AI — a violet gradient so it reads as the one "intelligent" action
    in the row, distinct from the teal primary and red alert. Slow sheen so it
    invites a click without shouting. */
-.chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;
-  border-color:transparent;box-shadow:0 2px 12px rgba(124,58,237,.35);position:relative;overflow:hidden}
-.chip.ac-ai svg{color:#fff}
-.chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6);border-color:transparent}
+.chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9) !important;color:#fff !important;
+  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:hidden}
+.chip.ac-ai svg{color:#fff !important}
+.chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6) !important;border-color:transparent !important}
 .chip.ac-ai[data-new]::after{background:#facc15;color:#3b0764}
 .chip.ac-ai::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
@@ -10910,7 +10910,7 @@ document.addEventListener('keydown', function(e){
      the overdue-modal toolbar, where three buttons carry an inline gradient
      plus `color:#fff`. Repainting their background (even via !important) left
      the inline white text intact and the labels vanished into the glass. */
-  .chip:not(.blue):not(.green):not(.primary),
+  .chip:not(.blue):not(.green):not(.primary):not(.ac-ai),
   .col-hdr .col-hdr-btn,.tab-btn.active,.search-inp,.baseline-sel,.week-sel,
   .attr-btn,.rbtn,.check-item,.act-filter-input,.act-filter-sel{
     background:var(--glass-2) !important;
@@ -10918,7 +10918,7 @@ document.addEventListener('keydown', function(e){
     border:1px solid rgba(255,255,255,.78) !important;
     box-shadow:0 1px 2px rgba(15,23,42,.05),inset 0 1px 0 rgba(255,255,255,.85);
   }
-  .chip:not(.blue):not(.green):not(.primary):hover,
+  .chip:not(.blue):not(.green):not(.primary):not(.ac-ai):hover,
   .col-hdr .col-hdr-btn:hover,.attr-btn:hover,.rbtn:hover,.check-item:hover{
     background:linear-gradient(155deg,rgba(255,255,255,.9),
                                rgba(255,255,255,.68)) !important;
@@ -11802,6 +11802,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.20.1 Mustashar button was washed out — the glass theme repainted it
+#          near-white over its white text. Excluded .ac-ai from that rule
+#          and pinned its violet fill. (Also: the invalid DeepSeek key in
+#          the Worker was replaced with a working one.)
 #   2.20.0 Mustashar AI — a header button that runs a twice-a-week, CEO-
 #          style briefing over the whole live project (verdict, risks, who
 #          to push, do-this-week). Reuses the existing DeepSeek Worker
@@ -11925,7 +11929,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.20.0"
+SITE_VERSION = "2.20.1"
 
 
 def _build_stamp():
