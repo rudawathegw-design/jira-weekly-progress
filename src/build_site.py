@@ -400,10 +400,10 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 /* Mustashar AI — a violet gradient so it reads as the one "intelligent" action
    in the row, distinct from the teal primary and red alert. Slow sheen so it
    invites a click without shouting. */
-.chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9) !important;color:#fff !important;
-  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:visible}
-.chip.ac-ai svg{color:#fff !important}
-.chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6) !important;border-color:transparent !important}
+.chip.ac-ai{background:#f4effd !important;color:#6d28d9 !important;
+  border:1.5px solid #ddd0f7 !important;box-shadow:0 1px 3px rgba(0,0,0,.05) !important;position:relative;overflow:visible}
+.chip.ac-ai svg{color:#8b5cf6 !important}
+.chip.ac-ai:hover{background:#ece2fb !important;border-color:#cbb8f2 !important}
 .chip.ac-ai[data-new]::after{background:#facc15;color:#3b0764}
 /* ── Mustashar AI briefing modal ─────────────────────────────────────────── */
 .ceo-head{background:linear-gradient(135deg,#faf5ff,#f3e8ff);margin:-20px -20px 0;padding:18px 20px;border-radius:14px 14px 0 0;border-bottom:1px solid #ede0ff}
@@ -11797,6 +11797,9 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.20.3 Softened the Mustashar button per request — light lavender fill
+#          with violet text and a plain neutral shadow, dropping the
+#          coloured violet glow ("aura").
 #   2.20.2 The NEW badge on the Mustashar button was clipped — the button
 #          had overflow:hidden for a sheen effect, which cut off the badge
 #          sitting just outside its corner. Dropped the sheen and set
@@ -11928,7 +11931,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.20.2"
+SITE_VERSION = "2.20.3"
 
 
 def _build_stamp():
