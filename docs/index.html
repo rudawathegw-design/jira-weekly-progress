@@ -364,15 +364,10 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
    in the row, distinct from the teal primary and red alert. Slow sheen so it
    invites a click without shouting. */
 .chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9) !important;color:#fff !important;
-  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:hidden}
+  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:visible}
 .chip.ac-ai svg{color:#fff !important}
 .chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6) !important;border-color:transparent !important}
 .chip.ac-ai[data-new]::after{background:#facc15;color:#3b0764}
-.chip.ac-ai::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
-  transform:skewX(-18deg);animation:aiSheen 4.5s ease-in-out infinite}
-@keyframes aiSheen{0%,72%{left:-60%}86%{left:120%}100%{left:120%}}
-@media (prefers-reduced-motion:reduce){.chip.ac-ai::before{animation:none;display:none}}
 /* ── Mustashar AI briefing modal ─────────────────────────────────────────── */
 .ceo-head{background:linear-gradient(135deg,#faf5ff,#f3e8ff);margin:-20px -20px 0;padding:18px 20px;border-radius:14px 14px 0 0;border-bottom:1px solid #ede0ff}
 .ceo-badge{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;color:#fff;
@@ -1207,8 +1202,8 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- Version badge — outside the gate on purpose: lets anyone confirm which
      build is live without signing in. Contains no report data. -->
-<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.20.1, built 2026-08-26 21:02 UTC (commit c1a9dab)">
-  <span class="ver-num">v2.20.1</span>
+<div class="ver-badge" id="ver-badge" title="Dashboard build — v2.20.2, built 2026-08-26 21:02 UTC (commit c1a9dab)">
+  <span class="ver-num">v2.20.2</span>
   <span class="ver-sep">·</span>
   <span>2026-08-26</span>
   <span class="ver-sep">·</span>
@@ -2017,7 +2012,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-26 21:02 UTC · commit c1a9dab"><span class="ver-num">v2.20.1</span> · 2026-08-26 · c1a9dab</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-26 21:02 UTC · commit c1a9dab"><span class="ver-num">v2.20.2</span> · 2026-08-26 · c1a9dab</span>
   </footer>
 </div>
 </div>
@@ -2035,7 +2030,7 @@ let GH_PAT   = '';
 // ── Build identity ─────────────────────────────────────────────────────────
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
-const SITE_VERSION = "2.20.1";
+const SITE_VERSION = "2.20.2";
 const BUILD_TIME   = "2026-08-26 21:02 UTC";
 const BUILD_COMMIT = "c1a9dab";
 

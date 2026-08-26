@@ -401,15 +401,10 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
    in the row, distinct from the teal primary and red alert. Slow sheen so it
    invites a click without shouting. */
 .chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9) !important;color:#fff !important;
-  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:hidden}
+  border:1.5px solid transparent !important;box-shadow:0 2px 12px rgba(124,58,237,.35) !important;position:relative;overflow:visible}
 .chip.ac-ai svg{color:#fff !important}
 .chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6) !important;border-color:transparent !important}
 .chip.ac-ai[data-new]::after{background:#facc15;color:#3b0764}
-.chip.ac-ai::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
-  transform:skewX(-18deg);animation:aiSheen 4.5s ease-in-out infinite}
-@keyframes aiSheen{0%,72%{left:-60%}86%{left:120%}100%{left:120%}}
-@media (prefers-reduced-motion:reduce){.chip.ac-ai::before{animation:none;display:none}}
 /* ── Mustashar AI briefing modal ─────────────────────────────────────────── */
 .ceo-head{background:linear-gradient(135deg,#faf5ff,#f3e8ff);margin:-20px -20px 0;padding:18px 20px;border-radius:14px 14px 0 0;border-bottom:1px solid #ede0ff}
 .ceo-badge{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;color:#fff;
@@ -11802,6 +11797,10 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.20.2 The NEW badge on the Mustashar button was clipped — the button
+#          had overflow:hidden for a sheen effect, which cut off the badge
+#          sitting just outside its corner. Dropped the sheen and set
+#          overflow:visible so the badge shows in full.
 #   2.20.1 Mustashar button was washed out — the glass theme repainted it
 #          near-white over its white text. Excluded .ac-ai from that rule
 #          and pinned its violet fill. (Also: the invalid DeepSeek key in
@@ -11929,7 +11928,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.20.1"
+SITE_VERSION = "2.20.2"
 
 
 def _build_stamp():
