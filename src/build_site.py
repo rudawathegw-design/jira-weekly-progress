@@ -397,6 +397,47 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
   border-color:transparent;box-shadow:0 2px 10px rgba(13,148,136,.28)}
 .chip.primary svg{color:#fff}
 .chip.primary:hover{background:linear-gradient(135deg,#0f766e,#115e59);border-color:transparent}
+/* Mustashar AI — a violet gradient so it reads as the one "intelligent" action
+   in the row, distinct from the teal primary and red alert. Slow sheen so it
+   invites a click without shouting. */
+.chip.ac-ai{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;
+  border-color:transparent;box-shadow:0 2px 12px rgba(124,58,237,.35);position:relative;overflow:hidden}
+.chip.ac-ai svg{color:#fff}
+.chip.ac-ai:hover{background:linear-gradient(135deg,#6d28d9,#5b21b6);border-color:transparent}
+.chip.ac-ai[data-new]::after{background:#facc15;color:#3b0764}
+.chip.ac-ai::before{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+  transform:skewX(-18deg);animation:aiSheen 4.5s ease-in-out infinite}
+@keyframes aiSheen{0%,72%{left:-60%}86%{left:120%}100%{left:120%}}
+@media (prefers-reduced-motion:reduce){.chip.ac-ai::before{animation:none;display:none}}
+/* ── Mustashar AI briefing modal ─────────────────────────────────────────── */
+.ceo-head{background:linear-gradient(135deg,#faf5ff,#f3e8ff);margin:-20px -20px 0;padding:18px 20px;border-radius:14px 14px 0 0;border-bottom:1px solid #ede0ff}
+.ceo-badge{width:38px;height:38px;flex:none;border-radius:11px;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);box-shadow:0 6px 16px -6px rgba(124,58,237,.7)}
+.ceo-scroll{max-height:62vh;overflow-y:auto;padding:4px 2px 2px}
+.ceo-loading{display:flex;gap:14px;align-items:center;padding:34px 14px}
+.ceo-spin{width:26px;height:26px;flex:none;border-radius:50%;border:3px solid #e9d5ff;border-top-color:#7c3aed;animation:ceoSpin .8s linear infinite}
+@keyframes ceoSpin{to{transform:rotate(360deg)}}
+.ceo-loading-t{font-weight:800;color:#5b21b6;font-size:15px}
+.ceo-loading-s{color:#7c6f95;font-size:12.5px;margin-top:3px}
+.ceo-body{padding:6px 6px 10px;color:#2b2540;font-size:14.5px;line-height:1.62}
+.ceo-body h2{font-size:15.5px;font-weight:800;color:#5b21b6;margin:20px 0 8px;padding-bottom:5px;border-bottom:2px solid #f0e6ff;display:flex;align-items:center;gap:8px}
+.ceo-body h2:first-child{margin-top:2px}
+.ceo-body h3{font-size:13.5px;font-weight:800;color:#6d28d9;margin:15px 0 5px}
+.ceo-body p{margin:0 0 10px}
+.ceo-body ul{margin:0 0 12px;padding-left:20px}
+.ceo-body li{margin:0 0 6px}
+.ceo-body strong{color:#3b0764;font-weight:800}
+.ceo-body code{background:#f4eeff;color:#5b21b6;padding:1px 5px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:12.5px}
+.ceo-body .ceo-hi{background:linear-gradient(transparent 60%,#fde68a 60%)}
+.ceo-error{padding:26px 14px;color:#b91c1c;font-weight:600}
+.ceo-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin:4px -20px -20px;padding:14px 20px;border-top:1px solid #eee;background:#faf9fc;border-radius:0 0 14px 14px}
+.ceo-quota{font-size:12.5px;font-weight:700;color:#6d28d9;display:flex;align-items:center;gap:6px}
+.ceo-quota .ceo-dot{width:7px;height:7px;border-radius:50%;background:#a855f7}
+.ceo-quota.spent{color:#b45309}.ceo-quota.spent .ceo-dot{background:#f59e0b}
+.ceo-foot-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ceo-listening{background:#ede9fe!important;border-color:#c4b5fd!important;color:#5b21b6!important}
 /* LIVE freshness chip — pale green pill (warm/stale/loading states recolor it) */
 #live-chip{background:#ecfdf5;border-color:#a7f3d0;color:#047857;
   box-shadow:none;cursor:default;gap:7px;font-size:12px}
@@ -1380,6 +1421,51 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   </div>
 </div>
 
+<!-- ═══════════════ Mustashar AI — CEO Briefing Modal ══════════════════════ -->
+<div class="modal-overlay hidden" id="ceo-modal" onclick="if(event.target===this){ceoStopSpeak();closeModal('ceo-modal')}">
+  <div class="modal m-lg ceo-modal">
+    <div class="pm-head ceo-head">
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:11px">
+        <span class="ceo-badge" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 3l1.9 4.8L18.7 9.6l-4.8 1.9L12 16.3l-1.9-4.8L5.3 9.6l4.8-1.9L12 3z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7L19 14z"/></svg>
+        </span>
+        <div style="min-width:0">
+          <div class="pm-name" style="color:#5b21b6">Mustashar AI</div>
+          <div class="pm-sub" id="ceo-sub">Reading the whole project…</div>
+        </div>
+      </div>
+      <button class="btn-modal ghost" onclick="ceoStopSpeak();closeModal('ceo-modal')">Close</button>
+    </div>
+
+    <div class="ceo-scroll">
+      <div id="ceo-loading" class="ceo-loading">
+        <span class="ceo-spin"></span>
+        <div>
+          <div class="ceo-loading-t">Mustashar is reviewing every task…</div>
+          <div class="ceo-loading-s">Pulling live data, weighing risks, and drafting its recommendations.</div>
+        </div>
+      </div>
+      <article id="ceo-body" class="ceo-body" style="display:none"></article>
+      <div id="ceo-error" class="ceo-error" style="display:none"></div>
+    </div>
+
+    <div class="ceo-foot" id="ceo-foot" style="display:none">
+      <div class="ceo-quota" id="ceo-quota"></div>
+      <div class="ceo-foot-actions">
+        <button class="btn-modal ghost" id="ceo-listen" onclick="ceoToggleSpeak()" title="Read the briefing aloud">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <span id="ceo-listen-txt">Listen</span>
+        </button>
+        <button class="btn-modal" id="ceo-word" onclick="ceoDownloadWord()" title="Download this briefing as a Word document"
+                style="background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-color:transparent">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Download Word
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ Overdue Tasks Modal ════════════════════════════════════ -->
 <div class="modal-overlay hidden" id="overdue-modal" onclick="if(event.target===this)closeModal('overdue-modal')">
   <div class="modal m-lg">
@@ -1655,6 +1741,14 @@ CC: @cc</textarea>
 
       <!-- Row 2: action buttons -->
       <div class="topbar-actions" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <!-- Mustashar AI — one-tap CEO-style briefing over the whole project.
+             Limited to twice a week (per browser) to keep the API spend bounded;
+             the button carries the NEW badge until first use like every new
+             control here. -->
+        <button class="chip chip-lg ac-ai" data-new="ai-ceo" id="ceo-btn" onclick="openCeoBriefing()" title="Mustashar AI — a leadership briefing that reads the whole project and tells you what to act on. Twice a week.">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l1.9 4.8L18.7 9.6l-4.8 1.9L12 16.3l-1.9-4.8L5.3 9.6l4.8-1.9L12 3z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7L19 19l-.7-1.8-1.8-.7 1.8-.7L19 14z"/></svg>
+          Mustashar AI
+        </button>
         <!-- Quick-look buttons first (red Overdue is highest-priority alert) -->
         <button class="chip chip-lg ac-red" data-new="overdue-btn" id="overdue-btn" onclick="openOverdueModal()" style="display:none" title="Show all overdue tasks with Jira links">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -3633,6 +3727,263 @@ async function sendAI(){
     _AI_BUSY = false;
   }
 }
+
+// ── Mustashar AI — twice-a-week CEO briefing ───────────────────────────────
+// A one-shot leadership review of the WHOLE project: it reads the same full
+// snapshot the chat dock uses, but is prompted to answer like an experienced
+// program CEO — verdict, risks, who to push, and what to do this week. Capped
+// at two runs per calendar week (per browser, via localStorage) so the API
+// spend stays bounded; the footer always says how many are left.
+const _CEO_LS_KEY = 'fibtmp_ceo_quota';
+const _CEO_WEEKLY_LIMIT = 2;
+let _CEO_TEXT = '';   // raw briefing (for TTS + Word)
+let _CEO_HTML = '';   // rendered briefing (for Word)
+let _CEO_SPEAKING = false;
+
+// ISO-week id like "2026-W35" — the quota bucket. Monday-based, matching how a
+// work week is counted, so "twice a week" resets at the start of each week.
+function _ceoIsoWeek(d){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;                 // Sun=7
+  t.setUTCDate(t.getUTCDate() + 4 - day);         // nearest Thursday
+  const yStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil((((t - yStart) / 86400000) + 1) / 7);
+  return t.getUTCFullYear() + '-W' + String(wk).padStart(2, '0');
+}
+function _ceoQuota(){
+  const wk = _ceoIsoWeek(new Date());
+  try {
+    const raw = JSON.parse(localStorage.getItem(_CEO_LS_KEY) || '{}');
+    if (raw.week === wk) return { week: wk, used: Math.max(0, raw.used|0) };
+  } catch(e){}
+  return { week: wk, used: 0 };
+}
+function _ceoBump(){
+  const q = _ceoQuota();
+  const next = { week: q.week, used: Math.min(_CEO_WEEKLY_LIMIT, q.used + 1) };
+  try { localStorage.setItem(_CEO_LS_KEY, JSON.stringify(next)); } catch(e){}
+  return next;
+}
+// Days until next Monday — used to tell the user when the allowance comes back.
+function _ceoNextMonday(){
+  const d = new Date(); const dow = d.getDay();       // Sun=0..Sat=6
+  const add = ((8 - (dow === 0 ? 7 : dow)) % 7) || 7; // 1..7 → next Monday
+  const m = new Date(d); m.setDate(d.getDate() + add);
+  return m.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+}
+
+// Escape first, then light markdown → HTML (headings, bold, code, bullets,
+// task keys). The model's text is untrusted, so nothing raw reaches innerHTML.
+function _ceoRender(md){
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\b(FIBTMP-\d+)\b/g, '<code>$1</code>');
+  const lines = String(md||'').replace(/\r/g,'').split('\n');
+  const out = []; let inList = false;
+  const closeList = () => { if (inList){ out.push('</ul>'); inList = false; } };
+  for (let raw of lines){
+    const line = raw.trimEnd();
+    let m;
+    if ((m = line.match(/^\s*#{3}\s+(.*)$/))){ closeList(); out.push('<h3>'+inline(m[1])+'</h3>'); }
+    else if ((m = line.match(/^\s*#{1,2}\s+(.*)$/))){ closeList(); out.push('<h2>'+inline(m[1])+'</h2>'); }
+    else if ((m = line.match(/^\s*[-*]\s+(.*)$/))){ if(!inList){ out.push('<ul>'); inList = true; } out.push('<li>'+inline(m[1])+'</li>'); }
+    else if (!line.trim()){ closeList(); }
+    else { closeList(); out.push('<p>'+inline(line)+'</p>'); }
+  }
+  closeList();
+  return out.join('\n');
+}
+
+function _ceoSetQuotaLabel(){
+  const q = _ceoQuota();
+  const left = Math.max(0, _CEO_WEEKLY_LIMIT - q.used);
+  const el = document.getElementById('ceo-quota');
+  if (!el) return;
+  el.classList.toggle('spent', left === 0);
+  const word = left === 1 ? 'briefing' : 'briefings';
+  el.innerHTML = '<span class="ceo-dot"></span>' + (left > 0
+    ? `${left} ${word} left this week`
+    : `No briefings left — next unlocks ${_ceoNextMonday()}`);
+}
+
+async function openCeoBriefing(){
+  // Stop any narration from a previous open, reset the panel.
+  ceoStopSpeak();
+  const q = _ceoQuota();
+  const sub  = document.getElementById('ceo-sub');
+  const load = document.getElementById('ceo-loading');
+  const body = document.getElementById('ceo-body');
+  const errB = document.getElementById('ceo-error');
+  const foot = document.getElementById('ceo-foot');
+  body.style.display = 'none'; body.innerHTML = '';
+  errB.style.display = 'none'; errB.textContent = '';
+  _CEO_TEXT = ''; _CEO_HTML = '';
+  openModal('ceo-modal');
+  _ceoSetQuotaLabel();
+
+  // Out of allowance → don't spend an API call; explain when it returns.
+  if (q.used >= _CEO_WEEKLY_LIMIT){
+    load.style.display = 'none';
+    foot.style.display = 'flex';
+    sub.textContent = 'Weekly allowance used';
+    errB.style.display = 'block';
+    errB.style.color = '#6d28d9';
+    errB.innerHTML = `You've used both of this week's briefings. Mustashar runs twice a week to keep it focused — the next one unlocks <strong>${_ceoNextMonday()}</strong>.`;
+    document.getElementById('ceo-listen').style.display = 'none';
+    document.getElementById('ceo-word').style.display = 'none';
+    return;
+  }
+
+  if (!GH_PROXY){
+    load.style.display = 'none';
+    sub.textContent = 'Not available';
+    errB.style.display = 'block';
+    errB.textContent = 'Mustashar AI needs the Cloudflare Worker (meta gh-proxy) to reach the model.';
+    return;
+  }
+
+  load.style.display = 'flex';
+  foot.style.display = 'none';
+  sub.textContent = 'Reading the whole project…';
+
+  // Freshest possible picture: pull live issues on demand (same as the dock),
+  // fall back to the in-memory report if the live call is unavailable.
+  let rep = (typeof REPORT !== 'undefined') ? REPORT : null;
+  try {
+    const issues  = await fetchLiveIssues();
+    const hidden  = (hiddenPeople && hiddenPeople.size) ? hiddenPeople : new Set();
+    const history = (rep && rep.history) ? rep.history : [];
+    rep = _LIVE.buildReport(issues, history, hidden, (rep && rep.jira_base_url) || '');
+  } catch(e){ /* keep in-memory rep */ }
+
+  const sys = { role:'system', content:
+    "You are Mustashar AI, the executive advisor to the leadership of a bank's " +
+    "Banking Reform Project (مشروع الإصلاح المصرفي). Speak like a sharp, experienced " +
+    "program CEO briefing the board: decisive, specific, and honest — never vague " +
+    "cheerleading. You are given the FULL live project snapshot (team stats, every " +
+    "person, and task-level rows). Read all of it and produce a briefing with these " +
+    "sections, using '## ' markdown headings exactly:\n" +
+    "## Verdict — one paragraph: are we on track? Name the single most important thing.\n" +
+    "## What's going well — 2–4 bullets, concrete, cite people or numbers.\n" +
+    "## Risks & bottlenecks — the real problems: overdue concentration, stalled " +
+    "approvals, people overloaded or behind. Cite task keys (e.g. FIBTMP-123) and names.\n" +
+    "## Who needs a push this week — name specific people and exactly what to ask them.\n" +
+    "## Do this week — a short, prioritised, numbered action list the leader can act on now.\n" +
+    "Be concise but complete. Use **bold** for the few things that matter most. " +
+    "Do not invent data that isn't in the snapshot.\n\n=== LIVE PROJECT SNAPSHOT ===\n" +
+    _aiContext(rep) };
+  const usr = { role:'user', content:
+    'Give me this week’s executive briefing on the Banking Reform Project. ' +
+    'Tell me plainly where we stand, what is at risk, who to push, and what to do next.' };
+
+  try {
+    const pw = sessionStorage.getItem('pw_cache') || '';
+    const r = await window.fetch(GH_PROXY, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Proxy-Auth':pw},
+      body: JSON.stringify({ action:'deepseek', messages:[sys, usr], max_tokens:2000, temperature:0.35 })
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(j.message ? (j.message + (j.detail?(' — '+j.detail):'')) : ('HTTP '+r.status));
+    const reply = (j.reply || '').trim();
+    if (!reply) throw new Error('The model returned an empty briefing. Try again.');
+
+    _CEO_TEXT = reply;
+    _CEO_HTML = _ceoRender(reply);
+    load.style.display = 'none';
+    body.innerHTML = _CEO_HTML;
+    body.style.display = 'block';
+
+    // Only a SUCCESSFUL briefing spends one of the two weekly runs.
+    const after = _ceoBump();
+    const left = Math.max(0, _CEO_WEEKLY_LIMIT - after.used);
+    sub.textContent = `Briefing for ${(rep && rep.date) || (new Date().toISOString().slice(0,10))}`;
+    foot.style.display = 'flex';
+    document.getElementById('ceo-listen').style.display = '';
+    document.getElementById('ceo-word').style.display = '';
+    _ceoSetQuotaLabel();
+    toast(left === 1
+      ? '1 Mustashar briefing left this week.'
+      : left === 0
+        ? `That was this week's last briefing — next unlocks ${_ceoNextMonday()}.`
+        : 'Briefing ready.');
+  } catch(e){
+    load.style.display = 'none';
+    errB.style.display = 'block';
+    errB.style.color = '#b91c1c';
+    errB.textContent = '⚠ ' + (e.message || e);
+    // A failure does NOT consume the weekly allowance (we only bump on success).
+  }
+}
+
+// ── Listen: read the briefing aloud with the browser's speech engine ────────
+function ceoStopSpeak(){
+  try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch(e){}
+  _CEO_SPEAKING = false;
+  const b = document.getElementById('ceo-listen');
+  const t = document.getElementById('ceo-listen-txt');
+  if (b) b.classList.remove('ceo-listening');
+  if (t) t.textContent = 'Listen';
+}
+function ceoToggleSpeak(){
+  if (!('speechSynthesis' in window)){ toast('This browser can’t read text aloud.'); return; }
+  if (_CEO_SPEAKING){ ceoStopSpeak(); return; }
+  if (!_CEO_TEXT){ return; }
+  // Speak the plain text (strip markdown marks so it doesn't read "hash hash").
+  const speakable = _CEO_TEXT
+    .replace(/[#*`]/g, '')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, '. ');
+  const u = new SpeechSynthesisUtterance(speakable);
+  u.rate = 1.0; u.pitch = 1.0;
+  u.onend = ceoStopSpeak;
+  u.onerror = ceoStopSpeak;
+  _CEO_SPEAKING = true;
+  const b = document.getElementById('ceo-listen');
+  const t = document.getElementById('ceo-listen-txt');
+  if (b) b.classList.add('ceo-listening');
+  if (t) t.textContent = 'Stop';
+  try { window.speechSynthesis.cancel(); window.speechSynthesis.speak(u); }
+  catch(e){ ceoStopSpeak(); }
+}
+
+// ── Download the briefing as a Word (.doc) file ─────────────────────────────
+// A Word-flavoured HTML document — Word opens it natively and it keeps the
+// headings, bold and task keys. Simpler and more reliable than assembling a
+// real .docx in the browser, and good enough for an executive one-pager.
+function ceoDownloadWord(){
+  if (!_CEO_HTML){ return; }
+  const when = (typeof REPORT!=='undefined' && REPORT && REPORT.date) ? REPORT.date : new Date().toISOString().slice(0,10);
+  const style =
+    "body{font-family:Calibri,Arial,sans-serif;color:#232228;font-size:11.5pt;line-height:1.5}" +
+    "h1{color:#5b21b6;font-size:20pt;margin:0 0 2pt}" +
+    ".sub{color:#7c6f95;font-size:10pt;margin:0 0 14pt}" +
+    "h2{color:#5b21b6;font-size:13pt;border-bottom:1px solid #d9c9f5;padding-bottom:3pt;margin:16pt 0 6pt}" +
+    "h3{color:#6d28d9;font-size:11.5pt;margin:12pt 0 4pt}" +
+    "code{background:#f2ecff;color:#5b21b6;font-family:Consolas,monospace;font-size:10.5pt;padding:0 2pt}" +
+    "ul{margin:0 0 8pt 0}li{margin:0 0 4pt}strong{color:#3b0764}" +
+    ".foot{color:#8a8398;font-size:9pt;margin-top:20pt;border-top:1px solid #e6e0f0;padding-top:8pt}";
+  const doc =
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+    '<head><meta charset="utf-8"><title>Mustashar AI Briefing</title><style>' + style + '</style></head><body>' +
+    '<h1>Mustashar AI — Executive Briefing</h1>' +
+    '<p class="sub">Banking Reform Project (مشروع الإصلاح المصرفي) &middot; ' + when + '</p>' +
+    _CEO_HTML +
+    '<p class="foot">Generated by Mustashar AI from live project data on ' + when + '. Advisory only — verify before acting.</p>' +
+    '</body></html>';
+  const blob = new Blob(['﻿', doc], { type:'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Mustashar-Briefing-${when}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+}
+// Closing the modal (or pressing Esc) must also stop any narration.
+document.addEventListener('keydown', e => { if (e.key === 'Escape') ceoStopSpeak(); });
 
 // Current local time as "HH:MM" — embedded in every exported image so a paste
 // shows when the snapshot was captured, not just the date.
@@ -11451,6 +11802,13 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 # (outside the password gate) so which build is live can be confirmed without
 # logging in, and again in the footer + the Excel cover sheet.
 #
+#   2.20.0 Mustashar AI — a header button that runs a twice-a-week, CEO-
+#          style briefing over the whole live project (verdict, risks, who
+#          to push, do-this-week). Reuses the existing DeepSeek Worker
+#          relay; the quota is per-browser via localStorage; the briefing
+#          can be read aloud and downloaded as a Word .doc. The Worker's
+#          deepseek action now accepts a bounded max_tokens so the briefing
+#          can be longer than the chat dock.
 #   2.19.4 No overlay on the film. The dark scrim is removed entirely —
 #          the clip plays clean at full quality and only the marks and
 #          the Arabic title sit on top, kept readable by their own
@@ -11567,7 +11925,7 @@ const esc = s => { const d=document.createElement('div'); d.textContent=s; retur
 #          counted against that level's reviewer instead of the assignee;
 #          attribution-mode selector, configurable status mapping, overdue split
 #          into delivery vs. review, and Excel naming the accountable person.
-SITE_VERSION = "2.19.4"
+SITE_VERSION = "2.20.0"
 
 
 def _build_stamp():

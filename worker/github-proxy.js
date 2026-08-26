@@ -672,6 +672,12 @@ async function handleRequest(request, env, ctx) {
       }
       const messages = Array.isArray(body.messages) ? body.messages : [];
       if (!messages.length) return json(400, { message: "No messages" });
+      // The chat dock is happy with the 800-token default; the CEO briefing asks
+      // for a longer, structured write-up, so an optional caller-supplied ceiling
+      // is honoured — bounded here so the page can never run up an unbounded bill.
+      const _maxTok = Math.min(Math.max(parseInt(body.max_tokens) || 800, 100), 2400);
+      const _temp = (typeof body.temperature === "number")
+        ? Math.min(Math.max(body.temperature, 0), 1) : 0.3;
       const dr = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
         headers: {
@@ -681,8 +687,8 @@ async function handleRequest(request, env, ctx) {
         body: JSON.stringify({
           model: "deepseek-chat",
           messages,
-          temperature: 0.3,
-          max_tokens: 800,
+          temperature: _temp,
+          max_tokens: _maxTok,
           stream: false,
         }),
       });
