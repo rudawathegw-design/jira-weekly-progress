@@ -4409,7 +4409,7 @@ async function otpSend(isResend){
   err.textContent = '';
   if (!isResend){ sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
   let res;
-  try { res = await otpApi('/api/send', { name: _otpName }); }
+  try { res = await otpApi('/api/send', { name: _otpName, app: 'report' }); }
   catch(e){ res = { ok:false, body:{ error:'network' } }; }
   sendBtn.textContent = 'Send code →'; sendBtn.disabled = false;
   if (res.ok && res.body.ok){
