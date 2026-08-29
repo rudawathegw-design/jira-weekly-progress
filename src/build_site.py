@@ -8388,7 +8388,7 @@ function saveSnapshotNow() {
 function exportExcel() {
   toast('Generating Excel…');
   const s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.src='https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';  // styled fork (keeps cell colors)
   const buildWorkbook=()=>{
     const wb = XLSX.utils.book_new();
     const modeLabel = (ATTR_MODES[_ATTR.mode]||{}).label || _ATTR.mode;
@@ -9831,7 +9831,7 @@ function loadCompareExcel(input) {
   const wrap = document.getElementById('cmp-wrap');
   wrap.innerHTML = '<p style="color:#64748b;font-size:12.5px;padding:12px 0">Parsing…</p>';
   const s=document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.src='https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';  // styled fork (keeps cell colors)
   s.onload=()=>{
     const reader = new FileReader();
     reader.onload = e => {
