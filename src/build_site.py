@@ -12140,8 +12140,9 @@ SITE_VERSION = "2.20.3"
 
 def _build_stamp():
     """(build_time, build_date, short_commit) for the version badge."""
-    from datetime import datetime as _dt, timezone as _tz
-    now = _dt.now(_tz.utc)
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+    # Baghdad is UTC+3 year-round (no DST) — stamp the badge in local time.
+    now = _dt.now(_tz.utc).astimezone(_tz(_td(hours=3)))
     commit = (os.environ.get("GITHUB_SHA", "") or "")[:7]
     if not commit:
         try:
@@ -12153,7 +12154,7 @@ def _build_stamp():
             ).stdout.strip()
         except Exception:
             commit = ""
-    return (now.strftime("%Y-%m-%d %H:%M UTC"),
+    return (now.strftime("%Y-%m-%d %H:%M Baghdad"),
             now.strftime("%Y-%m-%d"),
             commit or "local")
 
