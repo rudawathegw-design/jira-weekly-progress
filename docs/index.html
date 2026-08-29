@@ -425,13 +425,24 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 #live-chip.loading,#live-chip.warm,#live-chip.stale{color:#fff}
 #live-chip.loading .live-dot,#live-chip.warm .live-dot,#live-chip.stale .live-dot{
   background:#fff;animation:livePulse 1.4s infinite}
-/* Mobile: action row becomes a horizontally scrollable tab strip */
+/* Mobile: stack the top bar and let the action buttons WRAP onto multiple
+   rows. (An earlier version made this a nowrap horizontal-scroll strip, but the
+   flex parents had no min-width:0 so the strip grew to its full content width
+   and pushed the whole page sideways; worse, overflow-x:auto also clipped
+   overflow-y, hiding the "More" dropdown that opens below the strip.) */
 @media (max-width:640px){
-  .topbar-actions{flex-wrap:nowrap!important;overflow-x:auto;
-    justify-content:flex-start!important;-webkit-overflow-scrolling:touch;
-    scrollbar-width:none;padding-bottom:3px}
-  .topbar-actions::-webkit-scrollbar{display:none}
+  .topbar{flex-direction:column;align-items:stretch}
+  .topbar-right{align-items:stretch!important;width:100%;min-width:0}
+  .topbar-right>div{min-width:0;max-width:100%;justify-content:flex-start!important}
+  .topbar-actions{flex-wrap:wrap!important;overflow:visible!important;
+    justify-content:flex-start!important;min-width:0;max-width:100%}
   .topbar-actions>*{flex:0 0 auto}
+  /* The "More" button can wrap anywhere in the grid, so an absolutely-anchored
+     dropdown would land off-screen or past the fold. On phones present it as a
+     bottom action sheet instead — always fully on-screen and scrollable. */
+  .menu-items{position:fixed!important;left:12px!important;right:12px!important;
+    bottom:12px!important;top:auto!important;width:auto!important;max-width:none!important;
+    max-height:76vh;overflow-y:auto;box-shadow:0 -8px 30px rgba(15,23,42,.22)}
 }
 
 /* spinner */
