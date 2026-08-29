@@ -224,6 +224,20 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
   font-weight:700;color:#94a3b8;letter-spacing:.05em}
 .ver-inline .ver-num{color:#2563eb}
 @media (max-width:520px){ .ver-badge{bottom:8px;right:8px;font-size:9.5px;padding:4px 9px} }
+/* PMO dashboard last-deploy stamp — shown on the sign-in screen (bottom-left)
+   so you can tell at a glance whether the PMO dashboard was updated. */
+.pmo-upd{position:fixed;bottom:14px;left:16px;z-index:501;
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.82);border:1px solid #e2ddd2;border-radius:999px;
+  padding:5px 12px;font-size:10.5px;font-weight:700;color:#8b8578;
+  letter-spacing:.05em;backdrop-filter:blur(8px);
+  font-family:'JetBrains Mono',monospace;user-select:text}
+.pmo-upd .pmo-upd-dot{width:7px;height:7px;border-radius:50%;flex:none;
+  background:#0e9f8f;box-shadow:0 0 0 3px rgba(14,159,143,.16)}
+.pmo-upd .pmo-upd-lbl{color:#0e9f8f;font-weight:800}
+.pmo-upd .ver-sep{opacity:.4}
+html.theme-dark .pmo-upd{background:rgba(48,48,46,.8);border-color:#4a4844;color:#b8b5ad}
+@media (max-width:520px){ .pmo-upd{bottom:8px;left:8px;font-size:9px;padding:4px 9px;gap:5px} }
 .inp{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;
   color:#1e293b;font-size:15px;padding:11px 15px;outline:none;
   font-family:inherit;transition:border .2s,background .2s}
@@ -1313,6 +1327,33 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   <span class="ver-sep">·</span>
   <span>__COMMIT__</span>
 </div>
+
+<!-- PMO dashboard deploy stamp (read live from the dashboard page, same host). -->
+<div class="pmo-upd" id="pmo-upd-badge" title="When the PMO dashboard page was last deployed (Baghdad time)">
+  <span class="pmo-upd-dot"></span>
+  <span class="pmo-upd-lbl">PMO dashboard</span>
+  <span class="ver-sep">·</span>
+  <span id="pmo-upd-time">checking…</span>
+</div>
+<script>
+(function(){
+  var el = document.getElementById('pmo-upd-time'); if (!el) return;
+  var U = 'https://rudawathegw-design.github.io/fibpmo/dashboard/';
+  function fmt(lm){
+    var d = new Date(lm); if (isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Baghdad',day:'2-digit',month:'short',
+      year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(d) + ' Baghdad';
+  }
+  function lastMod(method){
+    return fetch(U,{method:method,cache:'no-store'}).then(function(r){
+      return r.headers.get('Last-Modified') || r.headers.get('last-modified');
+    });
+  }
+  lastMod('HEAD').then(function(lm){ return lm || lastMod('GET'); })
+    .then(function(lm){ var s = lm && fmt(lm); el.textContent = s || 'updated recently'; })
+    .catch(function(){ el.textContent = 'unavailable'; });
+})();
+</script>
 
 <!-- ═══════════════ Status Mapping Modal ═══════════════════════════════════ -->
 <div class="modal-overlay hidden" id="smap-modal">
@@ -4398,6 +4439,8 @@ function unlock(){
   // version lives in the footer, clear of the FAB stack in the corner.
   const vb = document.getElementById('ver-badge');
   if (vb) vb.style.display = 'none';
+  const pb = document.getElementById('pmo-upd-badge');
+  if (pb) pb.style.display = 'none';
   playIntro();
 }
 // Require the password on every page load (including refresh): clear any
