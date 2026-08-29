@@ -1312,14 +1312,14 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- Build stamps — outside the gate on purpose: confirm which builds are live
      without signing in. Report build + PMO dashboard deploy, side by side. -->
 <div class="footer-badges" id="footer-badges">
-  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 04:13 PM Baghdad (commit 4004baa)">
+  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 04:36 PM Baghdad (commit 1609c9a)">
     <span class="pmo-upd-lbl" style="color:#1366cc">Report</span>
     <span class="ver-sep">·</span>
     <span class="ver-num">v2.20.3</span>
     <span class="ver-sep">·</span>
-    <span>2026-08-29 04:13 PM Baghdad</span>
+    <span>2026-08-29 04:36 PM Baghdad</span>
     <span class="ver-sep">·</span>
-    <span>4004baa</span>
+    <span>1609c9a</span>
   </div>
   <div class="pmo-upd" id="pmo-upd-badge" title="PMO dashboard — version and last deploy time (Baghdad)">
     <span class="pmo-upd-dot"></span>
@@ -2170,7 +2170,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 04:13 PM Baghdad · commit 4004baa"><span class="ver-num">v2.20.3</span> · 2026-08-29 04:13 PM Baghdad · 4004baa</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 04:36 PM Baghdad · commit 1609c9a"><span class="ver-num">v2.20.3</span> · 2026-08-29 04:36 PM Baghdad · 1609c9a</span>
   </footer>
 </div>
 </div>
@@ -2189,8 +2189,8 @@ let GH_PAT   = '';
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
 const SITE_VERSION = "2.20.3";
-const BUILD_TIME   = "2026-08-29 04:13 PM Baghdad";
-const BUILD_COMMIT = "4004baa";
+const BUILD_TIME   = "2026-08-29 04:36 PM Baghdad";
+const BUILD_COMMIT = "1609c9a";
 
 // ── GitHub proxy (optional) ────────────────────────────────────────────────
 // If a Worker URL is configured (meta gh-proxy), the GitHub PAT lives in the
@@ -4355,6 +4355,25 @@ async function otpApi(path, body){
   let j = {}; try { j = await r.json(); } catch(_){}
   return { ok: r.ok, status: r.status, body: j };
 }
+// Presence heartbeat: tell the Worker this person is actively viewing, and
+// mark them offline the moment the tab closes. Powers the "who's online" log.
+function startHeartbeat(name, app){
+  function ping(leave){
+    try {
+      const body = JSON.stringify({ name: name, app: app, leave: leave ? 1 : 0 });
+      if (leave && navigator.sendBeacon){
+        navigator.sendBeacon(OTP_API + '/api/ping', new Blob([body], {type:'application/json'}));
+        return;
+      }
+      fetch(OTP_API + '/api/ping', {method:'POST', headers:{'Content-Type':'application/json'}, body: body, keepalive: true}).catch(function(){});
+    } catch(e){}
+  }
+  ping(false);
+  const iv = setInterval(function(){ if (document.visibilityState === 'visible') ping(false); }, 45000);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') ping(false); });
+  window.addEventListener('pagehide', function(){ clearInterval(iv); ping(true); });
+  window.addEventListener('beforeunload', function(){ ping(true); });
+}
 function otpCooldownStart(){
   const btn = document.getElementById('otp-resend');
   let left = 30; btn.disabled = true;
@@ -4409,6 +4428,7 @@ async function otpVerify(){
   if (res.ok && res.body.ok){
     clearInterval(_otpCooldown);
     document.getElementById('otp-overlay').style.display = 'none';
+    startHeartbeat(_otpName, 'report');
     const done = _otpDone; _otpDone = null;
     if (done) done();
     return;

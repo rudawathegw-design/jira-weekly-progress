@@ -4392,6 +4392,25 @@ async function otpApi(path, body){
   let j = {}; try { j = await r.json(); } catch(_){}
   return { ok: r.ok, status: r.status, body: j };
 }
+// Presence heartbeat: tell the Worker this person is actively viewing, and
+// mark them offline the moment the tab closes. Powers the "who's online" log.
+function startHeartbeat(name, app){
+  function ping(leave){
+    try {
+      const body = JSON.stringify({ name: name, app: app, leave: leave ? 1 : 0 });
+      if (leave && navigator.sendBeacon){
+        navigator.sendBeacon(OTP_API + '/api/ping', new Blob([body], {type:'application/json'}));
+        return;
+      }
+      fetch(OTP_API + '/api/ping', {method:'POST', headers:{'Content-Type':'application/json'}, body: body, keepalive: true}).catch(function(){});
+    } catch(e){}
+  }
+  ping(false);
+  const iv = setInterval(function(){ if (document.visibilityState === 'visible') ping(false); }, 45000);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') ping(false); });
+  window.addEventListener('pagehide', function(){ clearInterval(iv); ping(true); });
+  window.addEventListener('beforeunload', function(){ ping(true); });
+}
 function otpCooldownStart(){
   const btn = document.getElementById('otp-resend');
   let left = 30; btn.disabled = true;
@@ -4446,6 +4465,7 @@ async function otpVerify(){
   if (res.ok && res.body.ok){
     clearInterval(_otpCooldown);
     document.getElementById('otp-overlay').style.display = 'none';
+    startHeartbeat(_otpName, 'report');
     const done = _otpDone; _otpDone = null;
     if (done) done();
     return;
