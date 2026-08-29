@@ -205,6 +205,11 @@ body{
 .otp-link:hover{text-decoration:underline}
 .otp-link:disabled{color:#9aa6b6;cursor:not-allowed;text-decoration:none}
 .otp-sent{font-size:12px;color:#0e8f70;font-weight:600;min-height:16px;margin:2px 0 12px}
+.otp-reqrow{margin:2px 0 2px;padding:12px;border-radius:12px;cursor:pointer;text-align:center;
+  font-weight:800;font-size:13px;color:#fff;letter-spacing:.02em;font-family:inherit;
+  background:linear-gradient(135deg,#F0B24B,#E9972B);box-shadow:0 8px 18px -10px rgba(233,151,43,.8)}
+.otp-reqrow:hover{filter:brightness(1.05)}
+.otp-reqrow:focus-visible{outline:2px solid #1366cc;outline-offset:2px}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1301,7 +1306,19 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
     <div id="otp-step-name">
       <div id="otp-names" class="otp-names"></div>
+      <div class="otp-reqrow" id="otp-reqrow" role="button" tabindex="0" onclick="otpOpenReq()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();otpOpenReq();}">&#65291;&nbsp; Name not listed? Request access</div>
       <button class="btn-primary" id="otp-send-btn" onclick="otpSend(false)" disabled><span>Send code</span><i>&rarr;</i></button>
+    </div>
+
+    <div id="otp-step-req" style="display:none">
+      <label class="pw-label" for="otp-req-name">Your full name</label>
+      <div class="pw-field"><input id="otp-req-name" class="inp" type="text" placeholder="Full name" autocomplete="name"></div>
+      <label class="pw-label" for="otp-req-email" style="margin-top:12px">Your email address</label>
+      <div class="pw-field"><input id="otp-req-email" class="inp" type="email" placeholder="name@fib.iq" autocomplete="email"
+             onkeydown="if(event.key==='Enter')otpSubmitReq()"></div>
+      <button class="btn-primary" id="otp-req-send" onclick="otpSubmitReq()"><span>Send request</span><i>&rarr;</i></button>
+      <div class="otp-row"><button type="button" class="otp-link" onclick="otpBack()">&larr; Back to names</button></div>
     </div>
 
     <div id="otp-step-code" style="display:none">
@@ -4303,11 +4320,51 @@ function startOtp(onSuccess){
 function otpBack(){
   clearInterval(_otpCooldown);
   document.getElementById('otp-step-code').style.display = 'none';
+  var rq = document.getElementById('otp-step-req'); if (rq) rq.style.display = 'none';
   document.getElementById('otp-step-name').style.display = 'block';
   document.getElementById('otp-send-btn').disabled = !_otpName;
   document.getElementById('otp-err').textContent = '';
   document.getElementById('otp-sub').textContent =
     "Select your name — we'll email you a one-time code to open the report.";
+}
+function otpOpenReq(){
+  clearInterval(_otpCooldown);
+  document.getElementById('otp-step-name').style.display = 'none';
+  document.getElementById('otp-step-code').style.display = 'none';
+  document.getElementById('otp-step-req').style.display = 'block';
+  document.getElementById('otp-err').textContent = '';
+  document.getElementById('otp-sub').textContent =
+    "Not on the list? Send your name and email — the PMO officer will review it.";
+  var n = document.getElementById('otp-req-name'); if (n) setTimeout(function(){ n.focus(); }, 60);
+}
+async function otpSubmitReq(){
+  var err = document.getElementById('otp-err');
+  var btn = document.getElementById('otp-req-send');
+  var name = (document.getElementById('otp-req-name').value || '').trim();
+  var email = (document.getElementById('otp-req-email').value || '').trim();
+  if (name.length < 2){ err.textContent = 'Please enter your name.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = 'Please enter a valid email address.'; return; }
+  err.textContent = ''; btn.disabled = true; btn.querySelector('span').textContent = 'Sending…';
+  var res;
+  try { res = await otpApi('/api/request-access', { name: name, email: email }); }
+  catch(e){ res = { ok:false, body:{ error:'network' } }; }
+  btn.disabled = false; btn.querySelector('span').textContent = 'Send request';
+  if (res.ok && res.body.ok){
+    document.getElementById('otp-step-req').innerHTML =
+      '<div style="text-align:center;padding:6px 0 2px">' +
+      '<div style="font-size:38px;line-height:1;margin-bottom:8px">&#9989;</div>' +
+      '<h2 style="margin:0 0 6px">Request sent</h2>' +
+      '<p style="margin:0 0 14px">Thank you, <b>' + esc(name) + '</b>. The PMO officer will review your request and contact you at <b>' + esc(email) + '</b>.</p>' +
+      '<div class="otp-row" style="justify-content:center"><button type="button" class="otp-link" onclick="otpBack()">&larr; Back to sign in</button></div>' +
+      '</div>';
+    document.getElementById('otp-sub').textContent = "We'll be in touch soon.";
+  } else {
+    var e = (res.body && res.body.error) || 'error';
+    err.textContent =
+      e === 'rate_limited' ? 'Too many requests — please try again later.' :
+      e === 'network'      ? 'Network error — check your connection and retry.' :
+                             'Could not send your request. Please try again.';
+  }
 }
 async function otpApi(path, body){
   const r = await fetch(OTP_API + path, {
