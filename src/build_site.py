@@ -210,6 +210,12 @@ body{
   background:linear-gradient(135deg,#F0B24B,#E9972B);box-shadow:0 8px 18px -10px rgba(233,151,43,.8)}
 .otp-reqrow:hover{filter:brightness(1.05)}
 .otp-reqrow:focus-visible{outline:2px solid #1366cc;outline-offset:2px}
+/* Status filter chips in the Daily status export modal */
+.epic-st-chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#334155;
+  background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:6px 12px;cursor:pointer;user-select:none}
+.epic-st-chk input{accent-color:#1366cc;width:15px;height:15px;cursor:pointer;margin:0}
+.epic-st-chk:hover{border-color:#cbd5e1}
+.epic-st-chk:has(input:checked){background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1471,6 +1477,18 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div class="persist-note" style="margin-top:8px">
         One status column per day, from this date through <b id="epic-excel-today-label"></b>
         (today's column is always live). Remembers your last pick for next time.
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Include statuses</div>
+      <div id="epic-excel-statuses" style="display:flex;flex-wrap:wrap;gap:8px">
+        <label class="epic-st-chk"><input type="checkbox" value="Completed" checked><span>Completed</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="Waiting For Approval" checked><span>Waiting for approval</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="In Progress" checked><span>In progress</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="Open" checked><span>Open / On hold</span></label>
+      </div>
+      <div class="persist-note" style="margin-top:8px">
+        Only tasks whose <b>latest</b> status is ticked are exported. Remembers your pick.
       </div>
     </div>
     <div class="modal-actions">
@@ -9544,6 +9562,15 @@ function openEpicExcelModal(scope){
       _DAILY_SCOPE === 'project' ? 'Every task and sub-task in the project'
     : _DAILY_SCOPE === 'custom'  ? 'The epic you paste below — its tasks and sub-tasks'
     : `Epic ${EPIC_KEY} — its tasks and sub-tasks`;
+  // Restore the status include-filter (default: all ticked).
+  try {
+    const savedCats = (localStorage.getItem('epicExcelStatuses') || '').split(',').filter(Boolean);
+    if (savedCats.length){
+      document.querySelectorAll('#epic-excel-statuses input[type=checkbox]').forEach(cb => {
+        cb.checked = savedCats.indexOf(cb.value) > -1;
+      });
+    }
+  } catch(e){}
   openModal('epic-excel-modal');
 }
 
@@ -9586,12 +9613,18 @@ async function confirmEpicExcelExport(){
     try { localStorage.setItem('epicExcelKey', key); } catch(e){}
   }
 
+  // Which statuses to include (by latest status). At least one required.
+  const cats = Array.prototype.map.call(
+    document.querySelectorAll('#epic-excel-statuses input[type=checkbox]:checked'), cb => cb.value);
+  if (!cats.length){ toast('Tick at least one status to include.'); return; }
+  try { localStorage.setItem('epicExcelStatuses', cats.join(',')); } catch(e){}
+
   try { localStorage.setItem('epicExcelStart', val); } catch(e){}
   closeModal('epic-excel-modal');
-  exportEpicExcel(val, _DAILY_SCOPE, key);
+  exportEpicExcel(val, _DAILY_SCOPE, key, cats);
 }
 
-async function exportEpicExcel(historyStart, scope, epicKeyIn){
+async function exportEpicExcel(historyStart, scope, epicKeyIn, includeCats){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   const wholeProject = scope === 'project';
   // Which epic: the pasted one, or the built-in default.
@@ -9701,6 +9734,21 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
       return { key, owner, summary, type, daily, idle, lastStatus, link, issue };
     });
 
+    // Status include-filter (from the modal): keep tasks whose LATEST status
+    // falls in a ticked reporting bucket. Rows with no latest status are kept.
+    if (includeCats && includeCats.length){
+      const catSet = new Set(includeCats);
+      const before = rows.length;
+      const kept = rows.filter(r => {
+        if (!r.lastStatus) return true;
+        const cat = _ACC.bucketOf(r.lastStatus, _isDoneStatus(r.lastStatus), _ATTR.statusMap);
+        return catSet.has(cat);
+      });
+      if (!kept.length){ toast('No tasks match the selected statuses.'); return; }
+      if (kept.length !== before) toast(`${before - kept.length} task(s) excluded by the status filter.`);
+      rows.length = 0; Array.prototype.push.apply(rows, kept);
+    }
+
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     const buildSheet = () => {
@@ -9715,7 +9763,7 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
         const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+epicKey}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${issues.length} issue(s)  ·  Generated ${generatedAt}`;
+        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+epicKey}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${rows.length} issue(s)  ·  Generated ${generatedAt}`;
         const HEADER_ROW = 1, DATA_START = 2;
 
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };

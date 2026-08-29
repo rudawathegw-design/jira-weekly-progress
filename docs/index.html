@@ -173,6 +173,12 @@ body{
   background:linear-gradient(135deg,#F0B24B,#E9972B);box-shadow:0 8px 18px -10px rgba(233,151,43,.8)}
 .otp-reqrow:hover{filter:brightness(1.05)}
 .otp-reqrow:focus-visible{outline:2px solid #1366cc;outline-offset:2px}
+/* Status filter chips in the Daily status export modal */
+.epic-st-chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#334155;
+  background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:6px 12px;cursor:pointer;user-select:none}
+.epic-st-chk input{accent-color:#1366cc;width:15px;height:15px;cursor:pointer;margin:0}
+.epic-st-chk:hover{border-color:#cbd5e1}
+.epic-st-chk:has(input:checked){background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1306,14 +1312,14 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- Build stamps — outside the gate on purpose: confirm which builds are live
      without signing in. Report build + PMO dashboard deploy, side by side. -->
 <div class="footer-badges" id="footer-badges">
-  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 02:50 PM Baghdad (commit 9a5590f)">
+  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 03:03 PM Baghdad (commit 8edc7a1)">
     <span class="pmo-upd-lbl" style="color:#1366cc">Report</span>
     <span class="ver-sep">·</span>
     <span class="ver-num">v2.20.3</span>
     <span class="ver-sep">·</span>
-    <span>2026-08-29 02:50 PM Baghdad</span>
+    <span>2026-08-29 03:03 PM Baghdad</span>
     <span class="ver-sep">·</span>
-    <span>9a5590f</span>
+    <span>8edc7a1</span>
   </div>
   <div class="pmo-upd" id="pmo-upd-badge" title="PMO dashboard — version and last deploy time (Baghdad)">
     <span class="pmo-upd-dot"></span>
@@ -1434,6 +1440,18 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div class="persist-note" style="margin-top:8px">
         One status column per day, from this date through <b id="epic-excel-today-label"></b>
         (today's column is always live). Remembers your last pick for next time.
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Include statuses</div>
+      <div id="epic-excel-statuses" style="display:flex;flex-wrap:wrap;gap:8px">
+        <label class="epic-st-chk"><input type="checkbox" value="Completed" checked><span>Completed</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="Waiting For Approval" checked><span>Waiting for approval</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="In Progress" checked><span>In progress</span></label>
+        <label class="epic-st-chk"><input type="checkbox" value="Open" checked><span>Open / On hold</span></label>
+      </div>
+      <div class="persist-note" style="margin-top:8px">
+        Only tasks whose <b>latest</b> status is ticked are exported. Remembers your pick.
       </div>
     </div>
     <div class="modal-actions">
@@ -2152,7 +2170,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 02:50 PM Baghdad · commit 9a5590f"><span class="ver-num">v2.20.3</span> · 2026-08-29 02:50 PM Baghdad · 9a5590f</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 03:03 PM Baghdad · commit 8edc7a1"><span class="ver-num">v2.20.3</span> · 2026-08-29 03:03 PM Baghdad · 8edc7a1</span>
   </footer>
 </div>
 </div>
@@ -2171,8 +2189,8 @@ let GH_PAT   = '';
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
 const SITE_VERSION = "2.20.3";
-const BUILD_TIME   = "2026-08-29 02:50 PM Baghdad";
-const BUILD_COMMIT = "9a5590f";
+const BUILD_TIME   = "2026-08-29 03:03 PM Baghdad";
+const BUILD_COMMIT = "8edc7a1";
 
 // ── GitHub proxy (optional) ────────────────────────────────────────────────
 // If a Worker URL is configured (meta gh-proxy), the GitHub PAT lives in the
@@ -9508,6 +9526,15 @@ function openEpicExcelModal(scope){
       _DAILY_SCOPE === 'project' ? 'Every task and sub-task in the project'
     : _DAILY_SCOPE === 'custom'  ? 'The epic you paste below — its tasks and sub-tasks'
     : `Epic ${EPIC_KEY} — its tasks and sub-tasks`;
+  // Restore the status include-filter (default: all ticked).
+  try {
+    const savedCats = (localStorage.getItem('epicExcelStatuses') || '').split(',').filter(Boolean);
+    if (savedCats.length){
+      document.querySelectorAll('#epic-excel-statuses input[type=checkbox]').forEach(cb => {
+        cb.checked = savedCats.indexOf(cb.value) > -1;
+      });
+    }
+  } catch(e){}
   openModal('epic-excel-modal');
 }
 
@@ -9550,12 +9577,18 @@ async function confirmEpicExcelExport(){
     try { localStorage.setItem('epicExcelKey', key); } catch(e){}
   }
 
+  // Which statuses to include (by latest status). At least one required.
+  const cats = Array.prototype.map.call(
+    document.querySelectorAll('#epic-excel-statuses input[type=checkbox]:checked'), cb => cb.value);
+  if (!cats.length){ toast('Tick at least one status to include.'); return; }
+  try { localStorage.setItem('epicExcelStatuses', cats.join(',')); } catch(e){}
+
   try { localStorage.setItem('epicExcelStart', val); } catch(e){}
   closeModal('epic-excel-modal');
-  exportEpicExcel(val, _DAILY_SCOPE, key);
+  exportEpicExcel(val, _DAILY_SCOPE, key, cats);
 }
 
-async function exportEpicExcel(historyStart, scope, epicKeyIn){
+async function exportEpicExcel(historyStart, scope, epicKeyIn, includeCats){
   if (!GH_PROXY){ toast('This export needs the live Worker connection (meta gh-proxy).'); return; }
   const wholeProject = scope === 'project';
   // Which epic: the pasted one, or the built-in default.
@@ -9665,6 +9698,21 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
       return { key, owner, summary, type, daily, idle, lastStatus, link, issue };
     });
 
+    // Status include-filter (from the modal): keep tasks whose LATEST status
+    // falls in a ticked reporting bucket. Rows with no latest status are kept.
+    if (includeCats && includeCats.length){
+      const catSet = new Set(includeCats);
+      const before = rows.length;
+      const kept = rows.filter(r => {
+        if (!r.lastStatus) return true;
+        const cat = _ACC.bucketOf(r.lastStatus, _isDoneStatus(r.lastStatus), _ATTR.statusMap);
+        return catSet.has(cat);
+      });
+      if (!kept.length){ toast('No tasks match the selected statuses.'); return; }
+      if (kept.length !== before) toast(`${before - kept.length} task(s) excluded by the status filter.`);
+      rows.length = 0; Array.prototype.push.apply(rows, kept);
+    }
+
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js';
     const buildSheet = () => {
@@ -9679,7 +9727,7 @@ async function exportEpicExcel(historyStart, scope, epicKeyIn){
         const lastColLetter = XLSX.utils.encode_col(linkCol);
 
         const generatedAt = now.toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+epicKey}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${issues.length} issue(s)  ·  Generated ${generatedAt}`;
+        const titleText = `${wholeProject ? 'Project '+scopeName : 'Epic '+epicKey}  ·  ${startLabel} → ${dateLabel} (Today)  ·  ${rows.length} issue(s)  ·  Generated ${generatedAt}`;
         const HEADER_ROW = 1, DATA_START = 2;
 
         const headStyle = { font:{bold:true,color:{rgb:'FFFFFF'},sz:12}, fill:{fgColor:{rgb:'1F4E78'}}, alignment:{horizontal:'center',vertical:'center',wrapText:true}, border:{bottom:{style:'thin',color:{rgb:'0F2D46'}}} };
