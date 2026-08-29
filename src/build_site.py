@@ -4440,7 +4440,7 @@ async function otpVerify(){
   if (code.length < 6){ err.textContent = 'Enter the 6-digit code.'; inp.focus(); return; }
   err.textContent = ''; btn.disabled = true; btn.textContent = 'Verifying…';
   let res;
-  try { res = await otpApi('/api/verify', { name: _otpName, code: code }); }
+  try { res = await otpApi('/api/verify', { name: _otpName, code: code, app: 'report' }); }
   catch(e){ res = { ok:false, body:{ error:'network' } }; }
   btn.disabled = false; btn.textContent = 'Verify & open →';
   if (res.ok && res.body.ok){

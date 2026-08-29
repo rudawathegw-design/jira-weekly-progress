@@ -1312,14 +1312,14 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <!-- Build stamps — outside the gate on purpose: confirm which builds are live
      without signing in. Report build + PMO dashboard deploy, side by side. -->
 <div class="footer-badges" id="footer-badges">
-  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 03:03 PM Baghdad (commit 8edc7a1)">
+  <div class="ver-badge" id="ver-badge" title="Report build — v2.20.3, built 2026-08-29 04:01 PM Baghdad (commit 9aec19c)">
     <span class="pmo-upd-lbl" style="color:#1366cc">Report</span>
     <span class="ver-sep">·</span>
     <span class="ver-num">v2.20.3</span>
     <span class="ver-sep">·</span>
-    <span>2026-08-29 03:03 PM Baghdad</span>
+    <span>2026-08-29 04:01 PM Baghdad</span>
     <span class="ver-sep">·</span>
-    <span>8edc7a1</span>
+    <span>9aec19c</span>
   </div>
   <div class="pmo-upd" id="pmo-upd-badge" title="PMO dashboard — version and last deploy time (Baghdad)">
     <span class="pmo-upd-dot"></span>
@@ -2170,7 +2170,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 03:03 PM Baghdad · commit 8edc7a1"><span class="ver-num">v2.20.3</span> · 2026-08-29 03:03 PM Baghdad · 8edc7a1</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built 2026-08-29 04:01 PM Baghdad · commit 9aec19c"><span class="ver-num">v2.20.3</span> · 2026-08-29 04:01 PM Baghdad · 9aec19c</span>
   </footer>
 </div>
 </div>
@@ -2189,8 +2189,8 @@ let GH_PAT   = '';
 // Surfaced on the sign-in screen (outside the gate), in the footer, and on the
 // Excel cover sheet, so the deployed build can always be identified.
 const SITE_VERSION = "2.20.3";
-const BUILD_TIME   = "2026-08-29 03:03 PM Baghdad";
-const BUILD_COMMIT = "8edc7a1";
+const BUILD_TIME   = "2026-08-29 04:01 PM Baghdad";
+const BUILD_COMMIT = "9aec19c";
 
 // ── GitHub proxy (optional) ────────────────────────────────────────────────
 // If a Worker URL is configured (meta gh-proxy), the GitHub PAT lives in the
@@ -4403,7 +4403,7 @@ async function otpVerify(){
   if (code.length < 6){ err.textContent = 'Enter the 6-digit code.'; inp.focus(); return; }
   err.textContent = ''; btn.disabled = true; btn.textContent = 'Verifying…';
   let res;
-  try { res = await otpApi('/api/verify', { name: _otpName, code: code }); }
+  try { res = await otpApi('/api/verify', { name: _otpName, code: code, app: 'report' }); }
   catch(e){ res = { ok:false, body:{ error:'network' } }; }
   btn.disabled = false; btn.textContent = 'Verify & open →';
   if (res.ok && res.body.ok){
