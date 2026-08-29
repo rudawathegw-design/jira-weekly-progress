@@ -1309,7 +1309,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 <div class="ver-badge" id="ver-badge" title="Dashboard build — v__VERSION__, built __BUILD_TIME__ (commit __COMMIT__)">
   <span class="ver-num">v__VERSION__</span>
   <span class="ver-sep">·</span>
-  <span>__BUILD_DATE__</span>
+  <span>__BUILD_TIME__</span>
   <span class="ver-sep">·</span>
   <span>__COMMIT__</span>
 </div>
@@ -2116,7 +2116,7 @@ CC: @cc</textarea>
   </section>
 
   <footer>FIBTMP &nbsp;·&nbsp; © <span id="copy-year">2026</span> PMO Team
-    &nbsp;·&nbsp; <span class="ver-inline" title="Built __BUILD_TIME__ · commit __COMMIT__"><span class="ver-num">v__VERSION__</span> · __BUILD_DATE__ · __COMMIT__</span>
+    &nbsp;·&nbsp; <span class="ver-inline" title="Built __BUILD_TIME__ · commit __COMMIT__"><span class="ver-num">v__VERSION__</span> · __BUILD_TIME__ · __COMMIT__</span>
   </footer>
 </div>
 </div>
