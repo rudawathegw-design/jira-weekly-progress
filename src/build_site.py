@@ -237,7 +237,12 @@ html.theme-dark .ver-badge .ver-num{color:#7aa7e8}
 .pmo-upd .pmo-upd-lbl{color:#0e9f8f;font-weight:800}
 .pmo-upd .ver-sep{opacity:.4}
 html.theme-dark .pmo-upd{background:rgba(48,48,46,.8);border-color:#4a4844;color:#b8b5ad}
-@media (max-width:520px){ .pmo-upd{bottom:8px;left:8px;font-size:9px;padding:4px 9px;gap:5px} }
+/* Both stamps live side by side in one fixed cluster (bottom-right). */
+.footer-badges{position:fixed;bottom:14px;right:16px;z-index:501;display:flex;align-items:center;
+  gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 32px)}
+.footer-badges .ver-badge,.footer-badges .pmo-upd{position:static;bottom:auto;left:auto;right:auto}
+@media (max-width:520px){ .footer-badges{bottom:8px;right:8px;left:8px;gap:6px;justify-content:center}
+  .pmo-upd{font-size:9px;padding:4px 9px;gap:5px} }
 .inp{width:100%;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;
   color:#1e293b;font-size:15px;padding:11px 15px;outline:none;
   font-family:inherit;transition:border .2s,background .2s}
@@ -1320,38 +1325,48 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- Version badge — outside the gate on purpose: lets anyone confirm which
      build is live without signing in. Contains no report data. -->
-<div class="ver-badge" id="ver-badge" title="Dashboard build — v__VERSION__, built __BUILD_TIME__ (commit __COMMIT__)">
-  <span class="ver-num">v__VERSION__</span>
-  <span class="ver-sep">·</span>
-  <span>__BUILD_TIME__</span>
-  <span class="ver-sep">·</span>
-  <span>__COMMIT__</span>
-</div>
-
-<!-- PMO dashboard deploy stamp (read live from the dashboard page, same host). -->
-<div class="pmo-upd" id="pmo-upd-badge" title="When the PMO dashboard page was last deployed (Baghdad time)">
-  <span class="pmo-upd-dot"></span>
-  <span class="pmo-upd-lbl">PMO dashboard</span>
-  <span class="ver-sep">·</span>
-  <span id="pmo-upd-time">checking…</span>
+<div class="footer-badges" id="footer-badges">
+  <div class="ver-badge" id="ver-badge" title="Report build — v__VERSION__, built __BUILD_TIME__ (commit __COMMIT__)">
+    <span class="pmo-upd-lbl" style="color:#1366cc">Report</span>
+    <span class="ver-sep">·</span>
+    <span class="ver-num">v__VERSION__</span>
+    <span class="ver-sep">·</span>
+    <span>__BUILD_TIME__</span>
+    <span class="ver-sep">·</span>
+    <span>__COMMIT__</span>
+  </div>
+  <div class="pmo-upd" id="pmo-upd-badge" title="PMO dashboard — version and last deploy time (Baghdad)">
+    <span class="pmo-upd-dot"></span>
+    <span class="pmo-upd-lbl">PMO dashboard</span>
+    <span class="ver-sep">·</span>
+    <span class="ver-num" id="pmo-upd-ver" style="color:#0e9f8f">…</span>
+    <span class="ver-sep">·</span>
+    <span id="pmo-upd-time">checking…</span>
+  </div>
 </div>
 <script>
 (function(){
-  var el = document.getElementById('pmo-upd-time'); if (!el) return;
+  var elT = document.getElementById('pmo-upd-time');
+  var elV = document.getElementById('pmo-upd-ver');
+  if (!elT) return;
   var U = 'https://rudawathegw-design.github.io/fibpmo/dashboard/';
   function fmt(lm){
     var d = new Date(lm); if (isNaN(d.getTime())) return null;
     return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Baghdad',day:'2-digit',month:'short',
-      year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(d) + ' Baghdad';
+      year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).format(d) + ' Baghdad';
   }
-  function lastMod(method){
-    return fetch(U,{method:method,cache:'no-store'}).then(function(r){
-      return r.headers.get('Last-Modified') || r.headers.get('last-modified');
-    });
+  function pick(html, cls){
+    var m = new RegExp('class="' + cls + '"[^>]*>([^<]*)<').exec(html);
+    return m ? m[1].trim() : '';
   }
-  lastMod('HEAD').then(function(lm){ return lm || lastMod('GET'); })
-    .then(function(lm){ var s = lm && fmt(lm); el.textContent = s || 'updated recently'; })
-    .catch(function(){ el.textContent = 'unavailable'; });
+  fetch(U,{cache:'no-store'}).then(function(r){
+    var lm = r.headers.get('Last-Modified') || r.headers.get('last-modified');
+    return r.text().then(function(html){ return { lm: lm, html: html }; });
+  }).then(function(o){
+    elT.textContent = (o.lm && fmt(o.lm)) || 'updated recently';
+    if (elV){ var v = pick(o.html, 'v'), rel = pick(o.html, 'rel');
+      elV.textContent = (v + (rel ? ' ' + rel : '')).trim() || '—'; }
+  }).catch(function(){ elT.textContent = 'unavailable'; if (elV) elV.textContent = ''; });
 })();
 </script>
 
@@ -12197,7 +12212,7 @@ def _build_stamp():
             ).stdout.strip()
         except Exception:
             commit = ""
-    return (now.strftime("%Y-%m-%d %H:%M Baghdad"),
+    return (now.strftime("%Y-%m-%d %I:%M %p Baghdad"),
             now.strftime("%Y-%m-%d"),
             commit or "local")
 
