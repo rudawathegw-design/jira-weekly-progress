@@ -49,13 +49,14 @@ body{
 /* Soft off-white field with a drafting grid and a low cloud bank. Pure white
    was glare on a large monitor; this settles a couple of steps down and gives
    the glass card something to sit against. */
-#pw-overlay{position:fixed;inset:0;overflow:hidden;
+#pw-overlay,#otp-overlay{position:fixed;inset:0;overflow:hidden;
   --pw-ink:#0f1c33; --pw-accent:#0a3b7c; --pw-teal:#0e9f8f;
   background:linear-gradient(180deg,#f7f9fc 0%,#eef2f8 55%,#e4ebf5 100%);
   display:flex;align-items:center;justify-content:center;z-index:500;padding:24px}
+#otp-overlay{z-index:501;display:none}
 /* Two-tier grid: 24px minor, 120px major, so it reads as ruled paper rather
    than a flat texture. Fades out toward the edges. */
-#pw-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;
+#pw-overlay::before,#otp-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;
   background-image:
     linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
     linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
@@ -67,7 +68,7 @@ body{
 /* Cloud bank along the bottom. Overlapping soft ellipses, no images — three
    layers drifting at different speeds so it reads as depth rather than a
    repeating pattern. The tint behind the card rides in the same layer. */
-#pw-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
+#pw-overlay::after,#otp-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:
     /* tint pooled behind the card, so the glass has something to refract */
     radial-gradient(ellipse 26% 30% at 42% 44%,rgba(19,102,204,.13),transparent 70%),
@@ -83,7 +84,7 @@ body{
   animation:pwClouds 90s ease-in-out infinite alternate}
 /* A few pixels of travel is enough to feel alive without being noticeable. */
 @keyframes pwClouds{from{transform:translateX(-14px)}to{transform:translateX(14px)}}
-@media (prefers-reduced-motion:reduce){#pw-overlay::after{animation:none}}
+@media (prefers-reduced-motion:reduce){#pw-overlay::after,#otp-overlay::after{animation:none}}
 /* Glass card: translucent, blurred backdrop, bright top rim, soft inner glow. */
 .pw-card{position:relative;z-index:1;
   background:linear-gradient(150deg,rgba(255,255,255,.72),rgba(255,255,255,.52));
@@ -148,6 +149,25 @@ body{
   border-top:1px solid rgba(15,28,51,.08);font-size:10.5px;color:#8b95a6;line-height:1.6}
 .pw-dot{flex:none;width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--pw-teal);
   box-shadow:0 0 0 3px rgba(14,159,143,.16)}
+/* -- OTP second factor (reuses the glass .pw-card) -- */
+.otp-names{display:grid;gap:9px;margin:2px 0 4px}
+.otp-name{display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-family:inherit;
+  border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);border-radius:12px;
+  padding:11px 13px;font-size:14px;font-weight:600;color:var(--pw-ink);cursor:pointer;
+  box-shadow:inset 0 1px 3px rgba(12,34,74,.05);transition:background .15s,border-color .15s,box-shadow .15s}
+.otp-name:hover{background:rgba(255,255,255,.8)}
+.otp-name.sel{background:rgba(255,255,255,.95);border-color:var(--pw-teal);
+  box-shadow:0 0 0 3px rgba(14,159,143,.18)}
+.otp-name .ini{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;font-size:11.5px;font-weight:800}
+.pw-card #otp-inp{text-align:center;letter-spacing:.42em;font-weight:700;font-size:19px;padding:13px 20px}
+.pw-card #otp-inp::placeholder{letter-spacing:.14em;font-weight:600}
+.otp-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.otp-link{border:none;background:transparent;color:var(--pw-accent);font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;padding:4px 2px}
+.otp-link:hover{text-decoration:underline}
+.otp-link:disabled{color:#9aa6b6;cursor:not-allowed;text-decoration:none}
+.otp-sent{font-size:12px;color:#0e8f70;font-weight:600;min-height:16px;margin:2px 0 12px}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1197,6 +1217,42 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     <button class="btn-primary" onclick="checkPw()"><span>Unlock report</span><i>&rarr;</i></button>
     <div class="err-msg" id="pw-err"></div>
     <div class="pw-foot"><span class="pw-dot"></span>Encrypted end-to-end — nothing is readable without the password. Authorized staff only.</div>
+  </div>
+</div>
+
+<!-- OTP Second Factor -->
+<div id="otp-overlay">
+  <div class="pw-card">
+    <div class="pw-head">
+      <div class="pw-brand"><img src="data:image/png;base64,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" alt="First Iraq Bank"></div>
+      <div class="pw-id">
+        <div class="pw-kicker">First Iraq Bank &middot; PMO</div>
+        <h2>Verify it's you</h2>
+      </div>
+    </div>
+    <p id="otp-sub">Select your name &mdash; we'll email you a one-time code to open the report.</p>
+
+    <div id="otp-step-name">
+      <div id="otp-names" class="otp-names"></div>
+      <button class="btn-primary" id="otp-send-btn" onclick="otpSend(false)" disabled><span>Send code</span><i>&rarr;</i></button>
+    </div>
+
+    <div id="otp-step-code" style="display:none">
+      <div class="otp-sent" id="otp-sent"></div>
+      <label class="pw-label" for="otp-inp">Verification code</label>
+      <div class="pw-field">
+        <input id="otp-inp" class="inp" inputmode="numeric" maxlength="6" placeholder="6-digit code"
+               autocomplete="one-time-code" onkeydown="if(event.key==='Enter')otpVerify()">
+      </div>
+      <button class="btn-primary" id="otp-verify-btn" onclick="otpVerify()"><span>Verify &amp; open</span><i>&rarr;</i></button>
+      <div class="otp-row">
+        <button type="button" class="otp-link" onclick="otpBack()">&larr; Change name</button>
+        <button type="button" class="otp-link" id="otp-resend" onclick="otpSend(true)">Resend code</button>
+      </div>
+    </div>
+
+    <div class="err-msg" id="otp-err"></div>
+    <div class="pw-foot"><span class="pw-dot"></span>A one-time code keeps the report protected even if the password is shared. Authorized staff only.</div>
   </div>
 </div>
 
@@ -4089,11 +4145,15 @@ async function checkPw(){
     // only if it turns up a newer list (someone hidden via live admin since the
     // last build) — a brief, rare correction instead of a guaranteed 4s wait.
     adoptBaseReport(data.report);
-    unlock();
-    init();
-    _loadHiddenListRemote()
-      .then(() => applyAttribution())
-      .catch(() => {});
+    // Password is correct - require a one-time email code (second factor) before
+    // the report is revealed. unlock()+init() run only after a verified code.
+    startOtp(function(){
+      unlock();
+      init();
+      _loadHiddenListRemote()
+        .then(() => applyAttribution())
+        .catch(() => {});
+    });
   } catch(e){
     err.textContent = 'Incorrect password — try again.';
     inp.value = '';
@@ -4101,6 +4161,132 @@ async function checkPw(){
     setTimeout(()=>err.textContent='', 3000);
   }
 }
+// ── OTP second factor (email one-time code) ─────────────────────────────────
+const OTP_API   = 'https://fibpmo-otp.rudaw-a-the-gw.workers.dev';
+// Names allowed to receive a code, in display order. Values must match the
+// worker's registered users exactly (it maps name → email server-side).
+const OTP_USERS = ['Kak Ali Al-Amili', 'Kak Ibrahim', 'Kak Waael Al-Qadhi', 'Kak Rudaw Abdalrahman'];
+let _otpDone = null, _otpName = '', _otpCooldown = null;
+
+function otpInitials(name){
+  const p = name.replace(/^kak\s+/i, '').trim().split(/\s+/).filter(Boolean);
+  const a = (p[0] || '')[0] || '';
+  const b = (p[1] || '')[0] || '';
+  return ((a + b).toUpperCase()) || name.slice(0, 2).toUpperCase();
+}
+function startOtp(onSuccess){
+  _otpDone = onSuccess; _otpName = '';
+  document.getElementById('pw-overlay').style.display = 'none';
+  const ov = document.getElementById('otp-overlay');
+  ov.style.display = 'flex';
+  otpBack();
+  const wrap = document.getElementById('otp-names');
+  wrap.innerHTML = '';
+  OTP_USERS.forEach(function(name){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'otp-name'; b.dataset.name = name;
+    b.innerHTML = '<span class="ini">' + otpInitials(name) + '</span><span>' +
+                  esc(name) + '</span>';
+    b.onclick = function(){
+      _otpName = name;
+      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel'); });
+      b.classList.add('sel');
+      document.getElementById('otp-send-btn').disabled = false;
+    };
+    wrap.appendChild(b);
+  });
+}
+function otpBack(){
+  clearInterval(_otpCooldown);
+  document.getElementById('otp-step-code').style.display = 'none';
+  document.getElementById('otp-step-name').style.display = 'block';
+  document.getElementById('otp-send-btn').disabled = !_otpName;
+  document.getElementById('otp-err').textContent = '';
+  document.getElementById('otp-sub').textContent =
+    "Select your name — we'll email you a one-time code to open the report.";
+}
+async function otpApi(path, body){
+  const r = await fetch(OTP_API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  let j = {}; try { j = await r.json(); } catch(_){}
+  return { ok: r.ok, status: r.status, body: j };
+}
+function otpCooldownStart(){
+  const btn = document.getElementById('otp-resend');
+  let left = 30; btn.disabled = true;
+  clearInterval(_otpCooldown);
+  _otpCooldown = setInterval(function(){
+    left--; btn.textContent = 'Resend in ' + left + 's';
+    if (left <= 0){ clearInterval(_otpCooldown); btn.disabled = false; btn.textContent = 'Resend code'; }
+  }, 1000);
+  btn.textContent = 'Resend in ' + left + 's';
+}
+async function otpSend(isResend){
+  if (!_otpName) return;
+  const err = document.getElementById('otp-err');
+  const sendBtn = document.getElementById('otp-send-btn');
+  err.textContent = '';
+  if (!isResend){ sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
+  let res;
+  try { res = await otpApi('/api/send', { name: _otpName }); }
+  catch(e){ res = { ok:false, body:{ error:'network' } }; }
+  sendBtn.textContent = 'Send code →'; sendBtn.disabled = false;
+  if (res.ok && res.body.ok){
+    document.getElementById('otp-step-name').style.display = 'none';
+    document.getElementById('otp-step-code').style.display = 'block';
+    document.getElementById('otp-sub').textContent =
+      'Enter the 6-digit code we just emailed you.';
+    document.getElementById('otp-sent').textContent =
+      'Code sent to ' + (res.body.to || 'your email') + ' · expires in 5 min';
+    const inp = document.getElementById('otp-inp');
+    inp.value = ''; inp.focus();
+    otpCooldownStart();
+  } else {
+    const e = (res.body && res.body.error) || 'error';
+    err.textContent =
+      e === 'unknown_name' ? 'This name is not registered for codes.' :
+      e === 'rate_limited' ? 'Too many requests — wait a few minutes and try again.' :
+      e === 'send_failed'  ? 'Could not send the email. Contact the PMO.' :
+      e === 'network'      ? 'Network error — check your connection and retry.' :
+                             'Could not send the code. Please try again.';
+  }
+}
+async function otpVerify(){
+  const inp = document.getElementById('otp-inp');
+  const err = document.getElementById('otp-err');
+  const btn = document.getElementById('otp-verify-btn');
+  const code = (inp.value || '').replace(/\D/g, '');
+  if (code.length < 6){ err.textContent = 'Enter the 6-digit code.'; inp.focus(); return; }
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Verifying…';
+  let res;
+  try { res = await otpApi('/api/verify', { name: _otpName, code: code }); }
+  catch(e){ res = { ok:false, body:{ error:'network' } }; }
+  btn.disabled = false; btn.textContent = 'Verify & open →';
+  if (res.ok && res.body.ok){
+    clearInterval(_otpCooldown);
+    document.getElementById('otp-overlay').style.display = 'none';
+    const done = _otpDone; _otpDone = null;
+    if (done) done();
+    return;
+  }
+  const e = (res.body && res.body.error) || 'error';
+  if (e === 'wrong_code'){
+    const left = res.body.left;
+    err.textContent = 'Incorrect code' + (left != null ? ' — ' + left + ' attempt' + (left===1?'':'s') + ' left.' : '.');
+  } else if (e === 'expired'){
+    err.textContent = 'Code expired — request a new one.';
+  } else if (e === 'locked'){
+    err.textContent = 'Too many wrong tries — request a new code.';
+  } else if (e === 'network'){
+    err.textContent = 'Network error — check your connection and retry.';
+  } else {
+    err.textContent = 'Could not verify the code. Please try again.';
+  }
+  inp.value = ''; inp.focus();
+}
+
 function playIntro(){
   var s = document.getElementById('intro-splash');
   if (!s) return;
@@ -10597,14 +10783,17 @@ document.addEventListener('keydown', function(e){
   /* Chrome that lives OUTSIDE #app gets real dark styles (no filter) */
   /* The gate is white by default; theme-dark flips the field and card only —
      layout, accent line and button shape stay identical. */
-  html.theme-dark #pw-overlay{--pw-ink:#f5f4ee;--pw-teal:#2dd4bf;
+  html.theme-dark #pw-overlay,html.theme-dark #otp-overlay{--pw-ink:#f5f4ee;--pw-teal:#2dd4bf;
     background:
       radial-gradient(ellipse 65% 55% at 8% 0%,  hsla(190,70%,40%,.24),transparent 60%),
       radial-gradient(ellipse 60% 50% at 96% 8%, hsla(248,60%,55%,.24),transparent 62%),
       linear-gradient(160deg,#151412 0%,#1b1a19 55%,#211f1d 100%)}
-  html.theme-dark #pw-overlay::after{
+  html.theme-dark #pw-overlay::after,html.theme-dark #otp-overlay::after{
     background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),
                      linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px)}
+  html.theme-dark .otp-name{background:rgba(38,38,36,.9);border-color:#4a4844;color:#f5f4ee}
+  html.theme-dark .otp-name:hover{background:rgba(48,48,46,.95)}
+  html.theme-dark .otp-name.sel{background:#2b2a28;border-color:#2dd4bf}
   html.theme-dark .pw-card{background:rgba(48,48,46,.9);border-color:rgba(255,255,255,.10);
     box-shadow:0 40px 90px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
   html.theme-dark .pw-card p{color:#b8b5ad}

@@ -86,13 +86,14 @@ body{
 /* Soft off-white field with a drafting grid and a low cloud bank. Pure white
    was glare on a large monitor; this settles a couple of steps down and gives
    the glass card something to sit against. */
-#pw-overlay{position:fixed;inset:0;overflow:hidden;
+#pw-overlay,#otp-overlay{position:fixed;inset:0;overflow:hidden;
   --pw-ink:#0f1c33; --pw-accent:#0a3b7c; --pw-teal:#0e9f8f;
   background:linear-gradient(180deg,#f7f9fc 0%,#eef2f8 55%,#e4ebf5 100%);
   display:flex;align-items:center;justify-content:center;z-index:500;padding:24px}
+#otp-overlay{z-index:501;display:none}
 /* Two-tier grid: 24px minor, 120px major, so it reads as ruled paper rather
    than a flat texture. Fades out toward the edges. */
-#pw-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;
+#pw-overlay::before,#otp-overlay::before{content:'';position:absolute;inset:0;pointer-events:none;
   background-image:
     linear-gradient(rgba(15,28,51,.10) 1px,transparent 1px),
     linear-gradient(90deg,rgba(15,28,51,.10) 1px,transparent 1px),
@@ -104,7 +105,7 @@ body{
 /* Cloud bank along the bottom. Overlapping soft ellipses, no images — three
    layers drifting at different speeds so it reads as depth rather than a
    repeating pattern. The tint behind the card rides in the same layer. */
-#pw-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
+#pw-overlay::after,#otp-overlay::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:
     /* tint pooled behind the card, so the glass has something to refract */
     radial-gradient(ellipse 26% 30% at 42% 44%,rgba(19,102,204,.13),transparent 70%),
@@ -120,7 +121,7 @@ body{
   animation:pwClouds 90s ease-in-out infinite alternate}
 /* A few pixels of travel is enough to feel alive without being noticeable. */
 @keyframes pwClouds{from{transform:translateX(-14px)}to{transform:translateX(14px)}}
-@media (prefers-reduced-motion:reduce){#pw-overlay::after{animation:none}}
+@media (prefers-reduced-motion:reduce){#pw-overlay::after,#otp-overlay::after{animation:none}}
 /* Glass card: translucent, blurred backdrop, bright top rim, soft inner glow. */
 .pw-card{position:relative;z-index:1;
   background:linear-gradient(150deg,rgba(255,255,255,.72),rgba(255,255,255,.52));
@@ -185,6 +186,25 @@ body{
   border-top:1px solid rgba(15,28,51,.08);font-size:10.5px;color:#8b95a6;line-height:1.6}
 .pw-dot{flex:none;width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--pw-teal);
   box-shadow:0 0 0 3px rgba(14,159,143,.16)}
+/* ── OTP second factor (reuses the glass .pw-card) ──────────────────────── */
+.otp-names{display:grid;gap:9px;margin:2px 0 4px}
+.otp-name{display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-family:inherit;
+  border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);border-radius:12px;
+  padding:11px 13px;font-size:14px;font-weight:600;color:var(--pw-ink);cursor:pointer;
+  box-shadow:inset 0 1px 3px rgba(12,34,74,.05);transition:background .15s,border-color .15s,box-shadow .15s}
+.otp-name:hover{background:rgba(255,255,255,.8)}
+.otp-name.sel{background:rgba(255,255,255,.95);border-color:var(--pw-teal);
+  box-shadow:0 0 0 3px rgba(14,159,143,.18)}
+.otp-name .ini{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;font-size:11.5px;font-weight:800}
+.pw-card #otp-inp{text-align:center;letter-spacing:.42em;font-weight:700;font-size:19px;padding:13px 20px}
+.pw-card #otp-inp::placeholder{letter-spacing:.14em;font-weight:600}
+.otp-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.otp-link{border:none;background:transparent;color:var(--pw-accent);font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;padding:4px 2px}
+.otp-link:hover{text-decoration:underline}
+.otp-link:disabled{color:#9aa6b6;cursor:not-allowed;text-decoration:none}
+.otp-sent{font-size:12px;color:#0e8f70;font-weight:600;min-height:16px;margin:2px 0 12px}
 /* Version badge — deliberately OUTSIDE the password gate so which build is
    deployed can be confirmed without logging in. Carries no data, only the
    version, build date and short commit. */
@@ -1234,6 +1254,42 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     <button class="btn-primary" onclick="checkPw()"><span>Unlock report</span><i>&rarr;</i></button>
     <div class="err-msg" id="pw-err"></div>
     <div class="pw-foot"><span class="pw-dot"></span>Encrypted end-to-end — nothing is readable without the password. Authorized staff only.</div>
+  </div>
+</div>
+
+<!-- ═══════════════ OTP Second Factor ═════════════════════════════════════ -->
+<div id="otp-overlay">
+  <div class="pw-card">
+    <div class="pw-head">
+      <div class="pw-brand"><img src="__LOGO_FIB__" alt="First Iraq Bank"></div>
+      <div class="pw-id">
+        <div class="pw-kicker">First Iraq Bank · PMO</div>
+        <h2>Verify it's you</h2>
+      </div>
+    </div>
+    <p id="otp-sub">Select your name — we'll email you a one-time code to open the report.</p>
+
+    <div id="otp-step-name">
+      <div id="otp-names" class="otp-names"></div>
+      <button class="btn-primary" id="otp-send-btn" onclick="otpSend(false)" disabled><span>Send code</span><i>&rarr;</i></button>
+    </div>
+
+    <div id="otp-step-code" style="display:none">
+      <div class="otp-sent" id="otp-sent"></div>
+      <label class="pw-label" for="otp-inp">Verification code</label>
+      <div class="pw-field">
+        <input id="otp-inp" class="inp" inputmode="numeric" maxlength="6" placeholder="6-digit code"
+               autocomplete="one-time-code" onkeydown="if(event.key==='Enter')otpVerify()">
+      </div>
+      <button class="btn-primary" id="otp-verify-btn" onclick="otpVerify()"><span>Verify &amp; open</span><i>&rarr;</i></button>
+      <div class="otp-row">
+        <button type="button" class="otp-link" onclick="otpBack()">&larr; Change name</button>
+        <button type="button" class="otp-link" id="otp-resend" onclick="otpSend(true)">Resend code</button>
+      </div>
+    </div>
+
+    <div class="err-msg" id="otp-err"></div>
+    <div class="pw-foot"><span class="pw-dot"></span>A one-time code keeps the report protected even if the password is shared. Authorized staff only.</div>
   </div>
 </div>
 
@@ -4126,17 +4182,146 @@ async function checkPw(){
     // only if it turns up a newer list (someone hidden via live admin since the
     // last build) — a brief, rare correction instead of a guaranteed 4s wait.
     adoptBaseReport(data.report);
-    unlock();
-    init();
-    _loadHiddenListRemote()
-      .then(() => applyAttribution())
-      .catch(() => {});
+    // Password is correct — require a one-time email code (second factor) before
+    // the report is revealed. unlock()+init() run only after a verified code.
+    startOtp(function(){
+      unlock();
+      init();
+      _loadHiddenListRemote()
+        .then(() => applyAttribution())
+        .catch(() => {});
+    });
   } catch(e){
     err.textContent = 'Incorrect password — try again.';
     inp.value = '';
     inp.focus();
     setTimeout(()=>err.textContent='', 3000);
   }
+}
+// ── OTP second factor (email one-time code) ─────────────────────────────────
+const OTP_API   = 'https://fibpmo-otp.rudaw-a-the-gw.workers.dev';
+// Names allowed to receive a code, in display order. Values must match the
+// worker's registered users exactly (it maps name → email server-side).
+const OTP_USERS = ['Kak Ali Al-Amili', 'Kak Ibrahim', 'Kak Waael Al-Qadhi', 'Kak Rudaw Abdalrahman'];
+let _otpDone = null, _otpName = '', _otpCooldown = null;
+
+function otpInitials(name){
+  const p = name.replace(/^kak\s+/i, '').trim().split(/\s+/).filter(Boolean);
+  const a = (p[0] || '')[0] || '';
+  const b = (p[1] || '')[0] || '';
+  return ((a + b).toUpperCase()) || name.slice(0, 2).toUpperCase();
+}
+function startOtp(onSuccess){
+  _otpDone = onSuccess; _otpName = '';
+  document.getElementById('pw-overlay').style.display = 'none';
+  const ov = document.getElementById('otp-overlay');
+  ov.style.display = 'flex';
+  otpBack();
+  const wrap = document.getElementById('otp-names');
+  wrap.innerHTML = '';
+  OTP_USERS.forEach(function(name){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'otp-name'; b.dataset.name = name;
+    b.innerHTML = '<span class="ini">' + otpInitials(name) + '</span><span>' +
+                  esc(name) + '</span>';
+    b.onclick = function(){
+      _otpName = name;
+      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel'); });
+      b.classList.add('sel');
+      document.getElementById('otp-send-btn').disabled = false;
+    };
+    wrap.appendChild(b);
+  });
+}
+function otpBack(){
+  clearInterval(_otpCooldown);
+  document.getElementById('otp-step-code').style.display = 'none';
+  document.getElementById('otp-step-name').style.display = 'block';
+  document.getElementById('otp-send-btn').disabled = !_otpName;
+  document.getElementById('otp-err').textContent = '';
+  document.getElementById('otp-sub').textContent =
+    "Select your name — we'll email you a one-time code to open the report.";
+}
+async function otpApi(path, body){
+  const r = await fetch(OTP_API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  let j = {}; try { j = await r.json(); } catch(_){}
+  return { ok: r.ok, status: r.status, body: j };
+}
+function otpCooldownStart(){
+  const btn = document.getElementById('otp-resend');
+  let left = 30; btn.disabled = true;
+  clearInterval(_otpCooldown);
+  _otpCooldown = setInterval(function(){
+    left--; btn.textContent = 'Resend in ' + left + 's';
+    if (left <= 0){ clearInterval(_otpCooldown); btn.disabled = false; btn.textContent = 'Resend code'; }
+  }, 1000);
+  btn.textContent = 'Resend in ' + left + 's';
+}
+async function otpSend(isResend){
+  if (!_otpName) return;
+  const err = document.getElementById('otp-err');
+  const sendBtn = document.getElementById('otp-send-btn');
+  err.textContent = '';
+  if (!isResend){ sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
+  let res;
+  try { res = await otpApi('/api/send', { name: _otpName }); }
+  catch(e){ res = { ok:false, body:{ error:'network' } }; }
+  sendBtn.textContent = 'Send code →'; sendBtn.disabled = false;
+  if (res.ok && res.body.ok){
+    document.getElementById('otp-step-name').style.display = 'none';
+    document.getElementById('otp-step-code').style.display = 'block';
+    document.getElementById('otp-sub').textContent =
+      'Enter the 6-digit code we just emailed you.';
+    document.getElementById('otp-sent').textContent =
+      'Code sent to ' + (res.body.to || 'your email') + ' · expires in 5 min';
+    const inp = document.getElementById('otp-inp');
+    inp.value = ''; inp.focus();
+    otpCooldownStart();
+  } else {
+    const e = (res.body && res.body.error) || 'error';
+    err.textContent =
+      e === 'unknown_name' ? 'This name is not registered for codes.' :
+      e === 'rate_limited' ? 'Too many requests — wait a few minutes and try again.' :
+      e === 'send_failed'  ? 'Could not send the email. Contact the PMO.' :
+      e === 'network'      ? 'Network error — check your connection and retry.' :
+                             'Could not send the code. Please try again.';
+  }
+}
+async function otpVerify(){
+  const inp = document.getElementById('otp-inp');
+  const err = document.getElementById('otp-err');
+  const btn = document.getElementById('otp-verify-btn');
+  const code = (inp.value || '').replace(/\D/g, '');
+  if (code.length < 6){ err.textContent = 'Enter the 6-digit code.'; inp.focus(); return; }
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Verifying…';
+  let res;
+  try { res = await otpApi('/api/verify', { name: _otpName, code: code }); }
+  catch(e){ res = { ok:false, body:{ error:'network' } }; }
+  btn.disabled = false; btn.textContent = 'Verify & open →';
+  if (res.ok && res.body.ok){
+    clearInterval(_otpCooldown);
+    document.getElementById('otp-overlay').style.display = 'none';
+    const done = _otpDone; _otpDone = null;
+    if (done) done();
+    return;
+  }
+  const e = (res.body && res.body.error) || 'error';
+  if (e === 'wrong_code'){
+    const left = res.body.left;
+    err.textContent = 'Incorrect code' + (left != null ? ' — ' + left + ' attempt' + (left===1?'':'s') + ' left.' : '.');
+  } else if (e === 'expired'){
+    err.textContent = 'Code expired — request a new one.';
+  } else if (e === 'locked'){
+    err.textContent = 'Too many wrong tries — request a new code.';
+  } else if (e === 'network'){
+    err.textContent = 'Network error — check your connection and retry.';
+  } else {
+    err.textContent = 'Could not verify the code. Please try again.';
+  }
+  inp.value = ''; inp.focus();
 }
 function playIntro(){
   var s = document.getElementById('intro-splash');
@@ -10634,14 +10819,17 @@ document.addEventListener('keydown', function(e){
   /* Chrome that lives OUTSIDE #app gets real dark styles (no filter) */
   /* The gate is white by default; theme-dark flips the field and card only —
      layout, accent line and button shape stay identical. */
-  html.theme-dark #pw-overlay{--pw-ink:#f5f4ee;--pw-teal:#2dd4bf;
+  html.theme-dark #pw-overlay,html.theme-dark #otp-overlay{--pw-ink:#f5f4ee;--pw-teal:#2dd4bf;
     background:
       radial-gradient(ellipse 65% 55% at 8% 0%,  hsla(190,70%,40%,.24),transparent 60%),
       radial-gradient(ellipse 60% 50% at 96% 8%, hsla(248,60%,55%,.24),transparent 62%),
       linear-gradient(160deg,#151412 0%,#1b1a19 55%,#211f1d 100%)}
-  html.theme-dark #pw-overlay::after{
+  html.theme-dark #pw-overlay::after,html.theme-dark #otp-overlay::after{
     background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),
                      linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px)}
+  html.theme-dark .otp-name{background:rgba(38,38,36,.9);border-color:#4a4844;color:#f5f4ee}
+  html.theme-dark .otp-name:hover{background:rgba(48,48,46,.95)}
+  html.theme-dark .otp-name.sel{background:#2b2a28;border-color:#2dd4bf}
   html.theme-dark .pw-card{background:rgba(48,48,46,.9);border-color:rgba(255,255,255,.10);
     box-shadow:0 40px 90px -30px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
   html.theme-dark .pw-card p{color:#b8b5ad}
