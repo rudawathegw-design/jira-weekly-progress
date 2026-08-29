@@ -4380,6 +4380,9 @@ document.addEventListener('DOMContentLoaded', function(){
 function unlock(){
   document.getElementById('pw-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  // Reveal the floating action buttons only now — they belong to the report
+  // view, and before unlock they float over the sign-in / OTP cards.
+  document.documentElement.classList.add('rpt-unlocked');
   // The floating badge is for the signed-out screen; inside the app the same
   // version lives in the footer, clear of the FAB stack in the corner.
   const vb = document.getElementById('ver-badge');
@@ -10845,6 +10848,8 @@ document.addEventListener('keydown', function(e){
   html.theme-dark .fab-label{background:rgba(48,48,46,.72);color:#f5f4ee;border-color:rgba(255,255,255,.14)}
   html.theme-dark .fab-label::after{border-top-color:rgba(48,48,46,.72)}
   .fab-stack{position:fixed;right:18px;bottom:168px;z-index:650;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+  /* FABs belong to the unlocked report — keep them off the sign-in / OTP cards. */
+  html:not(.rpt-unlocked) .fab-stack{display:none}
   /* Frosted-glass FABs: translucent tinted fill + backdrop blur + light rim */
   .fab{width:44px;height:44px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
     color:#0369a1;background:linear-gradient(135deg,rgba(14,165,233,.28),rgba(3,105,161,.18));
