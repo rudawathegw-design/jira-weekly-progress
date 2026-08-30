@@ -150,16 +150,37 @@ body{
 .pw-dot{flex:none;width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--pw-teal);
   box-shadow:0 0 0 3px rgba(14,159,143,.16)}
 /* -- OTP second factor (reuses the glass .pw-card) -- */
-.otp-names{display:grid;gap:9px;margin:2px 0 4px}
-.otp-name{display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-family:inherit;
-  border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.55);border-radius:12px;
-  padding:11px 13px;font-size:14px;font-weight:600;color:var(--pw-ink);cursor:pointer;
-  box-shadow:inset 0 1px 3px rgba(12,34,74,.05);transition:background .15s,border-color .15s,box-shadow .15s}
-.otp-name:hover{background:rgba(255,255,255,.8)}
-.otp-name.sel{background:rgba(255,255,255,.95);border-color:var(--pw-teal);
+.otp-names{display:grid;gap:8px;margin:6px 0 6px}
+/* Each name is a tappable card — clicking it sends the code, so it reads as a
+   call to action: avatar, name, hint, and a trailing arrow that slides on hover. */
+.otp-name{position:relative;display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:inherit;
+  border:1px solid rgba(255,255,255,.9);border-radius:14px;padding:10px 42px 10px 11px;color:var(--pw-ink);cursor:pointer;
+  background:linear-gradient(150deg,rgba(255,255,255,.62),rgba(255,255,255,.4));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 1px 2px rgba(12,34,74,.05);
+  transition:transform .16s cubic-bezier(.22,1,.36,1),background .16s,border-color .16s,box-shadow .16s}
+.otp-name:hover{transform:translateY(-1px);background:rgba(255,255,255,.92);border-color:rgba(14,159,143,.55);
+  box-shadow:0 12px 24px -16px rgba(12,34,74,.55),inset 0 1px 0 rgba(255,255,255,.9)}
+.otp-name:focus-visible{outline:2px solid var(--pw-teal);outline-offset:2px}
+.otp-name.sel,.otp-name.sending{background:rgba(255,255,255,.97);border-color:var(--pw-teal);
   box-shadow:0 0 0 3px rgba(14,159,143,.18)}
-.otp-name .ini{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
-  background:linear-gradient(135deg,#12539f,#0a3b7c 70%);color:#fff;font-size:11.5px;font-weight:800}
+.otp-name:disabled{cursor:default}
+.otp-name:disabled:not(.sending):not(.sel){opacity:.45;transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
+.otp-name .ini{flex:none;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
+  color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.02em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px -9px rgba(12,34,74,.7)}
+.otp-name .meta{display:flex;flex-direction:column;gap:1px;min-width:0}
+.otp-name .nm{font-size:14px;font-weight:700;line-height:1.25;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.otp-name .sub{font-size:11px;font-weight:500;color:#8b95a6;line-height:1.2;transition:color .16s}
+.otp-name:hover .sub{color:var(--pw-teal)}
+.otp-name .go{position:absolute;right:14px;top:50%;margin-top:-8px;width:16px;height:16px;color:#b3bccb;
+  display:grid;place-items:center;transition:transform .18s,color .16s}
+.otp-name:hover .go{color:var(--pw-teal);transform:translateX(3px)}
+.otp-name.sel .go,.otp-name.sending .go{color:var(--pw-teal)}
+.otp-name.sending .go{border:2px solid rgba(14,159,143,.25);border-top-color:var(--pw-teal);
+  border-radius:50%;transform:none;animation:otpSpin .6s linear infinite}
+.otp-name.sending .go svg{display:none}
+@keyframes otpSpin{to{transform:rotate(360deg)}}
 .pw-card #otp-inp{text-align:center;letter-spacing:.42em;font-weight:700;font-size:19px;padding:13px 20px}
 .pw-card #otp-inp::placeholder{letter-spacing:.14em;font-weight:600}
 .otp-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
@@ -4283,17 +4304,30 @@ function startOtp(onSuccess){
   otpBack();
   const wrap = document.getElementById('otp-names');
   wrap.innerHTML = '';
-  OTP_USERS.forEach(function(name){
+  // Distinct avatar gradient per person, picked deterministically by position,
+  // so the four names read apart at a glance instead of one repeated navy tile.
+  const AV = ['linear-gradient(135deg,#12539f,#0a3b7c)',
+              'linear-gradient(135deg,#0e9f8f,#0b7d6f)',
+              'linear-gradient(135deg,#7c5cff,#5a3ce0)',
+              'linear-gradient(135deg,#e9972b,#d97706)',
+              'linear-gradient(135deg,#e05a6d,#c53a52)'];
+  const ARROW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+                'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
+  OTP_USERS.forEach(function(name, i){
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'otp-name'; b.dataset.name = name;
-    b.innerHTML = '<span class="ini">' + otpInitials(name) + '</span><span>' +
-                  esc(name) + '</span>';
+    b.innerHTML =
+      '<span class="ini" style="background:' + AV[i % AV.length] + '">' + otpInitials(name) + '</span>' +
+      '<span class="meta"><span class="nm">' + esc(name) + '</span>' +
+      '<span class="sub">Email me a one-time code</span></span>' +
+      '<span class="go">' + ARROW + '</span>';
     b.onclick = function(){
       if (b.disabled) return;
       _otpName = name;
       // Selecting a name now sends the code straight away — no separate button.
-      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel'); c.disabled = true; });
-      b.classList.add('sel');
+      // The chosen row spins; the rest dim until the send resolves.
+      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel', 'sending'); c.disabled = true; });
+      b.classList.add('sel', 'sending');
       otpSend(false);
     };
     wrap.appendChild(b);
@@ -4305,7 +4339,7 @@ function otpBack(){
   var rq = document.getElementById('otp-step-req'); if (rq) rq.style.display = 'none';
   document.getElementById('otp-step-name').style.display = 'block';
   var _names = document.getElementById('otp-names');
-  if (_names) Array.prototype.forEach.call(_names.children, function(c){ c.disabled = false; c.classList.remove('sel'); });
+  if (_names) Array.prototype.forEach.call(_names.children, function(c){ c.disabled = false; c.classList.remove('sel', 'sending'); });
   document.getElementById('otp-err').textContent = '';
   document.getElementById('otp-sub').textContent =
     "Select your name — we'll email you a one-time code to open the report.";
@@ -4421,7 +4455,7 @@ async function otpSend(isResend){
     document.getElementById('otp-sub').textContent =
       "Select your name — we'll email you a one-time code to open the report.";
     const _n = document.getElementById('otp-names');
-    if (_n) Array.prototype.forEach.call(_n.children, function(c){ c.disabled = false; });
+    if (_n) Array.prototype.forEach.call(_n.children, function(c){ c.disabled = false; c.classList.remove('sel', 'sending'); });
   }
 }
 async function otpVerify(){
