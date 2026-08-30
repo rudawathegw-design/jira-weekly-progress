@@ -4342,16 +4342,18 @@ function startOtp(onSuccess){
   otpBack();
   const wrap = document.getElementById('otp-names');
   wrap.innerHTML = '';
-  // Neutral avatar tile with a thin colored ring per person — an understated,
-  // standard "avatar" look: the name reads apart by its ring, not a loud fill.
-  const RING = ['#2563eb', '#0e9f8f', '#d97706', '#e11d48', '#7c5cff'];
+  // Neutral avatar tile with a single standard slate person icon + ring — the
+  // name text tells the rows apart, so the avatars stay uniform and calm.
+  const RING_C = '#64748b';
   const ARROW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
                 'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
+  const PERSON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">' +
+                 '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.46-8 5.5V21h16v-1.5c0-3.04-3.58-5.5-8-5.5Z"/></svg>';
   OTP_USERS.forEach(function(name, i){
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'otp-name'; b.dataset.name = name;
     b.innerHTML =
-      '<span class="ini" style="--ring:' + RING[i % RING.length] + '">' + otpInitials(name) + '</span>' +
+      '<span class="ini" style="--ring:' + RING_C + '">' + PERSON + '</span>' +
       '<span class="meta"><span class="nm">' + esc(name) + '</span>' +
       '<span class="sub">Email me a one-time code</span></span>' +
       '<span class="go">' + ARROW + '</span>';
