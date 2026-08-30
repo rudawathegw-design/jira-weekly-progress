@@ -202,9 +202,10 @@ body{
   box-shadow:0 0 0 3px rgba(14,159,143,.18)}
 .otp-name:disabled{cursor:default}
 .otp-name:disabled:not(.sending):not(.sel){opacity:.45;transform:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
-.otp-name .ini{flex:none;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;
-  color:#fff;font-size:12.5px;font-weight:800;letter-spacing:.02em;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px -9px rgba(12,34,74,.7)}
+.otp-name .ini{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  background:linear-gradient(135deg,#f4f7fb,#e4e9f1);color:#48566b;
+  font-size:12.5px;font-weight:800;letter-spacing:.02em;
+  box-shadow:inset 0 0 0 2px var(--ring,#cbd5e1),0 3px 8px -5px rgba(12,34,74,.45)}
 .otp-name .meta{display:flex;flex-direction:column;gap:1px;min-width:0}
 .otp-name .nm{font-size:14px;font-weight:700;line-height:1.25;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -4341,20 +4342,16 @@ function startOtp(onSuccess){
   otpBack();
   const wrap = document.getElementById('otp-names');
   wrap.innerHTML = '';
-  // Distinct avatar gradient per person, picked deterministically by position,
-  // so the four names read apart at a glance instead of one repeated navy tile.
-  const AV = ['linear-gradient(135deg,#12539f,#0a3b7c)',
-              'linear-gradient(135deg,#0e9f8f,#0b7d6f)',
-              'linear-gradient(135deg,#7c5cff,#5a3ce0)',
-              'linear-gradient(135deg,#e9972b,#d97706)',
-              'linear-gradient(135deg,#e05a6d,#c53a52)'];
+  // Neutral avatar tile with a thin colored ring per person — an understated,
+  // standard "avatar" look: the name reads apart by its ring, not a loud fill.
+  const RING = ['#2563eb', '#0e9f8f', '#d97706', '#e11d48', '#7c5cff'];
   const ARROW = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
                 'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>';
   OTP_USERS.forEach(function(name, i){
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'otp-name'; b.dataset.name = name;
     b.innerHTML =
-      '<span class="ini" style="background:' + AV[i % AV.length] + '">' + otpInitials(name) + '</span>' +
+      '<span class="ini" style="--ring:' + RING[i % RING.length] + '">' + otpInitials(name) + '</span>' +
       '<span class="meta"><span class="nm">' + esc(name) + '</span>' +
       '<span class="sub">Email me a one-time code</span></span>' +
       '<span class="go">' + ARROW + '</span>';
