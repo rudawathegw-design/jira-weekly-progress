@@ -1277,7 +1277,6 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
       <div id="otp-names" class="otp-names"></div>
       <div class="otp-reqrow" id="otp-reqrow" role="button" tabindex="0" onclick="otpOpenReq()"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();otpOpenReq();}">&#65291;&nbsp; Name not listed? Request access</div>
-      <button class="btn-primary" id="otp-send-btn" onclick="otpSend(false)" disabled><span>Send code</span><i>&rarr;</i></button>
     </div>
 
     <div id="otp-step-req" style="display:none">
@@ -4290,10 +4289,12 @@ function startOtp(onSuccess){
     b.innerHTML = '<span class="ini">' + otpInitials(name) + '</span><span>' +
                   esc(name) + '</span>';
     b.onclick = function(){
+      if (b.disabled) return;
       _otpName = name;
-      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel'); });
+      // Selecting a name now sends the code straight away — no separate button.
+      Array.prototype.forEach.call(wrap.children, function(c){ c.classList.remove('sel'); c.disabled = true; });
       b.classList.add('sel');
-      document.getElementById('otp-send-btn').disabled = false;
+      otpSend(false);
     };
     wrap.appendChild(b);
   });
@@ -4303,7 +4304,8 @@ function otpBack(){
   document.getElementById('otp-step-code').style.display = 'none';
   var rq = document.getElementById('otp-step-req'); if (rq) rq.style.display = 'none';
   document.getElementById('otp-step-name').style.display = 'block';
-  document.getElementById('otp-send-btn').disabled = !_otpName;
+  var _names = document.getElementById('otp-names');
+  if (_names) Array.prototype.forEach.call(_names.children, function(c){ c.disabled = false; c.classList.remove('sel'); });
   document.getElementById('otp-err').textContent = '';
   document.getElementById('otp-sub').textContent =
     "Select your name — we'll email you a one-time code to open the report.";
@@ -4387,13 +4389,16 @@ function otpCooldownStart(){
 async function otpSend(isResend){
   if (!_otpName) return;
   const err = document.getElementById('otp-err');
-  const sendBtn = document.getElementById('otp-send-btn');
+  const sendBtn = document.getElementById('otp-send-btn'); // may be absent (auto-send flow)
   err.textContent = '';
-  if (!isResend){ sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
+  if (!isResend){
+    if (sendBtn){ sendBtn.disabled = true; sendBtn.textContent = 'Sending…'; }
+    document.getElementById('otp-sub').textContent = 'Sending your code…';
+  }
   let res;
   try { res = await otpApi('/api/send', { name: _otpName, app: 'report' }); }
   catch(e){ res = { ok:false, body:{ error:'network' } }; }
-  sendBtn.textContent = 'Send code →'; sendBtn.disabled = false;
+  if (sendBtn){ sendBtn.textContent = 'Send code →'; sendBtn.disabled = false; }
   if (res.ok && res.body.ok){
     document.getElementById('otp-step-name').style.display = 'none';
     document.getElementById('otp-step-code').style.display = 'block';
@@ -4412,6 +4417,11 @@ async function otpSend(isResend){
       e === 'send_failed'  ? 'Could not send the email. Contact the PMO.' :
       e === 'network'      ? 'Network error — check your connection and retry.' :
                              'Could not send the code. Please try again.';
+    // Send failed: re-enable the name list so they can pick again / retry.
+    document.getElementById('otp-sub').textContent =
+      "Select your name — we'll email you a one-time code to open the report.";
+    const _n = document.getElementById('otp-names');
+    if (_n) Array.prototype.forEach.call(_n.children, function(c){ c.disabled = false; });
   }
 }
 async function otpVerify(){
