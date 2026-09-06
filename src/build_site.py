@@ -77,7 +77,12 @@ body{
   padding:clamp(14px,2.2vw,32px);
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:var(--page-max);margin:0 auto}
+/* Global guard: never let a stray wide element (a long ticker item, a data row,
+   an oversized card) push the page sideways and open an empty gap on the right.
+   `clip` (not `hidden`) avoids making <html> a scroll container, so sticky/fixed
+   elements and dropdowns are unaffected; tables keep their own overflow-x:auto. */
+html{overflow-x:clip}
+.wrap{max-width:var(--page-max);margin:0 auto;overflow-x:clip}
 /* Wider screens get more table, not more empty gutter. */
 @media (min-width:1700px){ :root{ --page-max:1600px } }
 @media (min-width:2100px){ :root{ --page-max:1840px } }
