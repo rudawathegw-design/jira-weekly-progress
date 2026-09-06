@@ -1345,7 +1345,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     <span class="ver-sep">·</span>
     <span class="ver-num">v2.21.0</span>
     <span class="ver-sep">·</span>
-    <span>2026-09-06 11:34 PM Baghdad</span>
+    <span id="rep-ver-time">2026-09-06 11:34 PM Baghdad</span>
     <span class="ver-sep">·</span>
     <span>7b6bbaf</span>
   </div>
@@ -1381,6 +1381,22 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     if (elV){ var v = pick(o.html, 'v'), rel = pick(o.html, 'rel');
       elV.textContent = (v + (rel ? ' ' + rel : '')).trim() || '—'; }
   }).catch(function(){ elT.textContent = 'unavailable'; if (elV) elV.textContent = ''; });
+})();
+</script>
+
+<script>
+/* Report badge shows its OWN last-deploy time (the page's Last-Modified header)
+   so the date always reflects the latest deploy automatically — no rebuild or
+   manual bump needed. Falls back to the build-stamped value if unavailable. */
+(function(){
+  var el=document.getElementById('rep-ver-time'); if(!el) return;
+  try{
+    fetch(location.href,{method:'HEAD',cache:'no-store'}).then(function(r){
+      var lm=r.headers.get('Last-Modified'); if(!lm) return;
+      var d=new Date(lm); if(isNaN(d.getTime())) return;
+      el.textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Baghdad',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).format(d)+' Baghdad';
+    }).catch(function(){});
+  }catch(e){}
 })();
 </script>
 
