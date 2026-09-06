@@ -644,7 +644,7 @@ async function handleRequest(request, env, ctx) {
       for (let i = 0; i < 2; i++) {            // cap ~100 recent issues
         const qs = new URLSearchParams({
           jql, maxResults: "50",
-          fields: "summary,assignee,status,duedate,issuetype,statuscategorychangedate,updated",
+          fields: "summary,assignee,status,duedate,issuetype,statuscategorychangedate,updated,comment",
           expand: "changelog",
         });
         if (token) qs.set("nextPageToken", token);

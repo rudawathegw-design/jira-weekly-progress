@@ -967,6 +967,8 @@ body.laser-on #laser-dot{display:block}
 .act-field.duedate  {background:#fee2e2;color:#991b1b}
 .act-field.assignee {background:#fef3c7;color:#854d0e}
 .act-field.priority {background:#ede9fe;color:#5b21b6}
+.act-field.comment  {background:#d1fae5;color:#065f46}
+.act-comment{color:#0f172a;font-size:12.5px;line-height:1.45}
 .act-change{color:#334155;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .act-from{color:#64748b;text-decoration:line-through}
@@ -1546,6 +1548,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
         <option value="duedate">Due date only</option>
         <option value="assignee">Assignee only</option>
         <option value="priority">Priority only</option>
+        <option value="comment">Comments only</option>
       </select>
       <select class="act-filter-sel" id="act-range" onchange="_renderActivityList()">
         <option value="1" selected>Last 24 hours</option>
@@ -5834,6 +5837,20 @@ function filterToName(name) {
 // via the Worker 'activity' action ONLY when the Activity Log opens - never on
 // the every-10s live path, so it can't blow the Worker CPU budget.
 let _ACTIVITY_OVERLAY = null;
+// Flatten a Jira ADF comment body (rich JSON) into plain text, keeping @mentions
+// readable. Falls back to a plain string body if the API returns one.
+function _adfToText(node){
+  if(node==null) return '';
+  if(typeof node==='string') return node;
+  if(Array.isArray(node)) return node.map(_adfToText).join('');
+  let s='';
+  if(node.type==='text' && node.text) s+=node.text;
+  else if(node.type==='mention') s+='@'+((node.attrs&&node.attrs.text)||'').replace(/^@/,'');
+  else if(node.type==='hardBreak') s+=' ';
+  if(node.content) s+=_adfToText(node.content);
+  if(node.type==='paragraph') s+=' ';
+  return s;
+}
 async function _loadActivityFeed(days){
   if(!GH_PROXY) return;
   const pw = sessionStorage.getItem('pw_cache')||'';
@@ -5856,6 +5873,13 @@ async function _loadActivityFeed(days){
           if(!interesting.has(field)) return;
           out.push({when, author, field, from:item.fromString||'', to:item.toString||'', key:it.key, summary, owner, _t:new Date(when).getTime()});
         });
+      });
+      // Jira comments — who said what, on which task, when.
+      ((f.comment && f.comment.comments) || []).forEach(c=>{
+        const when=c.created || c.updated; if(!when) return;
+        const author=(c.author && c.author.displayName) || 'Unknown';
+        const text=_adfToText(c.body).replace(/\s+/g,' ').trim();
+        out.push({when, author, field:'comment', from:'', to:text, key:it.key, summary, owner, _t:new Date(when).getTime()});
       });
     });
     out.sort((a,b)=>b._t-a._t);
@@ -6004,19 +6028,27 @@ function _renderActivityList() {
     return `${Math.floor(h/24)}d ago`;
   };
   const fmtVal = v => v ? esc(String(v).length > 30 ? v.slice(0,28)+'…' : v) : '<em>none</em>';
+  const fmtComment = v => {
+    const t = String(v||'').trim();
+    if (!t) return '<em>(empty comment)</em>';
+    return esc(t.length > 180 ? t.slice(0,178)+'…' : t);
+  };
 
-  list.innerHTML = events.slice(0, 500).map(e => `
+  list.innerHTML = events.slice(0, 500).map(e => {
+    const change = e.field === 'comment'
+      ? `<div class="act-comment" title="${esc(e.to)}">💬 ${fmtComment(e.to)}</div>
+         <div class="act-summary">${esc(e.summary || '')} · owned by ${esc(e.owner)}</div>`
+      : `<span class="act-from">${fmtVal(e.from)}</span><span class="act-arrow">→</span><span class="act-to">${fmtVal(e.to)}</span>
+         <div class="act-summary">${esc(e.summary || '')} · owned by ${esc(e.owner)}</div>`;
+    return `
     <div class="act-row">
       <div class="act-when" title="${esc(e.when)}">${ago(e._t)}</div>
       <div class="act-author" title="${esc(e.author)}">${esc(e.author)}</div>
-      <div class="act-field ${esc(e.field)}">${esc(e.field)}</div>
-      <div class="act-change">
-        <span class="act-from">${fmtVal(e.from)}</span><span class="act-arrow">→</span><span class="act-to">${fmtVal(e.to)}</span>
-        <div class="act-summary">${esc(e.summary || '')} · owned by ${esc(e.owner)}</div>
-      </div>
+      <div class="act-field ${esc(e.field)}">${e.field==='comment'?'comment':esc(e.field)}</div>
+      <div class="act-change">${change}</div>
       <a class="act-key" href="${base}/browse/${encodeURIComponent(e.key)}" target="_blank" rel="noopener">${esc(e.key)} ↗</a>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── Breaking-news ticker: recently changed tasks across the team ───────────
