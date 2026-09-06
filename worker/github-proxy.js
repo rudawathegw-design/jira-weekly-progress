@@ -245,6 +245,13 @@ export default {
   // parsed, threaded against what we've sent (via In-Reply-To / References),
   // and stored in D1 so the dashboard Mailbox can show a real conversation.
   async email(message, env, ctx) {
+    // 1) Forward a copy FIRST (to a verified destination) so a parsing/D1 error
+    //    can never lose the mail — the Gmail copy always goes out.
+    if (env.MAIL_FORWARD) {
+      try { await message.forward(env.MAIL_FORWARD); }
+      catch (e) { console.error("[mail] forward failed", String(e)); }
+    }
+    // 2) Then parse + store for the dashboard mailbox.
     try {
       if (!env.MAILDB) { console.error("[mail] no D1 bound; dropping inbound"); return; }
       const raw = await new Response(message.raw).arrayBuffer();
@@ -276,10 +283,6 @@ export default {
         snippet: _snippet(parsed.text, parsed.html),
         created_at: new Date().toISOString(), is_read: 0, err: "",
       });
-
-      // Optional safety net: also forward a copy to a personal inbox when
-      // MAIL_FORWARD is set to a VERIFIED destination address.
-      if (env.MAIL_FORWARD) { try { await message.forward(env.MAIL_FORWARD); } catch (e) {} }
     } catch (err) {
       console.error("[mail] inbound handler failed", (err && err.stack) || String(err));
     }
@@ -472,22 +475,46 @@ async function handleRequest(request, env, ctx) {
         if (!threadId) threadId = crypto.randomUUID();
 
         const text = _htmlToText(html);
-        const headers = {};
+        // Our own Message-ID so a reply's In-Reply-To/References match this row
+        // and thread correctly (works no matter which provider actually sends).
+        const ourMsgId = "<out-" + crypto.randomUUID() + "@fibpmo.com>";
+        const headers = { "Message-ID": ourMsgId };
         if (parentMsgId) { headers["In-Reply-To"] = parentMsgId; headers["References"] = parentMsgId; }
 
         let messageId = "", err = "";
         try {
-          const resp = await env.EMAIL.send({
-            to,
-            cc: cc.length ? cc : undefined,
-            from: { email: mailFrom(env), name: mailFromName(env) },
-            replyTo: mailFrom(env),
-            subject: subject || "(no subject)",
-            html,
-            text: text || " ",
-            headers: Object.keys(headers).length ? headers : undefined,
-          });
-          messageId = (resp && resp.messageId) || "";
+          if (env.RESEND_API_KEY) {
+            // Resend HTTP API (same provider as the weekly report).
+            const rr = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                from: `${mailFromName(env)} <${mailFrom(env)}>`,
+                to,
+                cc: cc.length ? cc : undefined,
+                reply_to: mailFrom(env),
+                subject: subject || "(no subject)",
+                html,
+                text: text || " ",
+                headers,
+              }),
+            });
+            if (!rr.ok) err = "Resend " + rr.status + ": " + (await rr.text()).slice(0, 300);
+            else messageId = ourMsgId;
+          } else {
+            // Cloudflare Email Sending binding (when the account is onboarded).
+            const resp = await env.EMAIL.send({
+              to,
+              cc: cc.length ? cc : undefined,
+              from: { email: mailFrom(env), name: mailFromName(env) },
+              replyTo: mailFrom(env),
+              subject: subject || "(no subject)",
+              html,
+              text: text || " ",
+              headers,
+            });
+            messageId = (resp && resp.messageId) || ourMsgId;
+          }
         } catch (e) {
           err = String((e && e.message) || e).slice(0, 400);
         }

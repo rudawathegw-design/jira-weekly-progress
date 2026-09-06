@@ -32,6 +32,12 @@ ALLOWED_ORIGIN = "https://admin.fibpmo.com,https://fibpmo.com,https://www.fibpmo
 # JIRA_EMAIL / JIRA_API_TOKEN stay as SECRETS (wrangler secret put …).
 JIRA_BASE_URL = "https://fibtask.atlassian.net"
 JIRA_PROJECT = "FIBTMP"
+# Mailbox: outbound identity + a copy of every inbound reply forwarded to this
+# (already-verified) Email Routing destination, so replies land in BOTH the
+# dashboard inbox and Gmail.
+MAIL_FROM = "admin@fibpmo.com"
+MAIL_FROM_NAME = "FIB PMO"
+MAIL_FORWARD = "rudaw.a.the.gw@gmail.com"
 
 # Secrets are NOT stored here. Set them once with:
 #   wrangler secret put GH_PAT
