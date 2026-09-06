@@ -1,0 +1,9 @@
+{
+  "name": "github-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cloudflare Worker: GitHub/Jira proxy + FIBPMO mailbox (Email Sending + Routing).",
+  "dependencies": {
+    "postal-mime": "^2.4.4"
+  }
+}

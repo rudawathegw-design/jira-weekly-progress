@@ -30,3 +30,7 @@ data/comment_log.json
 # Cloudflare wrangler local cache (leaks account id) — never commit
 worker/.wrangler/
 .wrangler/
+
+# Worker npm deps (postal-mime) — wrangler bundles them at deploy from package.json
+worker/node_modules/
+node_modules/

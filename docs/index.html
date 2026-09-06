@@ -1561,6 +1561,268 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   </div>
 </div>
 
+<!-- ═══════════════ Admin Mailbox Modal ════════════════════════════════════ -->
+<style>
+.mb-wrap{display:flex;height:min(74vh,640px);min-height:400px}
+.mb-side{width:308px;flex:none;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;background:#f8fafc}
+.mb-tabs{display:flex;gap:6px;padding:12px 12px 8px}
+.mb-tab{flex:1;border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:7px 0;font-weight:700;font-size:12.5px;color:#475569;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.mb-tab.active{background:#0f9389;color:#fff;border-color:#0f9389}
+.mb-cnt{background:rgba(0,0,0,.10);border-radius:999px;padding:0 7px;font-size:11px;font-weight:800}
+.mb-tab.active .mb-cnt{background:rgba(255,255,255,.28)}
+.mb-compose-btn{margin:0 12px 8px;border:none;background:#0369a1;color:#fff;border-radius:8px;padding:9px 0;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+.mb-search{margin:0 12px 8px;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:inherit;outline:none}
+.mb-list{flex:1;overflow-y:auto;padding:0 8px 10px}
+.mb-item{padding:10px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:2px}
+.mb-item:hover{background:#eef2f6}
+.mb-item.active{background:#e0f2f1;border-color:#0f9389}
+.mb-item-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.mb-item-who{font-weight:800;font-size:12.5px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-item-time{font-size:10.5px;color:#94a3b8;white-space:nowrap;flex:none}
+.mb-item-subj{font-size:12px;color:#334155;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-item-snip{font-size:11.5px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626;margin-left:6px;vertical-align:middle}
+.mb-main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.mb-empty{margin:auto;text-align:center;color:#94a3b8;font-size:13px;padding:30px;line-height:1.6}
+.mb-thead{padding:12px 18px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mb-thead-subj{font-weight:800;font-size:14px;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-thread{flex:1;overflow-y:auto;padding:16px 18px;background:#f1f5f9}
+.mb-msg{border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;overflow:hidden;background:#fff}
+.mb-msg.out{border-color:#bfe3df}
+.mb-msg-head{display:flex;justify-content:space-between;gap:10px;padding:9px 13px;background:#f8fafc;font-size:12px;border-bottom:1px solid #eef2f6;flex-wrap:wrap}
+.mb-msg.out .mb-msg-head{background:#e8f6f4}
+.mb-msg-from{font-weight:800;color:#0f172a}
+.mb-msg-meta{color:#94a3b8;font-size:11px;white-space:nowrap}
+.mb-msg-body{padding:4px 8px}
+.mb-frame{width:100%;height:340px;border:0;background:#fff;border-radius:6px;display:block}
+.mb-msg-text{white-space:pre-wrap;font-size:13px;color:#1e293b;padding:8px 6px}
+.mb-badge-dir{font-size:10px;font-weight:800;letter-spacing:.06em;padding:1px 7px;border-radius:999px;text-transform:uppercase;margin-right:6px}
+.mb-badge-dir.out{background:#0f9389;color:#fff}
+.mb-badge-dir.in{background:#dbeafe;color:#1e40af}
+.mb-compose{flex:1;overflow-y:auto;padding:16px 18px}
+.mb-field{margin-bottom:11px}
+.mb-field label{display:block;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#64748b;text-transform:uppercase;margin-bottom:4px}
+.mb-input{width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff}
+.mb-input:focus{border-color:#0f9389}
+textarea.mb-input{min-height:190px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;line-height:1.5;resize:vertical}
+.mb-foot{border-top:1px solid #e2e8f0;padding:11px 18px;display:flex;gap:12px;align-items:center;background:#f8fafc}
+.mb-send{border:none;background:#0f9389;color:#fff;border-radius:8px;padding:10px 22px;font-weight:800;font-size:13px;cursor:pointer}
+.mb-send:disabled{opacity:.6;cursor:wait}
+.mb-preview-toggle{font-size:12px;color:#0369a1;cursor:pointer;font-weight:700;background:none;border:none}
+.mb-hint{font-size:11px;color:#94a3b8}
+.mb-from-note{margin-left:auto;font-size:11px;color:#64748b}
+@media(max-width:720px){.mb-side{width:132px}.mb-wrap{height:80vh}.mb-from-note{display:none}}
+</style>
+<div class="modal-overlay hidden" id="mail-modal" onclick="if(event.target===this)closeModal('mail-modal')">
+  <div class="modal m-xl">
+    <div class="pm-head">
+      <div style="flex:1;min-width:0">
+        <div class="pm-name" style="color:#0f9389">✉️ Admin Mailbox</div>
+        <div class="pm-sub" id="mb-sub">Send HTML email from admin@fibpmo.com · read threaded replies</div>
+      </div>
+      <button class="btn-modal ghost" onclick="closeModal('mail-modal')">Close</button>
+    </div>
+    <div class="mb-wrap">
+      <div class="mb-side">
+        <div class="mb-tabs">
+          <button class="mb-tab active" id="mb-tab-inbox" onclick="mbSwitch('inbox')">Inbox <span class="mb-cnt" id="mb-cnt-inbox">0</span></button>
+          <button class="mb-tab" id="mb-tab-sent" onclick="mbSwitch('sent')">Sent <span class="mb-cnt" id="mb-cnt-sent">0</span></button>
+        </div>
+        <button class="mb-compose-btn" onclick="mbCompose()">✎ Compose</button>
+        <input class="mb-search" id="mb-search" type="search" placeholder="Search mail…" oninput="mbRenderList()">
+        <div class="mb-list" id="mb-list"></div>
+      </div>
+      <div class="mb-main" id="mb-main">
+        <div class="mb-empty">Select a conversation, or hit <b>Compose</b> to write a new email.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+/* ══ Admin Mailbox — send from admin@fibpmo.com, threaded inbox/sent ══════════
+   Auth reuses the SAME second password as Jira comments (window.__COMMENT_PW,
+   sent as X-Comment-Auth). The Worker verifies it against COMMENT_PASSWORD /
+   ADMIN_PASSWORD. All state is server-side (D1); nothing sensitive is stored
+   in the page. */
+let _mbBox='inbox', _mbAll=[], _mbActiveThread=null, _mbThreadMsgs=[], _mbReplyCtx=null, _mbPollTimer=null;
+
+function _mbHeaders(){
+  return {'Content-Type':'application/json',
+          'X-Proxy-Auth':(sessionStorage.getItem('pw_cache')||''),
+          'X-Comment-Auth':(window.__COMMENT_PW||'')};
+}
+async function _mbCall(payload){
+  if(!GH_PROXY) throw new Error('Worker proxy not configured.');
+  const r=await fetch(GH_PROXY,{method:'POST',headers:_mbHeaders(),body:JSON.stringify(payload)});
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok) throw new Error(d.message||('HTTP '+r.status));
+  return d;
+}
+async function _mbProbeStatus(){
+  try{ const r=await fetch(GH_PROXY,{method:'POST',headers:_mbHeaders(),body:JSON.stringify({action:'mail_unread'})}); return r.status; }
+  catch(e){ return 0; }
+}
+async function _mbEnsureAuth(){
+  if(window.__COMMENT_PW){ const s=await _mbProbeStatus(); if(s===200) return true; }
+  for(let i=0;i<3;i++){
+    const pw=prompt(i?'Incorrect. Enter the admin/comment password for the Mailbox:'
+                     :'Enter the admin/comment password to open the Mailbox:');
+    if(pw===null) return false;
+    window.__COMMENT_PW=pw;
+    const s=await _mbProbeStatus();
+    if(s===200) return true;
+    if(s===501){ toast('Mailbox not set up on the server yet.'); return false; }
+  }
+  window.__COMMENT_PW='';
+  toast('Mailbox locked — wrong password.');
+  return false;
+}
+async function openMailModal(){
+  if(!GH_PROXY){ toast('Mailbox needs the live Worker (not available here).'); return; }
+  if(!(await _mbEnsureAuth())) return;
+  openModal('mail-modal');
+  _mbBox='inbox'; _mbActiveThread=null; _mbSwitchUI();
+  document.getElementById('mb-main').innerHTML='<div class="mb-empty">Select a conversation, or hit <b>Compose</b> to write a new email.</div>';
+  await mbReload();
+  if(!_mbPollTimer) _mbPollTimer=setInterval(mbPollUnread,60000);
+}
+function _mbSwitchUI(){
+  document.getElementById('mb-tab-inbox').classList.toggle('active',_mbBox==='inbox');
+  document.getElementById('mb-tab-sent').classList.toggle('active',_mbBox==='sent');
+}
+function mbSwitch(b){ _mbBox=b; _mbSwitchUI(); mbRenderList(); }
+async function mbReload(){
+  const list=document.getElementById('mb-list');
+  if(list) list.innerHTML='<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px">Loading…</div>';
+  try{
+    const d=await _mbCall({action:'mail_threads',box:'all'});
+    _mbAll=d.threads||[];
+    document.getElementById('mb-cnt-inbox').textContent=_mbAll.filter(t=>t.has_in).length;
+    document.getElementById('mb-cnt-sent').textContent=_mbAll.filter(t=>t.has_out).length;
+    mbRenderList(); mbPollUnread();
+  }catch(e){ if(list) list.innerHTML='<div style="padding:20px;text-align:center;color:#dc2626;font-size:12px">'+esc(e.message)+'</div>'; }
+}
+function _mbAgo(iso){
+  const t=new Date(iso).getTime(), s=Math.max(0,(Date.now()-t)/1000);
+  if(s<60)return 'now'; const m=s/60; if(m<60)return Math.floor(m)+'m';
+  const h=m/60; if(h<24)return Math.floor(h)+'h'; const dd=h/24; if(dd<7)return Math.floor(dd)+'d';
+  return new Date(iso).toLocaleDateString();
+}
+function mbRenderList(){
+  const list=document.getElementById('mb-list'); if(!list) return;
+  const q=(document.getElementById('mb-search').value||'').toLowerCase().trim();
+  let items=_mbAll.filter(t=> _mbBox==='inbox'? t.has_in : t.has_out);
+  if(q) items=items.filter(t=>[t.subject,t.snippet,t.from_addr,t.to_addrs].join(' ').toLowerCase().includes(q));
+  if(!items.length){ list.innerHTML='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">No '+(_mbBox==='inbox'?'incoming mail':'sent mail')+' yet.</div>'; return; }
+  list.innerHTML=items.map((t,i)=>{
+    const who=_mbBox==='sent'?('To: '+(t.to_addrs||'—')):(t.from_addr||'—');
+    const idx=_mbAll.indexOf(t);
+    return '<div class="mb-item '+(_mbActiveThread===t.thread_id?'active':'')+'" onclick="mbOpenThreadIdx('+idx+')">'
+      +'<div class="mb-item-top"><span class="mb-item-who">'+esc(who)+(t.unread>0?'<span class="mb-dot"></span>':'')+'</span>'
+      +'<span class="mb-item-time">'+_mbAgo(t.last_at)+'</span></div>'
+      +'<div class="mb-item-subj">'+esc(t.subject||'(no subject)')+'</div>'
+      +'<div class="mb-item-snip">'+esc(t.snippet||'')+'</div></div>';
+  }).join('');
+}
+function mbOpenThreadIdx(i){ const t=_mbAll[i]; if(t) mbOpenThread(t.thread_id); }
+async function mbOpenThread(tid){
+  _mbActiveThread=tid; mbRenderList();
+  const main=document.getElementById('mb-main');
+  main.innerHTML='<div class="mb-empty">Loading conversation…</div>';
+  try{
+    const d=await _mbCall({action:'mail_thread',thread_id:tid});
+    const msgs=d.messages||[]; _mbThreadMsgs=msgs;
+    if(!msgs.length){ main.innerHTML='<div class="mb-empty">This conversation is empty.</div>'; return; }
+    const subject=msgs[msgs.length-1].subject||'(no subject)';
+    const lastIn=[...msgs].reverse().find(m=>m.direction==='in');
+    const lastMsg=msgs[msgs.length-1];
+    _mbReplyCtx={ thread_id:tid,
+      to:lastIn?lastIn.from_addr:(lastMsg.to_addrs||''),
+      in_reply_to:((lastIn?lastIn.message_id:lastMsg.message_id)||''),
+      subject:subject.replace(/^(re:\s*)+/i,'') };
+    main.innerHTML='<div class="mb-thead"><div class="mb-thead-subj">'+esc(subject)+'</div>'
+      +'<button class="mb-send" style="padding:8px 16px" onclick="mbReplyForm()">Reply</button></div>'
+      +'<div class="mb-thread" id="mb-thread"></div>';
+    const wrap=document.getElementById('mb-thread');
+    wrap.innerHTML=msgs.map((m,i)=>{
+      const cc=m.cc_addrs?(' · cc '+esc(m.cc_addrs)):'';
+      const who=m.direction==='out'?('To: '+esc(m.to_addrs)):esc(m.from_addr);
+      const errHtml=m.err?('<span style="color:#dc2626;font-weight:700"> · failed: '+esc(m.err)+'</span>'):'';
+      const body=(m.html&&m.html.trim())
+        ? '<iframe class="mb-frame" data-idx="'+i+'" sandbox=""></iframe>'
+        : '<div class="mb-msg-text">'+esc(m.body_text||'(no content)')+'</div>';
+      return '<div class="mb-msg '+m.direction+'"><div class="mb-msg-head"><div>'
+        +'<span class="mb-badge-dir '+m.direction+'">'+(m.direction==='out'?'Sent':'Received')+'</span>'
+        +'<span class="mb-msg-from">'+who+'</span>'+cc+errHtml+'</div>'
+        +'<div class="mb-msg-meta">'+new Date(m.created_at).toLocaleString()+'</div></div>'
+        +'<div class="mb-msg-body">'+body+'</div></div>';
+    }).join('');
+    // Populate iframes via the srcdoc PROPERTY (safe — no attribute parsing).
+    wrap.querySelectorAll('.mb-frame').forEach(f=>{
+      const m=msgs[+f.dataset.idx]; if(m) f.srcdoc=m.html;
+    });
+    mbReload();
+  }catch(e){ main.innerHTML='<div class="mb-empty" style="color:#dc2626">'+esc(e.message)+'</div>'; }
+}
+function mbCompose(prefill){
+  _mbActiveThread=null; mbRenderList();
+  const p=prefill||{}; _mbReplyCtx=p.in_reply_to?{in_reply_to:p.in_reply_to,thread_id:p.thread_id}:null;
+  const val=s=>esc(s||'');
+  const main=document.getElementById('mb-main');
+  main.innerHTML='<div class="mb-compose">'
+    +'<div class="mb-field"><label>To</label><input class="mb-input" id="mb-to" placeholder="name@example.com, another@example.com" value="'+val(p.to)+'"></div>'
+    +'<div class="mb-field"><label>Cc <span class="mb-hint">(optional)</span></label><input class="mb-input" id="mb-cc" placeholder="cc@example.com" value="'+val(p.cc)+'"></div>'
+    +'<div class="mb-field"><label>Subject</label><input class="mb-input" id="mb-subj" placeholder="Subject" value="'+val(p.subject)+'"></div>'
+    +'<div class="mb-field"><label>HTML body <span class="mb-hint">— paste your HTML design</span></label>'
+    +'<textarea class="mb-input" id="mb-html" placeholder="&lt;h1&gt;Hello&lt;/h1&gt; …paste HTML here…" oninput="_mbSyncPreview()">'+val(p.html)+'</textarea></div>'
+    +'<div id="mb-preview-wrap" style="display:none"><label class="mb-hint" style="display:block;margin-bottom:4px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Live preview</label>'
+    +'<iframe id="mb-preview" class="mb-frame" style="height:300px;border:1px solid #e2e8f0" sandbox=""></iframe></div>'
+    +'</div>'
+    +'<div class="mb-foot"><button class="mb-send" id="mb-send-btn" onclick="mbDoSend()">Send email</button>'
+    +'<button class="mb-preview-toggle" onclick="mbTogglePreview()">Toggle preview</button>'
+    +'<span class="mb-from-note">From: admin@fibpmo.com</span></div>';
+}
+function mbReplyForm(){
+  if(!_mbReplyCtx){ mbCompose(); return; }
+  mbCompose({to:_mbReplyCtx.to,subject:'Re: '+(_mbReplyCtx.subject||''),in_reply_to:_mbReplyCtx.in_reply_to,thread_id:_mbReplyCtx.thread_id});
+}
+function _mbSyncPreview(){
+  const w=document.getElementById('mb-preview-wrap');
+  if(w&&w.style.display!=='none'){ document.getElementById('mb-preview').srcdoc=document.getElementById('mb-html').value||''; }
+}
+function mbTogglePreview(){
+  const w=document.getElementById('mb-preview-wrap');
+  if(!w) return;
+  if(w.style.display==='none'){ w.style.display='block'; _mbSyncPreview(); } else w.style.display='none';
+}
+async function mbDoSend(){
+  const to=document.getElementById('mb-to').value.trim();
+  const cc=document.getElementById('mb-cc').value.trim();
+  const subject=document.getElementById('mb-subj').value.trim();
+  const html=document.getElementById('mb-html').value;
+  if(!to){ toast('Add at least one recipient.'); return; }
+  if(!html.trim()){ toast('The email body is empty.'); return; }
+  if(!confirm('Send this email from admin@fibpmo.com to '+to+(cc?(' (cc '+cc+')'):'')+'?')) return;
+  const btn=document.getElementById('mb-send-btn'); btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const payload={action:'mail_send',to,cc,subject,html};
+    if(_mbReplyCtx&&_mbReplyCtx.in_reply_to){ payload.in_reply_to=_mbReplyCtx.in_reply_to; payload.thread_id=_mbReplyCtx.thread_id; }
+    const d=await _mbCall(payload);
+    toast('Email sent ✓');
+    _mbBox='sent'; _mbSwitchUI(); await mbReload();
+    if(d.thread_id) mbOpenThread(d.thread_id);
+  }catch(e){ toast('Send failed: '+e.message); btn.disabled=false; btn.textContent='Send email'; }
+}
+async function mbPollUnread(){
+  if(!GH_PROXY||!window.__COMMENT_PW) return;
+  try{
+    const d=await _mbCall({action:'mail_unread'});
+    const b=document.getElementById('mailbox-badge'); if(!b) return;
+    if(d.unread>0){ b.style.display='inline-block'; b.textContent=d.unread; } else b.style.display='none';
+  }catch(e){}
+}
+</script>
+
 <!-- ═══════════════ Mustashar AI — CEO Briefing Modal ══════════════════════ -->
 <div class="modal-overlay hidden" id="ceo-modal" onclick="if(event.target===this){ceoStopSpeak();closeModal('ceo-modal')}">
   <div class="modal m-lg ceo-modal">
@@ -1901,6 +2163,10 @@ CC: @cc</textarea>
         <button class="chip chip-lg" onclick="openActivityModal()" title="See every recent change — who, what, when">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Activity Log
+        </button>
+        <button class="chip chip-lg" id="mailbox-btn" onclick="openMailModal()" title="Admin Mailbox — send HTML emails from admin@fibpmo.com and read threaded replies">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+          Mailbox <span id="mailbox-badge" style="display:none;background:#dc2626;color:#fff;padding:1px 7px;border-radius:999px;margin-left:2px;font-family:'JetBrains Mono',monospace;font-size:11px">0</span>
         </button>
         <!-- Vertical divider -->
         <span style="width:1px;height:24px;background:#e2e8f0;margin:0 4px"></span>

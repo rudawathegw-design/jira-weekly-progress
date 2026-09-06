@@ -1,6 +1,22 @@
 name = "github-proxy"
 main = "github-proxy.js"
 compatibility_date = "2024-11-01"
+# nodejs_compat is needed for postal-mime (inbound email parsing).
+compatibility_flags = ["nodejs_compat"]
+
+# ── Mailbox feature ────────────────────────────────────────────────────────
+# Native Cloudflare Email Sending binding — no API key. The `from` domain
+# (fibpmo.com) must be onboarded to Email Sending in the Cloudflare dashboard
+# before the first send. Inbound replies arrive via an Email Routing rule that
+# points admin@fibpmo.com at THIS worker's email() handler.
+[[send_email]]
+name = "EMAIL"
+
+# D1 store for the mailbox (sent + inbox, threaded).
+[[d1_databases]]
+binding = "MAILDB"
+database_name = "fibpmo-mail"
+database_id = "ae63540a-bc3b-4ad1-a979-3a933b208c51"
 
 # Backup pinger: fire repository_dispatch cron_ping every 5 min so the weekly
 # snapshot no longer depends on a single external pinger (or GitHub's own

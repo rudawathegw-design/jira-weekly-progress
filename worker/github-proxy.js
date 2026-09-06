@@ -19,7 +19,58 @@
  *   ALLOWED_ORIGIN  e.g. "https://rudawathegw-design.github.io"
  */
 
+import PostalMime from "postal-mime";
+
 const GH = "https://api.github.com";
+
+// ── Mailbox helpers (D1-backed; Cloudflare Email Sending + Routing) ─────────
+// From identity for outbound mail. Both overridable via wrangler [vars].
+function mailFrom(env)     { return String(env.MAIL_FROM || "admin@fibpmo.com"); }
+function mailFromName(env) { return String(env.MAIL_FROM_NAME || "FIB PMO"); }
+
+function _addrList(v) {
+  if (!v) return [];
+  const arr = Array.isArray(v) ? v : String(v).split(/[,;]+/);
+  return arr.map((s) => String(s).trim()).filter(Boolean);
+}
+function _validEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+function _htmlToText(html) {
+  return String(html || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ").trim();
+}
+function _snippet(text, html) {
+  let t = (text || "").trim();
+  if (!t && html) t = _htmlToText(html);
+  return t.replace(/\s+/g, " ").trim().slice(0, 180);
+}
+async function mailStore(env, row) {
+  const r = await env.MAILDB.prepare(
+    `INSERT INTO messages
+      (thread_id,direction,message_id,in_reply_to,refs,from_addr,to_addrs,cc_addrs,subject,html,body_text,snippet,created_at,is_read,err)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    row.thread_id, row.direction, row.message_id || "", row.in_reply_to || "", row.refs || "",
+    row.from_addr, row.to_addrs, row.cc_addrs || "", row.subject || "", row.html || "",
+    row.body_text || "", row.snippet || "", row.created_at, row.is_read ? 1 : 0, row.err || ""
+  ).run();
+  return r.meta && r.meta.last_row_id;
+}
+// Find the thread a reply belongs to by matching any referenced Message-ID we
+// already have on file. Returns the thread_id or null (a brand-new thread).
+async function mailThreadForReferences(env, ids) {
+  const list = (ids || []).map((s) => s && String(s).trim()).filter(Boolean);
+  if (!list.length) return null;
+  const ph = list.map(() => "?").join(",");
+  const row = await env.MAILDB.prepare(
+    `SELECT thread_id FROM messages WHERE message_id IN (${ph}) ORDER BY created_at DESC LIMIT 1`
+  ).bind(...list).first();
+  return row ? row.thread_id : null;
+}
 
 // ── Approval-routing fields ────────────────────────────────────────────────
 // Who is ACTUALLY accountable for an issue right now. Once a task moves to
@@ -191,6 +242,46 @@ export default {
     }
   },
 
+  // ── Inbound mail (Email Routing → this worker) ────────────────────────────
+  // A routing rule points admin@fibpmo.com at this worker. Each reply is
+  // parsed, threaded against what we've sent (via In-Reply-To / References),
+  // and stored in D1 so the dashboard Mailbox can show a real conversation.
+  async email(message, env, ctx) {
+    try {
+      if (!env.MAILDB) { console.error("[mail] no D1 bound; dropping inbound"); return; }
+      const raw = await new Response(message.raw).arrayBuffer();
+      let parsed = {};
+      try { parsed = await PostalMime.parse(raw); } catch (e) { parsed = {}; }
+
+      const fromAddr = (parsed.from && parsed.from.address) || message.from || "";
+      const toAddrs  = ((parsed.to || []).map((a) => a.address).filter(Boolean).join(", ")) || message.to || "";
+      const ccAddrs  = (parsed.cc || []).map((a) => a.address).filter(Boolean).join(", ");
+      const subject  = parsed.subject || message.headers.get("subject") || "(no subject)";
+      const messageId = parsed.messageId || message.headers.get("message-id") || ("<in-" + crypto.randomUUID() + "@fibpmo.com>");
+      const inReplyTo = parsed.inReplyTo || message.headers.get("in-reply-to") || "";
+      const refsHeader = String(parsed.references || message.headers.get("references") || "");
+      const refIds = [inReplyTo, ...refsHeader.split(/\s+/)].filter(Boolean);
+
+      let threadId = await mailThreadForReferences(env, refIds);
+      if (!threadId) threadId = messageId;
+
+      await mailStore(env, {
+        thread_id: threadId, direction: "in",
+        message_id: messageId, in_reply_to: inReplyTo, refs: refsHeader,
+        from_addr: fromAddr, to_addrs: toAddrs, cc_addrs: ccAddrs,
+        subject, html: parsed.html || "", body_text: parsed.text || "",
+        snippet: _snippet(parsed.text, parsed.html),
+        created_at: new Date().toISOString(), is_read: 0, err: "",
+      });
+
+      // Optional safety net: also forward a copy to a personal inbox when
+      // MAIL_FORWARD is set to a VERIFIED destination address.
+      if (env.MAIL_FORWARD) { try { await message.forward(env.MAIL_FORWARD); } catch (e) {} }
+    } catch (err) {
+      console.error("[mail] inbound handler failed", (err && err.stack) || String(err));
+    }
+  },
+
   async fetch(request, env, ctx) {
     // Everything below runs inside a guard. Without it, any thrown error kills
     // the isolate: the connection drops with no HTTP status and the dashboard
@@ -267,6 +358,150 @@ async function handleRequest(request, env, ctx) {
     // so we only need to report WHICH credential matched.
     if (body.action === "verify") {
       return json(200, { ok: true, role: _okAdmin ? "admin" : "site" });
+    }
+
+    // ══ Mailbox (admin-gated) ════════════════════════════════════════════════
+    // Compose/send from admin@fibpmo.com to anyone, plus a threaded Inbox/Sent
+    // read from D1. When ADMIN_PASSWORD is configured the mailbox requires it;
+    // if no admin password is set yet, it falls back to the site password so
+    // the feature still works out of the box.
+    if (typeof body.action === "string" && body.action.startsWith("mail_")) {
+      // Gate the mailbox with the SAME second password as Jira comments:
+      // X-Comment-Auth must equal ADMIN_PASSWORD or COMMENT_PASSWORD. The outer
+      // X-Proxy-Auth (site/admin password) is already verified above.
+      if (!env.ADMIN_PASSWORD && !env.COMMENT_PASSWORD) {
+        return json(501, { message: "Mailbox not configured (set COMMENT_PASSWORD or ADMIN_PASSWORD secret)." });
+      }
+      let _cAuth = (request.headers.get("X-Comment-Auth") || "")
+        .replace(/^Bearer\s+/i, "").replace(/^token\s+/i, "").trim();
+      const _okMail =
+        (env.ADMIN_PASSWORD   && safeEqual(_cAuth, env.ADMIN_PASSWORD)) ||
+        (env.COMMENT_PASSWORD && safeEqual(_cAuth, env.COMMENT_PASSWORD));
+      if (!_okMail) {
+        await new Promise((r) => setTimeout(r, 400)); // blunt brute-forcing
+        return json(401, { message: "Mailbox password required or incorrect." });
+      }
+      if (!env.MAILDB) return json(501, { message: "Mail store (D1 MAILDB) not bound." });
+      const db = env.MAILDB;
+
+      if (body.action === "mail_unread") {
+        const r = await db.prepare(
+          `SELECT COUNT(*) AS n FROM messages WHERE direction='in' AND is_read=0`).first();
+        return json(200, { unread: (r && r.n) || 0 });
+      }
+
+      if (body.action === "mail_threads") {
+        const box = body.box === "sent" ? "sent" : (body.box === "inbox" ? "inbox" : "all");
+        const q = String(body.q || "").trim().toLowerCase();
+        const rows = ((await db.prepare(
+          `SELECT thread_id,
+                  MAX(created_at) AS last_at,
+                  COUNT(*)        AS n,
+                  SUM(CASE WHEN direction='in'  AND is_read=0 THEN 1 ELSE 0 END) AS unread,
+                  SUM(CASE WHEN direction='in'  THEN 1 ELSE 0 END) AS n_in,
+                  SUM(CASE WHEN direction='out' THEN 1 ELSE 0 END) AS n_out
+             FROM messages GROUP BY thread_id ORDER BY last_at DESC LIMIT 400`
+        ).all()).results) || [];
+        const out = [];
+        for (const t of rows) {
+          if (box === "inbox" && !t.n_in) continue;
+          if (box === "sent" && !t.n_out) continue;
+          const last = await db.prepare(
+            `SELECT direction,from_addr,to_addrs,cc_addrs,subject,snippet,created_at
+               FROM messages WHERE thread_id=? ORDER BY created_at DESC LIMIT 1`
+          ).bind(t.thread_id).first();
+          if (!last) continue;
+          if (q) {
+            const hay = [last.subject, last.snippet, last.from_addr, last.to_addrs].join(" ").toLowerCase();
+            if (!hay.includes(q)) continue;
+          }
+          out.push({
+            thread_id: t.thread_id, last_at: t.last_at, count: t.n, unread: t.unread,
+            has_in: !!t.n_in, has_out: !!t.n_out, subject: last.subject, snippet: last.snippet,
+            direction: last.direction, from_addr: last.from_addr, to_addrs: last.to_addrs,
+          });
+          if (out.length >= 200) break;
+        }
+        return json(200, { threads: out });
+      }
+
+      if (body.action === "mail_thread") {
+        const tid = String(body.thread_id || "");
+        if (!tid) return json(400, { message: "thread_id required" });
+        const msgs = ((await db.prepare(
+          `SELECT id,direction,message_id,from_addr,to_addrs,cc_addrs,subject,html,body_text,created_at,is_read,err
+             FROM messages WHERE thread_id=? ORDER BY created_at ASC`
+        ).bind(tid).all()).results) || [];
+        await db.prepare(
+          `UPDATE messages SET is_read=1 WHERE thread_id=? AND direction='in' AND is_read=0`
+        ).bind(tid).run();
+        return json(200, { thread_id: tid, messages: msgs });
+      }
+
+      if (body.action === "mail_markread") {
+        const tid = String(body.thread_id || "");
+        if (tid) await db.prepare(
+          `UPDATE messages SET is_read=1 WHERE thread_id=? AND direction='in'`).bind(tid).run();
+        return json(200, { ok: true });
+      }
+
+      if (body.action === "mail_delete") {
+        const tid = String(body.thread_id || "");
+        if (!tid) return json(400, { message: "thread_id required" });
+        await db.prepare(`DELETE FROM messages WHERE thread_id=?`).bind(tid).run();
+        return json(200, { ok: true });
+      }
+
+      if (body.action === "mail_send") {
+        const to = _addrList(body.to), cc = _addrList(body.cc);
+        const subject = String(body.subject || "").slice(0, 255);
+        const html = String(body.html || "");
+        if (!to.length) return json(400, { message: "At least one recipient (To) is required." });
+        const bad = [...to, ...cc].filter((e) => !_validEmail(e));
+        if (bad.length) return json(400, { message: "Not a valid email address: " + bad[0] });
+        if (to.length + cc.length > 50) return json(400, { message: "Too many recipients (max 50)." });
+        if (!html.trim()) return json(400, { message: "The email body is empty." });
+
+        // Threading: a reply inherits its parent's thread; a fresh mail starts one.
+        let threadId = String(body.thread_id || "") || null;
+        const parentMsgId = String(body.in_reply_to || "");
+        if (!threadId && parentMsgId) threadId = await mailThreadForReferences(env, [parentMsgId]);
+        if (!threadId) threadId = crypto.randomUUID();
+
+        const text = _htmlToText(html);
+        const headers = {};
+        if (parentMsgId) { headers["In-Reply-To"] = parentMsgId; headers["References"] = parentMsgId; }
+
+        let messageId = "", err = "";
+        try {
+          const resp = await env.EMAIL.send({
+            to,
+            cc: cc.length ? cc : undefined,
+            from: { email: mailFrom(env), name: mailFromName(env) },
+            replyTo: mailFrom(env),
+            subject: subject || "(no subject)",
+            html,
+            text: text || " ",
+            headers: Object.keys(headers).length ? headers : undefined,
+          });
+          messageId = (resp && resp.messageId) || "";
+        } catch (e) {
+          err = String((e && e.message) || e).slice(0, 400);
+        }
+
+        await mailStore(env, {
+          thread_id: threadId, direction: "out",
+          message_id: messageId, in_reply_to: parentMsgId, refs: parentMsgId,
+          from_addr: mailFrom(env), to_addrs: to.join(", "), cc_addrs: cc.join(", "),
+          subject, html, body_text: text, snippet: _snippet(text, html),
+          created_at: new Date().toISOString(), is_read: 1, err,
+        });
+
+        if (err) return json(502, { message: "Send failed: " + err, thread_id: threadId });
+        return json(200, { ok: true, thread_id: threadId, message_id: messageId });
+      }
+
+      return json(400, { message: "Unknown mail action" });
     }
 
     // ── Portfolio rollup: per-project counts across ALL accessible projects ──
