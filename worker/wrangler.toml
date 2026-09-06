@@ -18,6 +18,11 @@ binding = "MAILDB"
 database_name = "fibpmo-mail"
 database_id = "ae63540a-bc3b-4ad1-a979-3a933b208c51"
 
+# R2 bucket for attachment files (private — only this Worker can read it).
+[[r2_buckets]]
+binding = "MAILFILES"
+bucket_name = "fibpmo-mail-files"
+
 # Backup pinger: fire repository_dispatch cron_ping every 5 min so the weekly
 # snapshot no longer depends on a single external pinger (or GitHub's own
 # flaky cron). Offset from :00 like the repo cron to dodge load spikes.

@@ -1817,7 +1817,7 @@ async function mbOpenThread(tid){
         ? '<iframe class="mb-frame" data-idx="'+i+'" sandbox=""></iframe>'
         : '<div class="mb-msg-text">'+esc(m.body_text||'(no content)')+'</div>';
       const attsHtml=(m.attachments&&m.attachments.length)
-        ? '<div class="mb-msg-atts">'+m.attachments.map(a=>'<button class="mb-att-dl" '+(a.stored?('onclick="mbDownload(\''+a.id+'\',this)"'):'disabled title="Too large to store"')+'>&#128206; '+esc(a.filename)+' <span class="mb-att-sz">'+_mbSize(a.size)+'</span></button>').join('')+'</div>'
+        ? '<div class="mb-msg-atts">'+m.attachments.map(a=>'<button class="mb-att-dl" data-id="'+a.id+'" data-fn="'+encodeURIComponent(a.filename||'file')+'" '+(a.stored?'onclick="mbDownload(this)"':'disabled title="Too large to store"')+'>&#128206; '+esc(a.filename)+' <span class="mb-att-sz">'+_mbSize(a.size)+'</span></button>').join('')+'</div>'
         : '';
       return '<div class="mb-msg '+m.direction+'"><div class="mb-msg-head"><div>'
         +'<span class="mb-badge-dir '+m.direction+'">'+(m.direction==='out'?'Sent':'Received')+'</span>'
@@ -1883,7 +1883,7 @@ function mbGetHtml(){ const ed=document.getElementById('mb-editor'), ta=document
 function _mbSize(n){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
 function mbAttachAdd(files){
   Array.from(files||[]).forEach(f=>{
-    if(f.size>2*1024*1024){ toast('"'+f.name+'" is over 2 MB — skipped.'); return; }
+    if(f.size>20*1024*1024){ toast('"'+f.name+'" is over 20 MB — skipped.'); return; }
     const r=new FileReader();
     r.onload=()=>{ _mbAtts.push({filename:f.name,mime:f.type||'application/octet-stream',size:f.size,content_b64:String(r.result).replace(/^data:[^;]+;base64,/,'')}); mbRenderAtts(); };
     r.readAsDataURL(f);
@@ -1894,14 +1894,15 @@ function mbRenderAtts(){
   box.innerHTML=_mbAtts.map((a,i)=>'<span class="mb-att-chip">&#128206; '+esc(a.filename)+' <span class="mb-att-sz">'+_mbSize(a.size)+'</span><button title="Remove" onclick="mbAttRemove('+i+')">&#10005;</button></span>').join('');
 }
 function mbAttRemove(i){ _mbAtts.splice(i,1); mbRenderAtts(); }
-async function mbDownload(id,btn){
+async function mbDownload(btn){
+  const id=btn.dataset.id, filename=decodeURIComponent(btn.dataset.fn||'file');
   const old=btn.innerHTML; btn.disabled=true; btn.textContent='Downloading…';
   try{
-    const d=await _mbCall({action:'mail_file',id});
-    const bin=atob(d.content_b64||''); const u8=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([u8],{type:d.mime||'application/octet-stream'}));
-    const a=document.createElement('a'); a.href=url; a.download=d.filename||'file'; document.body.appendChild(a); a.click(); a.remove();
+    const r=await fetch(GH_PROXY,{method:'POST',headers:_mbHeaders(),body:JSON.stringify({action:'mail_file',id})});
+    if(!r.ok){ let m='HTTP '+r.status; try{ m=(await r.json()).message||m; }catch(e){} throw new Error(m); }
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),4000);
   }catch(e){ toast('Download failed: '+e.message); }
   btn.disabled=false; btn.innerHTML=old;

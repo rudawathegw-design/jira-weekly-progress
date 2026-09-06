@@ -1,0 +1,1 @@
+ALTER TABLE attachments ADD COLUMN r2_key TEXT DEFAULT "";

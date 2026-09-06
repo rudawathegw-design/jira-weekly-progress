@@ -59,12 +59,18 @@ async function mailStore(env, row) {
   return r.meta && r.meta.last_row_id;
 }
 // ── Attachments ────────────────────────────────────────────────────────────
-const MAIL_ATT_MAX = 2 * 1024 * 1024;      // 2 MB per file stored in D1
-const MAIL_INLINE_MAX = 900 * 1024;        // 900 KB per inline image embedded
+const MAIL_ATT_MAX = 20 * 1024 * 1024;     // 20 MB per file (stored in R2)
+const MAIL_INLINE_MAX = 900 * 1024;        // 900 KB per inline image embedded in HTML
 function _u8ToB64(u8) {
   let bin = "", chunk = 0x8000;
   for (let i = 0; i < u8.length; i += chunk) bin += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
   return btoa(bin);
+}
+function _b64ToU8(b64) {
+  const bin = atob(String(b64 || ""));
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
 }
 function _anyToU8(content) {
   if (content == null) return new Uint8Array(0);
@@ -74,18 +80,25 @@ function _anyToU8(content) {
   try { return new Uint8Array(content); } catch { return new Uint8Array(0); }
 }
 async function mailStoreAttachment(env, a) {
-  const id = crypto.randomUUID();
+  const id = a.id || crypto.randomUUID();
   await env.MAILDB.prepare(
     `INSERT INTO attachments
-      (id,message_row,thread_id,direction,filename,mime,size,is_inline,content_id,content_b64,stored,created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+      (id,message_row,thread_id,direction,filename,mime,size,is_inline,content_id,content_b64,stored,created_at,r2_key)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
   ).bind(
     id, a.message_row || null, a.thread_id || "", a.direction || "in",
     a.filename || "file", a.mime || "application/octet-stream", a.size || 0,
     a.is_inline ? 1 : 0, a.content_id || "", a.content_b64 || "",
-    a.stored ? 1 : 0, new Date().toISOString()
+    a.stored ? 1 : 0, new Date().toISOString(), a.r2_key || ""
   ).run();
   return id;
+}
+// Put an attachment's bytes into R2 and return its key. Bucket is private —
+// only reachable through this Worker's authenticated mail_file action.
+async function mailPutR2(env, id, u8, mime) {
+  const key = "att/" + id;
+  await env.MAILFILES.put(key, u8, { httpMetadata: { contentType: mime || "application/octet-stream" } });
+  return key;
 }
 
 // Find the thread a reply belongs to by matching any referenced Message-ID we
@@ -320,11 +333,7 @@ export default {
           html = html.split("cid:" + cid).join("data:" + mime + ";base64," + _u8ToB64(u8));
           continue;                       // embedded — no separate download row
         }
-        const store = size > 0 && size <= MAIL_ATT_MAX;
-        toStore.push({
-          filename: a.filename || "file", mime, size, is_inline: 0, content_id: cid,
-          content_b64: store ? _u8ToB64(u8) : "", stored: store ? 1 : 0,
-        });
+        toStore.push({ id: crypto.randomUUID(), u8, filename: a.filename || "file", mime, size });
       }
 
       const rowId = await mailStore(env, {
@@ -336,8 +345,15 @@ export default {
         created_at: new Date().toISOString(), is_read: 0, err: "",
       });
       for (const a of toStore) {
-        try { await mailStoreAttachment(env, { ...a, message_row: rowId, thread_id: threadId, direction: "in" }); }
-        catch (e) { console.error("[mail] attach store failed", String(e)); }
+        try {
+          const store = a.size > 0 && a.size <= MAIL_ATT_MAX && !!env.MAILFILES;
+          const r2_key = store ? await mailPutR2(env, a.id, a.u8, a.mime) : "";
+          await mailStoreAttachment(env, {
+            id: a.id, message_row: rowId, thread_id: threadId, direction: "in",
+            filename: a.filename, mime: a.mime, size: a.size,
+            is_inline: 0, content_id: "", content_b64: "", stored: store ? 1 : 0, r2_key,
+          });
+        } catch (e) { console.error("[mail] attach store failed", String(e)); }
       }
     } catch (err) {
       console.error("[mail] inbound handler failed", (err && err.stack) || String(err));
@@ -513,11 +529,23 @@ async function handleRequest(request, env, ctx) {
         const id = String(body.id || "");
         if (!id) return json(400, { message: "id required" });
         const a = await db.prepare(
-          `SELECT filename,mime,size,content_b64,stored FROM attachments WHERE id=?`
+          `SELECT filename,mime,size,content_b64,stored,r2_key FROM attachments WHERE id=?`
         ).bind(id).first();
         if (!a) return json(404, { message: "Attachment not found" });
-        if (!a.stored || !a.content_b64) return json(410, { message: "This file was too large to store." });
-        return json(200, { filename: a.filename, mime: a.mime, size: a.size, content_b64: a.content_b64 });
+        if (!a.stored) return json(410, { message: "This file was too large to store." });
+        const fname = String(a.filename || "file").replace(/[\r\n"\\]/g, "");
+        const hdrs = {
+          ...baseHeaders,
+          "Content-Type": a.mime || "application/octet-stream",
+          "Content-Disposition": `attachment; filename="${fname}"`,
+        };
+        if (a.r2_key && env.MAILFILES) {
+          const obj = await env.MAILFILES.get(a.r2_key);
+          if (!obj) return json(404, { message: "File missing from storage." });
+          return new Response(obj.body, { status: 200, headers: hdrs });
+        }
+        if (a.content_b64) return new Response(_b64ToU8(a.content_b64), { status: 200, headers: hdrs }); // legacy D1
+        return json(410, { message: "File content not available." });
       }
 
       if (body.action === "mail_markread") {
@@ -619,10 +647,13 @@ async function handleRequest(request, env, ctx) {
         if (!err) {
           for (const a of sendAtts) {
             try {
+              const aid = crypto.randomUUID();
+              const r2_key = env.MAILFILES ? await mailPutR2(env, aid, _b64ToU8(a.content_b64), a.mime) : "";
               await mailStoreAttachment(env, {
-                message_row: outRow, thread_id: threadId, direction: "out",
+                id: aid, message_row: outRow, thread_id: threadId, direction: "out",
                 filename: a.filename, mime: a.mime, size: a.size,
-                is_inline: 0, content_id: "", content_b64: a.content_b64, stored: 1,
+                is_inline: 0, content_id: "", content_b64: r2_key ? "" : a.content_b64,
+                stored: 1, r2_key,
               });
             } catch (e) { /* non-fatal */ }
           }
