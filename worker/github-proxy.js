@@ -19,8 +19,6 @@
  *   ALLOWED_ORIGIN  e.g. "https://rudawathegw-design.github.io"
  */
 
-import PostalMime from "postal-mime";
-
 const GH = "https://api.github.com";
 
 // ── Mailbox helpers (D1-backed; Cloudflare Email Sending + Routing) ─────────
@@ -250,8 +248,13 @@ export default {
     try {
       if (!env.MAILDB) { console.error("[mail] no D1 bound; dropping inbound"); return; }
       const raw = await new Response(message.raw).arrayBuffer();
+      // Load the MIME parser ONLY here (inbound mail), never on the hot HTTP
+      // path — keeps the live-refresh fetch lean and off the CPU ceiling.
       let parsed = {};
-      try { parsed = await PostalMime.parse(raw); } catch (e) { parsed = {}; }
+      try {
+        const PostalMime = (await import("postal-mime")).default;
+        parsed = await PostalMime.parse(raw);
+      } catch (e) { parsed = {}; }
 
       const fromAddr = (parsed.from && parsed.from.address) || message.from || "";
       const toAddrs  = ((parsed.to || []).map((a) => a.address).filter(Boolean).join(", ")) || message.to || "";
