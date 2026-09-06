@@ -1648,6 +1648,29 @@ textarea.mb-input{min-height:190px;font-family:'JetBrains Mono',ui-monospace,mon
 .mb-preview-toggle{font-size:12px;color:#0369a1;cursor:pointer;font-weight:700;background:none;border:none}
 .mb-hint{font-size:11px;color:#94a3b8}
 .mb-from-note{margin-left:auto;font-size:11px;color:#64748b}
+.mb-toolbar{display:flex;flex-wrap:wrap;gap:3px;align-items:center;border:1.5px solid #e2e8f0;border-bottom:none;border-radius:8px 8px 0 0;padding:6px 8px;background:#f8fafc}
+.mb-tb-btn{min-width:28px;height:28px;border:1px solid transparent;background:transparent;border-radius:6px;cursor:pointer;font-size:13px;color:#334155;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-family:inherit}
+.mb-tb-btn:hover{background:#e2e8f0}
+.mb-tb-html{margin-left:auto;font-family:'JetBrains Mono',monospace;font-weight:700;color:#0369a1}
+.mb-tb-sep{width:1px;height:18px;background:#e2e8f0;margin:0 3px}
+.mb-tb-sel{height:28px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;background:#fff;color:#334155;cursor:pointer;font-family:inherit}
+.mb-tb-color{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;cursor:pointer;font-weight:800;position:relative;color:#0f9389}
+.mb-tb-color:hover{background:#e2e8f0}
+.mb-tb-color input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.mb-editor{min-height:200px;max-height:340px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:0 0 8px 8px;padding:12px 14px;font-size:14px;line-height:1.6;color:#1e293b;background:#fff;outline:none}
+.mb-editor:focus{border-color:#0f9389}
+.mb-editor img{max-width:100%}
+.mb-atts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mb-att-chip{display:inline-flex;align-items:center;gap:6px;background:#eef2f6;border:1px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:12px;color:#334155}
+.mb-att-chip button{border:none;background:none;color:#94a3b8;cursor:pointer;font-size:12px;padding:0 2px;line-height:1}
+.mb-att-chip button:hover{color:#dc2626}
+.mb-att-sz{color:#94a3b8;font-size:11px}
+.mb-attach-btn{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:9px 14px;font-weight:700;font-size:12.5px;color:#334155;cursor:pointer}
+.mb-attach-btn:hover{background:#f1f5f9}
+.mb-msg-atts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 13px 10px}
+.mb-att-dl{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;color:#0369a1;cursor:pointer;font-weight:600}
+.mb-att-dl:hover{background:#e0f2f1;border-color:#0f9389}
+.mb-att-dl:disabled{opacity:.6;cursor:wait}
 @media(max-width:720px){.mb-side{width:132px}.mb-wrap{height:80vh}.mb-from-note{display:none}}
 </style>
 <div class="modal-overlay hidden" id="mail-modal" onclick="if(event.target===this)closeModal('mail-modal')">
@@ -1681,7 +1704,7 @@ textarea.mb-input{min-height:190px;font-family:'JetBrains Mono',ui-monospace,mon
    sent as X-Comment-Auth). The Worker verifies it against COMMENT_PASSWORD /
    ADMIN_PASSWORD. All state is server-side (D1); nothing sensitive is stored
    in the page. */
-let _mbBox='inbox', _mbAll=[], _mbActiveThread=null, _mbThreadMsgs=[], _mbReplyCtx=null, _mbPollTimer=null;
+let _mbBox='inbox', _mbAll=[], _mbActiveThread=null, _mbThreadMsgs=[], _mbReplyCtx=null, _mbPollTimer=null, _mbAtts=[], _mbHtmlMode=false;
 
 function _mbHeaders(){
   return {'Content-Type':'application/json',
@@ -1788,11 +1811,14 @@ async function mbOpenThread(tid){
       const body=(m.html&&m.html.trim())
         ? '<iframe class="mb-frame" data-idx="'+i+'" sandbox=""></iframe>'
         : '<div class="mb-msg-text">'+esc(m.body_text||'(no content)')+'</div>';
+      const attsHtml=(m.attachments&&m.attachments.length)
+        ? '<div class="mb-msg-atts">'+m.attachments.map(a=>'<button class="mb-att-dl" '+(a.stored?('onclick="mbDownload(\''+a.id+'\',this)"'):'disabled title="Too large to store"')+'>&#128206; '+esc(a.filename)+' <span class="mb-att-sz">'+_mbSize(a.size)+'</span></button>').join('')+'</div>'
+        : '';
       return '<div class="mb-msg '+m.direction+'"><div class="mb-msg-head"><div>'
         +'<span class="mb-badge-dir '+m.direction+'">'+(m.direction==='out'?'Sent':'Received')+'</span>'
         +'<span class="mb-msg-from">'+who+'</span>'+cc+errHtml+'</div>'
         +'<div class="mb-msg-meta">'+new Date(m.created_at).toLocaleString()+'</div></div>'
-        +'<div class="mb-msg-body">'+body+'</div></div>';
+        +'<div class="mb-msg-body">'+body+'</div>'+attsHtml+'</div>';
     }).join('');
     // Populate iframes via the srcdoc PROPERTY (safe — no attribute parsing).
     wrap.querySelectorAll('.mb-frame').forEach(f=>{
@@ -1804,45 +1830,88 @@ async function mbOpenThread(tid){
 function mbCompose(prefill){
   _mbActiveThread=null; mbRenderList();
   const p=prefill||{}; _mbReplyCtx=p.in_reply_to?{in_reply_to:p.in_reply_to,thread_id:p.thread_id}:null;
+  _mbAtts=[]; _mbHtmlMode=false;
   const val=s=>esc(s||'');
+  const tb=(cmd,label,title)=>'<button class="mb-tb-btn" title="'+title+'" onmousedown="event.preventDefault()" onclick="mbExec(\''+cmd+'\')">'+label+'</button>';
   const main=document.getElementById('mb-main');
   main.innerHTML='<div class="mb-compose">'
     +'<div class="mb-field"><label>To</label><input class="mb-input" id="mb-to" placeholder="name@example.com, another@example.com" value="'+val(p.to)+'"></div>'
     +'<div class="mb-field"><label>Cc <span class="mb-hint">(optional)</span></label><input class="mb-input" id="mb-cc" placeholder="cc@example.com" value="'+val(p.cc)+'"></div>'
     +'<div class="mb-field"><label>Subject</label><input class="mb-input" id="mb-subj" placeholder="Subject" value="'+val(p.subject)+'"></div>'
-    +'<div class="mb-field"><label>HTML body <span class="mb-hint">— paste your HTML design</span></label>'
-    +'<textarea class="mb-input" id="mb-html" placeholder="&lt;h1&gt;Hello&lt;/h1&gt; …paste HTML here…" oninput="_mbSyncPreview()">'+val(p.html)+'</textarea></div>'
-    +'<div id="mb-preview-wrap" style="display:none"><label class="mb-hint" style="display:block;margin-bottom:4px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Live preview</label>'
-    +'<iframe id="mb-preview" class="mb-frame" style="height:300px;border:1px solid #e2e8f0" sandbox=""></iframe></div>'
+    +'<div class="mb-field"><label>Message</label>'
+    +  '<div class="mb-toolbar">'
+    +    tb('bold','<b>B</b>','Bold')+tb('italic','<i>I</i>','Italic')+tb('underline','<u>U</u>','Underline')+tb('strikeThrough','<s>S</s>','Strikethrough')
+    +    '<span class="mb-tb-sep"></span>'
+    +    '<select class="mb-tb-sel" title="Text size" onchange="mbExec(\'fontSize\',this.value);this.selectedIndex=0"><option value="">Size</option><option value="2">Small</option><option value="4">Medium</option><option value="5">Large</option><option value="6">Huge</option></select>'
+    +    '<label class="mb-tb-color" title="Text colour">A<input type="color" value="#0f9389" oninput="mbExec(\'foreColor\',this.value)"></label>'
+    +    tb('insertUnorderedList','&bull;','Bullet list')+tb('insertOrderedList','1.','Numbered list')
+    +    '<span class="mb-tb-sep"></span>'
+    +    tb('justifyLeft','&#8676;','Align left')+tb('justifyCenter','&#8801;','Align centre')+tb('justifyRight','&#8677;','Align right')
+    +    '<button class="mb-tb-btn" title="Insert link" onmousedown="event.preventDefault()" onclick="mbLink()">&#128279;</button>'
+    +    tb('removeFormat','&#10007;','Clear formatting')
+    +    '<button class="mb-tb-btn mb-tb-html" title="Edit raw HTML" onmousedown="event.preventDefault()" onclick="mbToggleHtml()">&lt;/&gt;</button>'
+    +  '</div>'
+    +  '<div class="mb-editor" id="mb-editor" contenteditable="true">'+(p.html||'')+'</div>'
+    +  '<textarea class="mb-input" id="mb-html" style="display:none;border-radius:0 0 8px 8px" placeholder="Paste raw HTML here…"></textarea>'
+    +  '<div id="mb-atts" class="mb-atts"></div>'
+    +'</div>'
     +'</div>'
     +'<div class="mb-foot"><button class="mb-send" id="mb-send-btn" onclick="mbDoSend()">Send email</button>'
-    +'<button class="mb-preview-toggle" onclick="mbTogglePreview()">Toggle preview</button>'
+    +'<button class="mb-attach-btn" onclick="document.getElementById(\'mb-file\').click()">&#128206; Attach</button>'
+    +'<input type="file" id="mb-file" multiple style="display:none" onchange="mbAttachAdd(this.files);this.value=\'\'">'
     +'<span class="mb-from-note">From: admin@fibpmo.com</span></div>';
+  mbRenderAtts();
 }
 function mbReplyForm(){
   if(!_mbReplyCtx){ mbCompose(); return; }
   mbCompose({to:_mbReplyCtx.to,subject:'Re: '+(_mbReplyCtx.subject||''),in_reply_to:_mbReplyCtx.in_reply_to,thread_id:_mbReplyCtx.thread_id});
 }
-function _mbSyncPreview(){
-  const w=document.getElementById('mb-preview-wrap');
-  if(w&&w.style.display!=='none'){ document.getElementById('mb-preview').srcdoc=document.getElementById('mb-html').value||''; }
+function mbExec(cmd,v){ const ed=document.getElementById('mb-editor'); if(ed&&!_mbHtmlMode) ed.focus(); try{ document.execCommand(cmd,false,v||null); }catch(e){} }
+function mbLink(){ const u=prompt('Link URL:','https://'); if(u) mbExec('createLink',u); }
+function mbToggleHtml(){
+  const ed=document.getElementById('mb-editor'), ta=document.getElementById('mb-html');
+  if(!ed||!ta) return;
+  if(!_mbHtmlMode){ ta.value=ed.innerHTML; ed.style.display='none'; ta.style.display='block'; _mbHtmlMode=true; }
+  else { ed.innerHTML=ta.value; ta.style.display='none'; ed.style.display='block'; _mbHtmlMode=false; }
 }
-function mbTogglePreview(){
-  const w=document.getElementById('mb-preview-wrap');
-  if(!w) return;
-  if(w.style.display==='none'){ w.style.display='block'; _mbSyncPreview(); } else w.style.display='none';
+function mbGetHtml(){ const ed=document.getElementById('mb-editor'), ta=document.getElementById('mb-html'); return _mbHtmlMode?(ta?ta.value:''):(ed?ed.innerHTML:''); }
+function _mbSize(n){ if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; return (n/1048576).toFixed(1)+' MB'; }
+function mbAttachAdd(files){
+  Array.from(files||[]).forEach(f=>{
+    if(f.size>2*1024*1024){ toast('"'+f.name+'" is over 2 MB — skipped.'); return; }
+    const r=new FileReader();
+    r.onload=()=>{ _mbAtts.push({filename:f.name,mime:f.type||'application/octet-stream',size:f.size,content_b64:String(r.result).replace(/^data:[^;]+;base64,/,'')}); mbRenderAtts(); };
+    r.readAsDataURL(f);
+  });
+}
+function mbRenderAtts(){
+  const box=document.getElementById('mb-atts'); if(!box) return;
+  box.innerHTML=_mbAtts.map((a,i)=>'<span class="mb-att-chip">&#128206; '+esc(a.filename)+' <span class="mb-att-sz">'+_mbSize(a.size)+'</span><button title="Remove" onclick="mbAttRemove('+i+')">&#10005;</button></span>').join('');
+}
+function mbAttRemove(i){ _mbAtts.splice(i,1); mbRenderAtts(); }
+async function mbDownload(id,btn){
+  const old=btn.innerHTML; btn.disabled=true; btn.textContent='Downloading…';
+  try{
+    const d=await _mbCall({action:'mail_file',id});
+    const bin=atob(d.content_b64||''); const u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([u8],{type:d.mime||'application/octet-stream'}));
+    const a=document.createElement('a'); a.href=url; a.download=d.filename||'file'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }catch(e){ toast('Download failed: '+e.message); }
+  btn.disabled=false; btn.innerHTML=old;
 }
 async function mbDoSend(){
   const to=document.getElementById('mb-to').value.trim();
   const cc=document.getElementById('mb-cc').value.trim();
   const subject=document.getElementById('mb-subj').value.trim();
-  const html=document.getElementById('mb-html').value;
+  const html=mbGetHtml();
   if(!to){ toast('Add at least one recipient.'); return; }
   if(!html.trim()){ toast('The email body is empty.'); return; }
   if(!confirm('Send this email from admin@fibpmo.com to '+to+(cc?(' (cc '+cc+')'):'')+'?')) return;
   const btn=document.getElementById('mb-send-btn'); btn.disabled=true; btn.textContent='Sending…';
   try{
-    const payload={action:'mail_send',to,cc,subject,html};
+    const payload={action:'mail_send',to,cc,subject,html,attachments:_mbAtts};
     if(_mbReplyCtx&&_mbReplyCtx.in_reply_to){ payload.in_reply_to=_mbReplyCtx.in_reply_to; payload.thread_id=_mbReplyCtx.thread_id; }
     const d=await _mbCall(payload);
     toast('Email sent ✓');

@@ -58,6 +58,36 @@ async function mailStore(env, row) {
   ).run();
   return r.meta && r.meta.last_row_id;
 }
+// ── Attachments ────────────────────────────────────────────────────────────
+const MAIL_ATT_MAX = 2 * 1024 * 1024;      // 2 MB per file stored in D1
+const MAIL_INLINE_MAX = 900 * 1024;        // 900 KB per inline image embedded
+function _u8ToB64(u8) {
+  let bin = "", chunk = 0x8000;
+  for (let i = 0; i < u8.length; i += chunk) bin += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+  return btoa(bin);
+}
+function _anyToU8(content) {
+  if (content == null) return new Uint8Array(0);
+  if (content instanceof Uint8Array) return content;
+  if (content instanceof ArrayBuffer) return new Uint8Array(content);
+  if (typeof content === "string") return new TextEncoder().encode(content);
+  try { return new Uint8Array(content); } catch { return new Uint8Array(0); }
+}
+async function mailStoreAttachment(env, a) {
+  const id = crypto.randomUUID();
+  await env.MAILDB.prepare(
+    `INSERT INTO attachments
+      (id,message_row,thread_id,direction,filename,mime,size,is_inline,content_id,content_b64,stored,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+  ).bind(
+    id, a.message_row || null, a.thread_id || "", a.direction || "in",
+    a.filename || "file", a.mime || "application/octet-stream", a.size || 0,
+    a.is_inline ? 1 : 0, a.content_id || "", a.content_b64 || "",
+    a.stored ? 1 : 0, new Date().toISOString()
+  ).run();
+  return id;
+}
+
 // Find the thread a reply belongs to by matching any referenced Message-ID we
 // already have on file. Returns the thread_id or null (a brand-new thread).
 async function mailThreadForReferences(env, ids) {
@@ -275,14 +305,40 @@ export default {
       let threadId = await mailThreadForReferences(env, refIds);
       if (!threadId) threadId = messageId;
 
-      await mailStore(env, {
+      // Attachments: embed inline images into the HTML as data: URIs (so Outlook
+      // signature logos etc. render), and keep real file attachments to store.
+      let html = parsed.html || "";
+      const atts = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+      const toStore = [];
+      for (const a of atts) {
+        const u8 = _anyToU8(a.content);
+        const size = u8.length;
+        const mime = a.mimeType || a.contentType || "application/octet-stream";
+        const cid = String(a.contentId || "").replace(/^<|>$/g, "");
+        const isImg = /^image\//i.test(mime);
+        if (cid && isImg && html.includes("cid:" + cid) && size <= MAIL_INLINE_MAX) {
+          html = html.split("cid:" + cid).join("data:" + mime + ";base64," + _u8ToB64(u8));
+          continue;                       // embedded — no separate download row
+        }
+        const store = size > 0 && size <= MAIL_ATT_MAX;
+        toStore.push({
+          filename: a.filename || "file", mime, size, is_inline: 0, content_id: cid,
+          content_b64: store ? _u8ToB64(u8) : "", stored: store ? 1 : 0,
+        });
+      }
+
+      const rowId = await mailStore(env, {
         thread_id: threadId, direction: "in",
         message_id: messageId, in_reply_to: inReplyTo, refs: refsHeader,
         from_addr: fromAddr, to_addrs: toAddrs, cc_addrs: ccAddrs,
-        subject, html: parsed.html || "", body_text: parsed.text || "",
+        subject, html, body_text: parsed.text || "",
         snippet: _snippet(parsed.text, parsed.html),
         created_at: new Date().toISOString(), is_read: 0, err: "",
       });
+      for (const a of toStore) {
+        try { await mailStoreAttachment(env, { ...a, message_row: rowId, thread_id: threadId, direction: "in" }); }
+        catch (e) { console.error("[mail] attach store failed", String(e)); }
+      }
     } catch (err) {
       console.error("[mail] inbound handler failed", (err && err.stack) || String(err));
     }
@@ -438,10 +494,30 @@ async function handleRequest(request, env, ctx) {
           `SELECT id,direction,message_id,from_addr,to_addrs,cc_addrs,subject,html,body_text,created_at,is_read,err
              FROM messages WHERE thread_id=? ORDER BY created_at ASC`
         ).bind(tid).all()).results) || [];
+        // Downloadable file attachments (metadata only — content fetched on demand
+        // via mail_file so the thread payload stays small).
+        const arows = ((await db.prepare(
+          `SELECT id,message_row,filename,mime,size,stored FROM attachments
+             WHERE thread_id=? AND is_inline=0 ORDER BY created_at ASC`
+        ).bind(tid).all()).results) || [];
+        const byMsg = {};
+        for (const a of arows) (byMsg[a.message_row] = byMsg[a.message_row] || []).push(a);
+        for (const m of msgs) m.attachments = byMsg[m.id] || [];
         await db.prepare(
           `UPDATE messages SET is_read=1 WHERE thread_id=? AND direction='in' AND is_read=0`
         ).bind(tid).run();
         return json(200, { thread_id: tid, messages: msgs });
+      }
+
+      if (body.action === "mail_file") {
+        const id = String(body.id || "");
+        if (!id) return json(400, { message: "id required" });
+        const a = await db.prepare(
+          `SELECT filename,mime,size,content_b64,stored FROM attachments WHERE id=?`
+        ).bind(id).first();
+        if (!a) return json(404, { message: "Attachment not found" });
+        if (!a.stored || !a.content_b64) return json(410, { message: "This file was too large to store." });
+        return json(200, { filename: a.filename, mime: a.mime, size: a.size, content_b64: a.content_b64 });
       }
 
       if (body.action === "mail_markread") {
@@ -467,6 +543,17 @@ async function handleRequest(request, env, ctx) {
         if (bad.length) return json(400, { message: "Not a valid email address: " + bad[0] });
         if (to.length + cc.length > 50) return json(400, { message: "Too many recipients (max 50)." });
         if (!html.trim()) return json(400, { message: "The email body is empty." });
+
+        // Attachments the composer uploaded (base64). Capped per file.
+        const inAtts = Array.isArray(body.attachments) ? body.attachments.slice(0, 20) : [];
+        const sendAtts = [];
+        for (const a of inAtts) {
+          const b64 = String(a.content_b64 || "").replace(/^data:[^;]+;base64,/, "");
+          if (!b64) continue;
+          const size = Math.floor(b64.length * 3 / 4);
+          if (size > MAIL_ATT_MAX) return json(400, { message: `Attachment "${a.filename || "file"}" is too large (max 2 MB).` });
+          sendAtts.push({ filename: a.filename || "file", mime: a.mime || "application/octet-stream", content_b64: b64, size });
+        }
 
         // Threading: a reply inherits its parent's thread; a fresh mail starts one.
         let threadId = String(body.thread_id || "") || null;
@@ -497,6 +584,9 @@ async function handleRequest(request, env, ctx) {
                 html,
                 text: text || " ",
                 headers,
+                attachments: sendAtts.length
+                  ? sendAtts.map((a) => ({ filename: a.filename, content: a.content_b64 }))
+                  : undefined,
               }),
             });
             if (!rr.ok) err = "Resend " + rr.status + ": " + (await rr.text()).slice(0, 300);
@@ -519,13 +609,24 @@ async function handleRequest(request, env, ctx) {
           err = String((e && e.message) || e).slice(0, 400);
         }
 
-        await mailStore(env, {
+        const outRow = await mailStore(env, {
           thread_id: threadId, direction: "out",
           message_id: messageId, in_reply_to: parentMsgId, refs: parentMsgId,
           from_addr: mailFrom(env), to_addrs: to.join(", "), cc_addrs: cc.join(", "),
           subject, html, body_text: text, snippet: _snippet(text, html),
           created_at: new Date().toISOString(), is_read: 1, err,
         });
+        if (!err) {
+          for (const a of sendAtts) {
+            try {
+              await mailStoreAttachment(env, {
+                message_row: outRow, thread_id: threadId, direction: "out",
+                filename: a.filename, mime: a.mime, size: a.size,
+                is_inline: 0, content_id: "", content_b64: a.content_b64, stored: 1,
+              });
+            } catch (e) { /* non-fatal */ }
+          }
+        }
 
         if (err) return json(502, { message: "Send failed: " + err, thread_id: threadId });
         return json(200, { ok: true, thread_id: threadId, message_id: messageId });
