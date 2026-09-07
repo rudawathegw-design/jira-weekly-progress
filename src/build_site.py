@@ -4663,7 +4663,10 @@ async function _saveEncStore(name, data, message){
 async function checkPw(){
   const inp = document.getElementById('pw-inp');
   const err = document.getElementById('pw-err');
-  const v   = inp.value;
+  // Case-insensitive site password: the report blob was encrypted with the
+  // lowercase password, so normalising the input lets FIB / Fib / fib all
+  // derive the same key and unlock — no re-encryption needed.
+  const v   = (inp.value || '').trim().toLowerCase();
   // Hidden shortcut — input is hashed and the destination is encrypted, so
   // neither the word nor the URL is readable in this page's source.
   {
@@ -4835,21 +4838,8 @@ async function otpApi(path, body){
 // Presence heartbeat: tell the Worker this person is actively viewing, and
 // mark them offline the moment the tab closes. Powers the "who's online" log.
 function startHeartbeat(name, app){
-  function ping(leave){
-    try {
-      const body = JSON.stringify({ name: name, app: app, leave: leave ? 1 : 0 });
-      if (leave && navigator.sendBeacon){
-        navigator.sendBeacon(OTP_API + '/api/ping', new Blob([body], {type:'application/json'}));
-        return;
-      }
-      fetch(OTP_API + '/api/ping', {method:'POST', headers:{'Content-Type':'application/json'}, body: body, keepalive: true}).catch(function(){});
-    } catch(e){}
-  }
-  ping(false);
-  const iv = setInterval(function(){ if (document.visibilityState === 'visible') ping(false); }, 45000);
-  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') ping(false); });
-  window.addEventListener('pagehide', function(){ clearInterval(iv); ping(true); });
-  window.addEventListener('beforeunload', function(){ ping(true); });
+  /* Presence / "who's online" removed — it pinged the OTP worker every 45s and
+     burned the KV free-tier quota (Cloudflare limit emails). No-op now. */
 }
 function otpCooldownStart(){
   const btn = document.getElementById('otp-resend');
