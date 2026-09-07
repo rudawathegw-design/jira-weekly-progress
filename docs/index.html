@@ -1604,15 +1604,22 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 
 <!-- ═══════════════ Admin Mailbox Modal ════════════════════════════════════ -->
 <style>
-.mb-wrap{display:flex;height:min(74vh,640px);min-height:400px}
-.mb-side{width:308px;flex:none;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;background:#f8fafc}
-.mb-tabs{display:flex;gap:6px;padding:12px 12px 8px}
-.mb-tab{flex:1;border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:7px 0;font-weight:700;font-size:12.5px;color:#475569;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
-.mb-tab.active{background:#0f9389;color:#fff;border-color:#0f9389}
-.mb-cnt{background:rgba(0,0,0,.10);border-radius:999px;padding:0 7px;font-size:11px;font-weight:800}
-.mb-tab.active .mb-cnt{background:rgba(255,255,255,.28)}
-.mb-compose-btn{margin:0 12px 8px;border:none;background:#0369a1;color:#fff;border-radius:8px;padding:9px 0;font-weight:800;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
-.mb-search{margin:0 12px 8px;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:inherit;outline:none}
+.mb-modal{width:min(1500px,97vw);height:min(940px,94vh);max-height:94vh;padding:0;display:flex;flex-direction:column;overflow:hidden;border-radius:16px}
+.mb-modal .pm-head{padding:13px 20px;border-bottom:1px solid #e2e8f0;flex:none;margin:0;align-items:center}
+.mb-wrap{display:flex;flex:1;min-height:0}
+.mb-rail{width:212px;flex:none;border-right:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:3px;padding:14px 12px}
+.mb-folder{display:flex;align-items:center;gap:10px;border:none;background:transparent;border-radius:9px;padding:9px 12px;font-weight:700;font-size:13.5px;color:#334155;cursor:pointer;text-align:left;width:100%;font-family:inherit}
+.mb-folder:hover{background:#eef2f6}
+.mb-folder.active{background:#e0f2f1;color:#0f766e}
+.mb-folder svg{flex:none;opacity:.85}
+.mb-cnt{background:rgba(15,23,42,.10);border-radius:999px;padding:0 8px;font-size:11px;font-weight:800;margin-left:auto}
+.mb-folder.active .mb-cnt{background:rgba(15,118,110,.18)}
+.mb-rail-foot{margin-top:auto;font-size:10px;color:#94a3b8;padding:10px 4px 2px;border-top:1px solid #e8edf1;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.mb-compose-btn{margin:0 0 12px;border:none;background:#0369a1;color:#fff;border-radius:9px;padding:11px 0;font-weight:800;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;box-shadow:0 2px 8px rgba(3,105,161,.25)}
+.mb-compose-btn:hover{background:#075985}
+.mb-listpane{width:372px;flex:none;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;background:#fff;min-width:0}
+.mb-search{margin:12px 12px 8px;border:1.5px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:12.5px;font-family:inherit;outline:none}
+.mb-search:focus{border-color:#0f9389}
 .mb-list{flex:1;overflow-y:auto;padding:0 8px 10px}
 .mb-item{padding:10px 11px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:2px}
 .mb-item:hover{background:#eef2f6}
@@ -1635,7 +1642,7 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 .mb-msg-from{font-weight:800;color:#0f172a}
 .mb-msg-meta{color:#94a3b8;font-size:11px;white-space:nowrap}
 .mb-msg-body{padding:4px 8px}
-.mb-frame{width:100%;height:340px;border:0;background:#fff;border-radius:6px;display:block}
+.mb-frame{width:100%;height:min(520px,60vh);border:0;background:#fff;border-radius:6px;display:block}
 .mb-msg-text{white-space:pre-wrap;font-size:13px;color:#1e293b;padding:8px 6px}
 .mb-badge-dir{font-size:10px;font-weight:800;letter-spacing:.06em;padding:1px 7px;border-radius:999px;text-transform:uppercase;margin-right:6px}
 .mb-badge-dir.out{background:#0f9389;color:#fff}
@@ -1661,7 +1668,7 @@ textarea.mb-input{min-height:190px;font-family:'JetBrains Mono',ui-monospace,mon
 .mb-tb-color{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;cursor:pointer;font-weight:800;position:relative;color:#0f9389}
 .mb-tb-color:hover{background:#e2e8f0}
 .mb-tb-color input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.mb-editor{min-height:200px;max-height:340px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:0 0 8px 8px;padding:12px 14px;font-size:14px;line-height:1.6;color:#1e293b;background:#fff;outline:none}
+.mb-editor{min-height:240px;max-height:52vh;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:0 0 8px 8px;padding:12px 14px;font-size:14px;line-height:1.6;color:#1e293b;background:#fff;outline:none}
 .mb-editor:focus{border-color:#0f9389}
 .mb-editor img{max-width:100%}
 .mb-atts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -1675,24 +1682,40 @@ textarea.mb-input{min-height:190px;font-family:'JetBrains Mono',ui-monospace,mon
 .mb-att-dl{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;color:#0369a1;cursor:pointer;font-weight:600}
 .mb-att-dl:hover{background:#e0f2f1;border-color:#0f9389}
 .mb-att-dl:disabled{opacity:.6;cursor:wait}
-@media(max-width:720px){.mb-side{width:132px}.mb-wrap{height:80vh}.mb-from-note{display:none}}
+@media(max-width:720px){
+  .mb-modal{width:100vw;height:100dvh;max-height:100dvh;border-radius:0}
+  .mb-rail{width:72px;padding:12px 6px}
+  .mb-folder{flex-direction:column;gap:2px;font-size:10px;padding:8px 2px;text-align:center}
+  .mb-folder .mb-cnt{margin:0}
+  .mb-rail-foot{display:none}
+  .mb-compose-btn{font-size:11px;padding:9px 0}
+  .mb-listpane{width:42vw;min-width:150px}
+  .mb-from-note{display:none}
+}
 </style>
 <div class="modal-overlay hidden" id="mail-modal" onclick="if(event.target===this)closeModal('mail-modal')">
-  <div class="modal m-xl">
+  <div class="modal mb-modal">
     <div class="pm-head">
-      <div style="flex:1;min-width:0">
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:10px">
         <div class="pm-name" style="color:#0f9389">✉️ Admin Mailbox</div>
-        <div class="pm-sub" id="mb-sub">Send HTML email from admin@fibpmo.com · read threaded replies</div>
+        <div class="pm-sub" id="mb-sub" style="margin:0">admin@fibpmo.com · threaded, with attachments</div>
       </div>
       <button class="btn-modal ghost" onclick="closeModal('mail-modal')">Close</button>
     </div>
     <div class="mb-wrap">
-      <div class="mb-side">
-        <div class="mb-tabs">
-          <button class="mb-tab active" id="mb-tab-inbox" onclick="mbSwitch('inbox')">Inbox <span class="mb-cnt" id="mb-cnt-inbox">0</span></button>
-          <button class="mb-tab" id="mb-tab-sent" onclick="mbSwitch('sent')">Sent <span class="mb-cnt" id="mb-cnt-sent">0</span></button>
-        </div>
-        <button class="mb-compose-btn" onclick="mbCompose()">✎ Compose</button>
+      <div class="mb-rail">
+        <button class="mb-compose-btn" onclick="mbCompose()">✎ &nbsp;Compose</button>
+        <button class="mb-folder active" id="mb-tab-inbox" onclick="mbSwitch('inbox')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          <span>Inbox</span><span class="mb-cnt" id="mb-cnt-inbox">0</span>
+        </button>
+        <button class="mb-folder" id="mb-tab-sent" onclick="mbSwitch('sent')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span>Sent</span><span class="mb-cnt" id="mb-cnt-sent">0</span>
+        </button>
+        <div class="mb-rail-foot">FIB PMO Mailbox</div>
+      </div>
+      <div class="mb-listpane">
         <input class="mb-search" id="mb-search" type="search" placeholder="Search mail…" oninput="mbRenderList()">
         <div class="mb-list" id="mb-list"></div>
       </div>
@@ -2275,10 +2298,6 @@ CC: @cc</textarea>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Activity Log
         </button>
-        <button class="chip chip-lg" id="mailbox-btn" onclick="openMailModal()" title="Admin Mailbox — send HTML emails from admin@fibpmo.com and read threaded replies">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
-          Mailbox <span id="mailbox-badge" style="display:none;background:#dc2626;color:#fff;padding:1px 7px;border-radius:999px;margin-left:2px;font-family:'JetBrains Mono',monospace;font-size:11px">0</span>
-        </button>
         <!-- Vertical divider -->
         <span style="width:1px;height:24px;background:#e2e8f0;margin:0 4px"></span>
         <!-- Output buttons -->
@@ -2298,6 +2317,12 @@ CC: @cc</textarea>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="menu-items" id="more-menu">
+          <div class="menu-section-label">Communication</div>
+          <button class="menu-item" onclick="openMailModal();closeMoreMenu()" title="Admin Mailbox — send HTML email from admin@fibpmo.com and read threaded replies">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+            <div class="menu-item-text"><div>Mailbox <span id="mailbox-badge" style="display:none;background:#dc2626;color:#fff;padding:0 6px;border-radius:999px;font-size:10px;font-weight:800;margin-left:4px">0</span></div><div class="menu-item-sub">Send &amp; read email from admin@fibpmo.com</div></div>
+          </button>
+
           <div class="menu-section-label">Snapshots</div>
           <button class="menu-item" onclick="saveSnapshotNow();closeMoreMenu()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
