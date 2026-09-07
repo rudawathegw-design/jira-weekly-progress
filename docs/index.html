@@ -1373,13 +1373,23 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
     var m = new RegExp('class="' + cls + '"[^>]*>([^<]*)<').exec(html);
     return m ? m[1].trim() : '';
   }
-  fetch(U,{cache:'no-store'}).then(function(r){
-    var lm = r.headers.get('Last-Modified') || r.headers.get('last-modified');
-    return r.text().then(function(html){ return { lm: lm, html: html }; });
-  }).then(function(o){
-    elT.textContent = (o.lm && fmt(o.lm)) || 'updated recently';
-    if (elV){ var v = pick(o.html, 'v'), rel = pick(o.html, 'rel');
-      elV.textContent = (v + (rel ? ' ' + rel : '')).trim() || '—'; }
+  var BASE = 'https://rudawathegw-design.github.io/fibpmo/';
+  // Prefer build.json (has the auto build number); fall back to scraping.
+  fetch(BASE + 'build.json', {cache:'no-store'}).then(function(r){ return r.ok ? r.json() : null; }).then(function(b){
+    if (!b) return false;
+    if (elV) elV.textContent = ('v' + b.version + (b.rel ? ' ' + b.rel : '') + (b.build ? ' · build ' + b.build : '')).trim();
+    elT.textContent = (b.builtAt && fmt(b.builtAt)) || 'updated recently';
+    return true;
+  }).then(function(done){
+    if (done) return;
+    fetch(U,{cache:'no-store'}).then(function(r){
+      var lm = r.headers.get('Last-Modified') || r.headers.get('last-modified');
+      return r.text().then(function(html){ return { lm: lm, html: html }; });
+    }).then(function(o){
+      elT.textContent = (o.lm && fmt(o.lm)) || 'updated recently';
+      if (elV){ var v = pick(o.html, 'v'), rel = pick(o.html, 'rel');
+        elV.textContent = (v + (rel ? ' ' + rel : '')).trim() || '—'; }
+    }).catch(function(){ elT.textContent = 'unavailable'; if (elV) elV.textContent = ''; });
   }).catch(function(){ elT.textContent = 'unavailable'; if (elV) elV.textContent = ''; });
 })();
 </script>
