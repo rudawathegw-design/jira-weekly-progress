@@ -1,0 +1,54 @@
+name: auto-version
+
+# On every push to main, stamp docs/build.json with the current build number
+# (commit count), short commit SHA and Baghdad timestamp. The version badge on
+# the report reads this file at runtime, so the displayed version/build/commit
+# always match the latest deploy — no manual bumping.
+#
+# No loop: the commit this job pushes is made with GITHUB_TOKEN, which does not
+# re-trigger workflows; the actor guard and paths-ignore are extra insurance.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/build.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-version
+  cancel-in-progress: false
+
+jobs:
+  stamp:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Write build.json
+        run: |
+          VERSION=$(grep -oE '^SITE_VERSION = "[^"]+"' src/build_site.py | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          [ -z "$VERSION" ] && VERSION="0.0.0"
+          BUILD=$(git rev-list --count HEAD)
+          SHA=$(git rev-parse --short=7 HEAD)
+          TIME=$(TZ=Asia/Baghdad date +"%Y-%m-%dT%H:%M:%S%z")
+          mkdir -p docs
+          printf '{"version":"%s","build":%s,"commit":"%s","builtAt":"%s"}\n' "$VERSION" "$BUILD" "$SHA" "$TIME" > docs/build.json
+          echo "Stamped:"; cat docs/build.json
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- docs/build.json; then
+            echo "build.json unchanged — nothing to commit."
+            exit 0
+          fi
+          git add docs/build.json
+          git commit -m "chore(version): stamp build [auto-version]"
+          git push

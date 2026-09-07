@@ -1380,11 +1380,11 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
   <div class="ver-badge" id="ver-badge" title="Report build — v__VERSION__, built __BUILD_TIME__ (commit __COMMIT__)">
     <span class="pmo-upd-lbl" style="color:#1366cc">Report</span>
     <span class="ver-sep">·</span>
-    <span class="ver-num">v__VERSION__</span>
+    <span class="ver-num" id="rep-ver-num">v__VERSION__</span>
     <span class="ver-sep">·</span>
     <span id="rep-ver-time">__BUILD_TIME__</span>
     <span class="ver-sep">·</span>
-    <span>__COMMIT__</span>
+    <span id="rep-ver-commit">__COMMIT__</span>
   </div>
   <div class="pmo-upd" id="pmo-upd-badge" title="PMO dashboard — version and last deploy time (Baghdad)">
     <span class="pmo-upd-dot"></span>
@@ -1422,18 +1422,28 @@ footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:6px;
 </script>
 
 <script>
-/* Report badge shows its OWN last-deploy time (the page's Last-Modified header)
-   so the date always reflects the latest deploy automatically — no rebuild or
-   manual bump needed. Falls back to the build-stamped value if unavailable. */
+/* Report badge auto-fills from build.json (written by the auto-version workflow
+   on every push) so the version, build number and commit always reflect the
+   latest deploy; the date comes from the page's own Last-Modified header. All
+   fall back to the values baked at build time if a fetch fails. */
 (function(){
-  var el=document.getElementById('rep-ver-time'); if(!el) return;
-  try{
+  var elT=document.getElementById('rep-ver-time');
+  if(elT){
     fetch(location.href,{method:'HEAD',cache:'no-store'}).then(function(r){
       var lm=r.headers.get('Last-Modified'); if(!lm) return;
       var d=new Date(lm); if(isNaN(d.getTime())) return;
-      el.textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Baghdad',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).format(d)+' Baghdad';
+      elT.textContent=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Baghdad',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}).format(d)+' Baghdad';
     }).catch(function(){});
-  }catch(e){}
+  }
+  fetch('build.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(b){
+    if(!b) return;
+    var v=document.getElementById('rep-ver-num');
+    if(v&&b.version) v.textContent='v'+b.version+(b.build?(' · build '+b.build):'');
+    var c=document.getElementById('rep-ver-commit');
+    if(c&&b.commit) c.textContent=b.commit;
+    var badge=document.getElementById('ver-badge');
+    if(badge&&b.version) badge.title='Report — v'+b.version+(b.build?(' (build '+b.build+')'):'')+', commit '+(b.commit||'');
+  }).catch(function(){});
 })();
 </script>
 
