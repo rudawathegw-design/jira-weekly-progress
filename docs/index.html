@@ -4649,6 +4649,24 @@ async function checkPw(){
       return;
     }
   }
+  // Hidden shortcut — type "pci" to jump straight to the PCI DSS cockpit.
+  {
+    const _P = {h:"d72ce55d0d4f502a887c533f3a719998534aaf7486d8c11729d9603d56e0dadc",
+                s:"dDqQ8gohQfEHHY6CmI+cdg==",i:"RNjrBXwMvDhVg5zz",
+                c:"StgTZpXjPHWTR2FzCSYVkZfHJMqFcvzZKY8aQ9qQxifUsJpEw2sZ",it:100000};
+    const _t = v.trim().toLowerCase();
+    const _d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(_t));
+    const _hex = Array.from(new Uint8Array(_d)).map(x=>x.toString(16).padStart(2,'0')).join('');
+    if (_hex === _P.h) {
+      const _u = s => { const r=atob(s),a=new Uint8Array(r.length); for(let k=0;k<r.length;k++)a[k]=r.charCodeAt(k); return a; };
+      const _km = await crypto.subtle.importKey('raw', new TextEncoder().encode(_t), 'PBKDF2', false, ['deriveKey']);
+      const _k = await crypto.subtle.deriveKey({name:'PBKDF2',salt:_u(_P.s),iterations:_P.it,hash:'SHA-256'},
+        _km, {name:'AES-GCM',length:256}, false, ['decrypt']);
+      const _pt = await crypto.subtle.decrypt({name:'AES-GCM',iv:_u(_P.i)}, _k, _u(_P.c));
+      window.top.location.href = new TextDecoder().decode(_pt);
+      return;
+    }
+  }
   if (!v) return;
   err.textContent = 'Decrypting…';
   try {
